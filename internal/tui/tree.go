@@ -2,6 +2,7 @@ package tui
 
 import (
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -724,4 +725,44 @@ func truncateLeft(t ui.Theme, s string, w int) string {
 		r = r[1:]
 	}
 	return string(tail) + string(r)
+}
+
+// foldedIDs lists the containers that are currently folded, sorted, for
+// persistence (plan §0, D6).
+func (tv *treeState) foldedIDs() []model.ID {
+	var out []model.ID
+	for id, n := range tv.nodes {
+		if n.kind != rowRequest && tv.known[id] && !tv.expanded[id] {
+			out = append(out, id)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
+// seedFolds applies a persisted fold state before the first workspace is
+// indexed: listed containers start folded and every other container starts
+// open, so the user's last layout returns exactly. An empty list keeps the
+// size-based default.
+func (tv *treeState) seedFolds(folded []model.ID, ws *model.Workspace) {
+	if len(folded) == 0 || ws == nil {
+		return
+	}
+	closed := make(map[model.ID]bool, len(folded))
+	for _, id := range folded {
+		closed[id] = true
+	}
+	mark := func(id model.ID) {
+		tv.known[id] = true
+		tv.expanded[id] = !closed[id]
+	}
+	for _, c := range ws.Collections {
+		mark(c.ID)
+		_ = c.Walk(func(it model.Item, _ model.Container, _ int) error {
+			if f, ok := it.(*model.Folder); ok {
+				mark(f.ID)
+			}
+			return nil
+		})
+	}
 }

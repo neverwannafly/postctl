@@ -32,7 +32,7 @@ func (q *saveQueue) busy() bool { return q.running || len(q.ops) > 0 }
 
 // queueSave snapshots c and schedules a write.
 func (a *app) queueSave(c *model.Collection) tea.Cmd {
-	op := saveOp{id: c.ID, name: c.Name, snap: deepCopy(c)}
+	op := saveOp{id: c.ID, name: c.Name, snap: c.Clone()}
 	q := &a.saver
 	// Coalesce with a not-yet-started save of the same collection.
 	start := 0
@@ -106,4 +106,47 @@ func (a *app) onSaved(msg savedMsg) tea.Cmd {
 		cmds = append(cmds, a.quit(true))
 	}
 	return tea.Batch(cmds...)
+}
+
+// ---- fold state -------------------------------------------------------------
+
+const foldPersistDelay = 400 * time.Millisecond
+
+// foldPersistMsg fires after the fold state has been quiet for a moment.
+type foldPersistMsg struct{ seq int }
+
+// syncFold schedules persisting the tree's fold state when it changed. The
+// write is debounced so holding an arrow key over a folder never hits the
+// disk more than once.
+func (a *app) syncFold() tea.Cmd {
+	if a.phase != phaseReady || a.ws == nil {
+		return nil
+	}
+	cur := a.tree.foldedIDs()
+	if sameIDs(cur, a.state.Folded) {
+		return nil
+	}
+	a.foldSeq++
+	seq := a.foldSeq
+	return tea.Tick(foldPersistDelay, func(time.Time) tea.Msg { return foldPersistMsg{seq: seq} })
+}
+
+func (a *app) onFoldPersist(msg foldPersistMsg) tea.Cmd {
+	if msg.seq != a.foldSeq {
+		return nil
+	}
+	a.state.Folded = a.tree.foldedIDs()
+	return a.persistState()
+}
+
+func sameIDs(x, y []model.ID) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
 }

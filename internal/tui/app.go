@@ -110,6 +110,7 @@ type app struct {
 	toast    *toastState
 	toastSeq int
 
+	foldSeq        int
 	saver          saveQueue
 	quitting       bool
 	selfWriteUntil time.Time
@@ -211,7 +212,7 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		return a, a.setDark(msg.IsDark())
 	case tea.KeyPressMsg:
-		return a, a.onKey(msg)
+		return a, tea.Batch(a.onKey(msg), a.syncFold())
 	case tea.PasteMsg:
 		return a, a.onPaste(msg)
 	case showLoadingMsg:
@@ -257,6 +258,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.loadCmd(nil)
 	case quitNowMsg:
 		return a, a.quit(true)
+	case foldPersistMsg:
+		return a, a.onFoldPersist(msg)
 	}
 	// Anything else (including pane-private messages) goes to both panes.
 	return a, a.forward(msg)
@@ -300,6 +303,9 @@ func (a *app) onLoaded(msg loadedMsg) tea.Cmd {
 	}
 	if a.activeEnv != "" && a.ws.Environment(a.activeEnv) == nil {
 		a.activeEnv = "" // the environment was deleted on disk
+	}
+	if first {
+		a.tree.seedFolds(a.state.Folded, a.ws)
 	}
 	a.tree.setWorkspace(a.ws, a.problems, a.be.Root())
 	a.layoutPanes()

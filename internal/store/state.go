@@ -16,6 +16,9 @@ type State struct {
 	// ActiveEnvironment is the ID of the selected environment, or empty for
 	// none.
 	ActiveEnvironment model.ID `yaml:"activeEnvironment,omitempty"`
+	// Folded lists the IDs of collections and folders the user has folded in
+	// the tree (plan §0, D6). Containers not listed follow the default.
+	Folded []model.ID `yaml:"folded,omitempty"`
 }
 
 // LoadState reads local state. A missing file yields the zero State.
