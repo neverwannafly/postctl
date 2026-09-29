@@ -269,6 +269,18 @@ _ = s.SaveCollection(ctx, c)                           // create / rename / move
 _ = s.SaveRequest(ctx, c, id)                          // fast path for content-only edits
 p, _ := s.PathOf(c, id)                                // YAML path, for $EDITOR
 _ = s.SaveEnvironment(ctx, env); _ = s.SaveGlobals(ctx, g)
+_ = s.UpdateEnvironmentVariables(ctx, id, mutate)      // narrow: re-read, change some variables, keep the rest
+_ = s.UpdateCollectionVariables(ctx, id, mutate); _ = s.UpdateGlobalsVariables(ctx, mutate)
 _ = s.DeleteCollection(ctx, id); _ = s.DeleteEnvironment(ctx, id)
 st, _ := s.LoadState(); _ = s.SaveState(st)            // .postctl/state.yaml (active environment)
 ```
+
+Every writer above takes the workspace write lock (a per-directory mutex plus an
+advisory `flock` on `.postctl/store.lock`) for its whole read-modify-write, so
+handles in one process and separate processes (the TUI and `postctl run`) never
+interleave. Writes stay atomic (temp file and rename). The `Update*Variables`
+methods re-read the file under the lock and hand its variables to a `mutate`
+callback; callers that only change some keys (the engine after a send, `postctl
+env set`) use them so they never write back a stale snapshot. Whole-file savers
+(`SaveEnvironment`, the TUI's editors) still replace the file with what they
+hold.

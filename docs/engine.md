@@ -119,21 +119,22 @@ values stay live for the rest of a run.
   the store moves the value to the `SecretStore`. Only secrets a script
   changed are handed to the store with a value, so an untouched secret is saved
   by reference and never re-written to the Keychain.
-- **Concurrency.** All persistence runs under one mutex per workspace
-  directory (shared by every `Engine` in the process). Concurrent sends start
-  from the same stale copy of the environment, so each persist first replays the
-  changes other sends committed since it started (an in-memory commit log,
-  1,024 entries) and then applies its own on top. Writes to different variables
-  never get lost; writes to the same variable are last-writer-wins.
+- **Concurrency.** The engine never writes back the snapshot it took when the
+  send started. Each persist hands the store only the keys the send changed
+  (`UpdateEnvironmentVariables`, `UpdateCollectionVariables`,
+  `UpdateGlobalsVariables`); the store re-reads the file under the workspace
+  write lock, applies those keys, and writes it atomically (temp file and
+  rename), keeping everything else as it is on disk: other variables, the
+  environment name and `production` flag, and every secret it did not touch.
+  The lock is a per-directory mutex plus an advisory `flock` on
+  `.postctl/store.lock`, and every store writer takes it (the TUI's saves, the
+  CLI's `env set`, imports, the engine), so a TUI edit, a send and a
+  `postctl run` in another terminal never drop each other's variables. Writes
+  to the same key are last-writer-wins.
 - **No environment selected.** An environment write cannot be saved; the send
   gets a warning.
 - **Globals** come from `SendInput.Globals` or, when nil, from `globals.yaml`
   (cached by size and mtime). A missing file is created on the first write.
-
-Known limit: the store has no narrow "save collection variables" call, so a
-collection-variable write saves the collection snapshot taken when the send
-started. An edit to that collection made while the send was in flight can be
-reverted on disk. Environment and globals writes are not affected.
 
 ## Cookies and `pm.sendRequest`
 

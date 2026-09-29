@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sync"
 	"time"
 
@@ -13,39 +12,16 @@ import (
 	"github.com/shubham/postctl/internal/vars"
 )
 
-const (
-	persistTimeout = 30 * time.Second
-	// commitLogSize bounds the commit log. A send that overlaps more than
-	// this many other commits loses the oldest ones, which only matters
-	// for writes to the very same variable.
-	commitLogSize = 1024
-	globalsOwner  = model.ID("globals")
-)
+const persistTimeout = 30 * time.Second
 
 // workspace is the state shared by every Engine (and every send) working on
-// one workspace directory in this process.
+// one workspace directory in this process. Writes are serialised by the store
+// (see store.Store.UpdateEnvironmentVariables), not here.
 type workspace struct {
-	// mu serialises persistence, so concurrent sends never interleave their
-	// read-modify-write of the same file.
-	mu  sync.Mutex
-	seq uint64
-	log []commit
-
 	globalsMu   sync.Mutex
 	globalsInfo os.FileInfo
 	globals     *model.Globals
 	globalsRead bool
-}
-
-// commit is one persisted change set. Sessions replay commits made by other
-// sessions since they started, so a persist adds to what is already on disk
-// instead of overwriting it with a stale snapshot.
-type commit struct {
-	seq     uint64
-	session uint64
-	scope   vars.Scope
-	owner   model.ID
-	changes []vars.Change
 }
 
 var (
@@ -62,13 +38,6 @@ func workspaceFor(root string) *workspace {
 		workspaces[root] = w
 	}
 	return w
-}
-
-// currentSeq is the sequence number a new session starts from.
-func (w *workspace) currentSeq() uint64 {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.seq
 }
 
 // loadGlobals returns a copy of the globals on disk, or nil when the
@@ -139,13 +108,9 @@ func (s *session) persist(ctx context.Context, progress func(Step)) (saved, warn
 		progress(Step{Kind: StepSave, Text: stepSave})
 	}
 
-	w := s.e.ws
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	pctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), persistTimeout)
 	defer cancel()
 
-	var commits []commit
 	if changes, ok := pending[vars.Environment]; ok {
 		if s.env == nil {
 			warnings = append(warnings, "No environment is selected, so environment variable changes were not saved")
@@ -153,7 +118,6 @@ func (s *session) persist(ctx context.Context, progress func(Step)) (saved, warn
 			warnings = append(warnings, fmt.Sprintf("Could not save environment variables: %v", err))
 		} else {
 			saved = append(saved, "environment")
-			commits = append(commits, commit{scope: vars.Environment, owner: s.env.ID, changes: changes})
 		}
 	}
 	if changes, ok := pending[vars.Collection]; ok {
@@ -161,7 +125,6 @@ func (s *session) persist(ctx context.Context, progress func(Step)) (saved, warn
 			warnings = append(warnings, fmt.Sprintf("Could not save collection variables: %v", err))
 		} else {
 			saved = append(saved, "collection")
-			commits = append(commits, commit{scope: vars.Collection, owner: s.collection.ID, changes: changes})
 		}
 	}
 	if changes, ok := pending[vars.Global]; ok {
@@ -169,103 +132,51 @@ func (s *session) persist(ctx context.Context, progress func(Step)) (saved, warn
 			warnings = append(warnings, fmt.Sprintf("Could not save global variables: %v", err))
 		} else {
 			saved = append(saved, "globals")
-			commits = append(commits, commit{scope: vars.Global, owner: globalsOwner, changes: changes})
 		}
 	}
-	for _, c := range commits {
-		w.seq++
-		c.seq, c.session = w.seq, s.id
-		w.log = append(w.log, c)
-	}
-	if extra := len(w.log) - commitLogSize; extra > 0 {
-		w.log = append([]commit(nil), w.log[extra:]...)
-	}
-	s.seen = w.seq
 	s.refreshSecrets()
 	return saved, warnings
 }
 
-// replay applies the commits other sessions made to owner's scope since this
-// session last looked, so this session's own changes land on top of them. The
-// caller holds w.mu.
-func (s *session) replay(scope vars.Scope, owner model.ID) []vars.Change {
-	var out []vars.Change
-	for _, c := range s.e.ws.log {
-		if c.seq > s.seen && c.session != s.id && c.scope == scope && c.owner == owner {
-			out = append(out, c.changes...)
-		}
-	}
-	return out
-}
+// The persist functions write only the keys a send changed. Each one hands
+// the store a mutation, and the store applies it to the variables it has just
+// re-read from disk under its workspace lock. The session's clone (taken when
+// the send started) is never written back, so a variable a TUI edit or a
+// concurrent `postctl run` added in the meantime survives. The session's own
+// clone is updated in memory so later steps and the history redactor see the
+// written values. Writes to the same key are last-writer-wins.
 
 func (s *session) persistEnvironment(ctx context.Context, changes []vars.Change) error {
-	before := s.env.Variables
-	theirs := s.replay(vars.Environment, s.env.ID)
-	vars.Apply(nil, s.env, nil, map[vars.Scope][]vars.Change{vars.Environment: theirs})
 	vars.Apply(nil, s.env, nil, map[vars.Scope][]vars.Change{vars.Environment: changes})
-	if reflect.DeepEqual(before, s.env.Variables) {
-		return nil
-	}
-	out := *s.env
-	out.Variables = writable(s.env.Variables, changes, theirs)
-	return s.e.cfg.Store.SaveEnvironment(ctx, &out)
+	return s.e.cfg.Store.UpdateEnvironmentVariables(ctx, s.env.ID, func(current []model.Variable) []model.Variable {
+		env := &model.Environment{Variables: current}
+		vars.Apply(nil, env, nil, map[vars.Scope][]vars.Change{vars.Environment: changes})
+		return env.Variables
+	})
 }
 
 func (s *session) persistCollection(ctx context.Context, changes []vars.Change) error {
-	before := s.collection.Variables
-	theirs := s.replay(vars.Collection, s.collection.ID)
-	vars.Apply(nil, nil, s.collection, map[vars.Scope][]vars.Change{vars.Collection: theirs})
 	vars.Apply(nil, nil, s.collection, map[vars.Scope][]vars.Change{vars.Collection: changes})
-	if reflect.DeepEqual(before, s.collection.Variables) {
-		return nil
-	}
-	out := *s.collection
-	out.Variables = writable(s.collection.Variables, changes, theirs)
-	return s.e.cfg.Store.SaveCollectionVariables(ctx, out.ID, out.Variables)
+	return s.e.cfg.Store.UpdateCollectionVariables(ctx, s.collection.ID, func(current []model.Variable) []model.Variable {
+		c := &model.Collection{Variables: current}
+		vars.Apply(nil, nil, c, map[vars.Scope][]vars.Change{vars.Collection: changes})
+		return c.Variables
+	})
 }
 
 func (s *session) persistGlobals(ctx context.Context, changes []vars.Change) error {
 	workspace := &model.Workspace{Globals: s.globals}
-	var before []model.Variable
-	if s.globals != nil {
-		before = s.globals.Variables
-	}
-	theirs := s.replay(vars.Global, globalsOwner)
-	vars.Apply(workspace, nil, nil, map[vars.Scope][]vars.Change{vars.Global: theirs})
 	vars.Apply(workspace, nil, nil, map[vars.Scope][]vars.Change{vars.Global: changes})
 	s.globals = workspace.Globals
-	if s.globals == nil || reflect.DeepEqual(before, s.globals.Variables) {
-		return nil
-	}
-	out := *s.globals
-	out.Variables = writable(s.globals.Variables, changes, theirs)
-	if err := s.e.cfg.Store.SaveGlobals(ctx, &out); err != nil {
+	if err := s.e.cfg.Store.UpdateGlobalsVariables(ctx, func(current []model.Variable) []model.Variable {
+		g := &model.Workspace{Globals: &model.Globals{Variables: current}}
+		vars.Apply(g, nil, nil, map[vars.Scope][]vars.Change{vars.Global: changes})
+		return g.Globals.Variables
+	}); err != nil {
 		return err
 	}
 	s.e.invalidateGlobals()
 	return nil
-}
-
-// writable returns a copy of variables safe to hand to the store. The session
-// holds hydrated secret values in memory; the store would write every one of
-// them back to the Keychain on each save, which is slow and pointless. Only
-// the secrets a script changed keep their value, the rest are saved by
-// reference.
-func writable(variables []model.Variable, changes ...[]vars.Change) []model.Variable {
-	changed := map[string]bool{}
-	for _, list := range changes {
-		for _, c := range list {
-			changed[c.Key] = true
-		}
-	}
-	out := make([]model.Variable, len(variables))
-	copy(out, variables)
-	for i := range out {
-		if out[i].IsSecret() && out[i].SecretRef != "" && !changed[out[i].Key] {
-			out[i].Value = ""
-		}
-	}
-	return out
 }
 
 // applyPendingInMemory merges script variable writes into the session's model

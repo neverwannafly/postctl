@@ -25,8 +25,6 @@ import (
 type session struct {
 	e  *Engine
 	id uint64
-	// seen is the last commit sequence number this session has accounted for.
-	seen uint64
 
 	// collection, env and globals are deep copies taken when the session
 	// started, with secret variable values hydrated. Nothing outside the
@@ -76,7 +74,6 @@ func (e *Engine) newSession(
 		}
 		s.globals = g
 	}
-	s.seen = e.ws.currentSeq()
 
 	missing := 0
 	hydrate := func(list []model.Variable) error {
