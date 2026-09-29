@@ -11,7 +11,7 @@ Extraction is feasible in pure Go. `goleveldb` can open Chromium's LevelDB when
 given a comparator named `idb_cmp1`, and a sequential scan avoids key-range
 assumptions. Values in the current cache decode with a focused implementation of
 the IndexedDB envelope, Blink `SerializedScriptValue` envelope, Snappy wrapper,
-and V8 `ValueSerializer` tags.
+external blob indirection, and V8 `ValueSerializer` tags.
 
 The desktop cache is intentionally partial. Coverage and unresolved-reference
 counts are part of every extraction; a Postman “File → Export” remains the
@@ -71,7 +71,8 @@ The Go decoder supports null/undefined/hole, booleans, signed and unsigned
 integers, doubles, BigInt, UTF-8/one-byte/two-byte strings, objects, dense and
 sparse arrays, object references, dates, maps, sets, array buffers, and wrapped
 primitive values. Snappy-compressed values are recursively decoded. External
-blob metadata is recognized; unresolved external values contribute to coverage.
+blob metadata resolves to the copied `.indexeddb.blob/<database>/<bucket>/<id>`
+file and the resulting Blink value is decoded recursively.
 
 ## Current record shapes
 
@@ -149,8 +150,6 @@ Partial examples are emitted only if the cache contains a decoded response.
 
 - The cache can omit collections, request details, examples, test scripts, or
   globals. The extractor cannot reconstruct data absent from IndexedDB.
-- External blob spill values are detected but not yet resolved through blob
-  metadata. None were required by current live collection/environment records.
 - Rare V8 host objects, regular expressions, typed-array views, WebAssembly
   transfers, and error objects are unsupported.
 - The structural validator checks required Collection v2.1 shape and schema URL;
