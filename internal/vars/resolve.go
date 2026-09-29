@@ -2,7 +2,6 @@ package vars
 
 import (
 	"errors"
-	"maps"
 	"net/url"
 	"sort"
 	"strings"
@@ -23,7 +22,7 @@ func ResolveRequest(
 	if store == nil {
 		return nil, errors.New("resolve request: nil variable store")
 	}
-	resolved := cloneRequest(req)
+	resolved := req.Clone()
 	resolved.Name = store.Replace(resolved.Name)
 	resolved.Method = store.Replace(resolved.Method)
 	resolved.URL.Raw = store.Replace(resolved.URL.Raw)
@@ -60,7 +59,7 @@ func ResolveRequest(
 	if auth == nil || auth.IsInherit() {
 		auth = &model.Auth{Type: model.AuthNone}
 	}
-	resolved.Auth = cloneAuth(auth)
+	resolved.Auth = auth.Clone()
 	resolveAuth(resolved.Auth, store)
 	return resolved, nil
 }
@@ -207,124 +206,4 @@ func resolveAny(value any, store Store) any {
 	default:
 		return value
 	}
-}
-
-func cloneRequest(req *model.Request) *model.Request {
-	if req == nil {
-		return nil
-	}
-	cloned := *req
-	cloned.URL.Query = append([]model.KV(nil), req.URL.Query...)
-	cloned.URL.PathVars = append([]model.Variable(nil), req.URL.PathVars...)
-	cloned.Headers = append([]model.KV(nil), req.Headers...)
-	cloned.Body.URLEncoded = append([]model.KV(nil), req.Body.URLEncoded...)
-	cloned.Body.FormData = append([]model.FormPart(nil), req.Body.FormData...)
-	cloned.Body.Extra = cloneMap(req.Body.Extra)
-	if req.Body.GraphQL != nil {
-		graphql := *req.Body.GraphQL
-		cloned.Body.GraphQL = &graphql
-	}
-	cloned.Auth = cloneAuth(req.Auth)
-	cloned.Scripts = cloneScripts(req.Scripts)
-	cloned.Settings.Extra = cloneMap(req.Settings.Extra)
-	cloned.Extra = cloneMap(req.Extra)
-	cloned.Examples = make([]model.Example, len(req.Examples))
-	for i := range req.Examples {
-		cloned.Examples[i] = req.Examples[i]
-		cloned.Examples[i].Headers = append([]model.KV(nil), req.Examples[i].Headers...)
-		cloned.Examples[i].Cookies = append([]model.Cookie(nil), req.Examples[i].Cookies...)
-		cloned.Examples[i].Extra = cloneMap(req.Examples[i].Extra)
-		cloned.Examples[i].OriginalRequest = cloneRequest(req.Examples[i].OriginalRequest)
-	}
-	return &cloned
-}
-
-func cloneScripts(scripts model.Scripts) model.Scripts {
-	result := scripts
-	if scripts.PreRequest != nil {
-		pre := *scripts.PreRequest
-		result.PreRequest = &pre
-	}
-	if scripts.Test != nil {
-		test := *scripts.Test
-		result.Test = &test
-	}
-	return result
-}
-
-func cloneAuth(auth *model.Auth) *model.Auth {
-	if auth == nil {
-		return nil
-	}
-	cloned := *auth
-	if auth.Bearer != nil {
-		value := *auth.Bearer
-		cloned.Bearer = &value
-	}
-	if auth.Basic != nil {
-		value := *auth.Basic
-		cloned.Basic = &value
-	}
-	if auth.APIKey != nil {
-		value := *auth.APIKey
-		cloned.APIKey = &value
-	}
-	if auth.Digest != nil {
-		value := *auth.Digest
-		cloned.Digest = &value
-	}
-	if auth.OAuth2 != nil {
-		value := *auth.OAuth2
-		value.Extra = cloneMap(auth.OAuth2.Extra)
-		if auth.OAuth2.Token != nil {
-			token := *auth.OAuth2.Token
-			value.Token = &token
-		}
-		cloned.OAuth2 = &value
-	}
-	if auth.AWSV4 != nil {
-		value := *auth.AWSV4
-		cloned.AWSV4 = &value
-	}
-	if auth.Hawk != nil {
-		value := *auth.Hawk
-		cloned.Hawk = &value
-	}
-	if auth.NTLM != nil {
-		value := *auth.NTLM
-		cloned.NTLM = &value
-	}
-	cloned.Raw = cloneMap(auth.Raw)
-	return &cloned
-}
-
-func cloneMap(source map[string]any) map[string]any {
-	if source == nil {
-		return nil
-	}
-	result := maps.Clone(source)
-	for key, value := range result {
-		switch typed := value.(type) {
-		case map[string]any:
-			result[key] = cloneMap(typed)
-		case []any:
-			result[key] = cloneSlice(typed)
-		}
-	}
-	return result
-}
-
-func cloneSlice(source []any) []any {
-	result := make([]any, len(source))
-	for i, value := range source {
-		switch typed := value.(type) {
-		case map[string]any:
-			result[i] = cloneMap(typed)
-		case []any:
-			result[i] = cloneSlice(typed)
-		default:
-			result[i] = value
-		}
-	}
-	return result
 }
