@@ -278,6 +278,10 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	case rowAction:
 		val = th.Render(ui.AccentPrimary, r.value)
 	case rowInfo:
+		if r.label == "" {
+			// A sentence, not a field: use the label column too.
+			return marker + th.Render(ui.TextSecondary, th.Truncate(r.value, valW+labelW+1))
+		}
 		val = th.Render(ui.TextSecondary, th.Truncate(r.value, valW))
 	}
 	line := marker + label + " " + val
