@@ -37,6 +37,8 @@ type harness struct {
 	clip   []string
 	deps   Deps
 	be     tui.Backend
+	theme  ui.Theme
+	w, h   int
 }
 
 func newRequest() *model.Request {
@@ -84,9 +86,14 @@ func newHarness(t *testing.T, opts ...option) *harness {
 	for _, o := range opts {
 		o(h)
 	}
-	th := ui.NewTheme(true, false, false)
-	h.p = New(tui.PaneEnv{Theme: th, Actions: &tui.Registry{}, Backend: h.be}, h.deps)
-	h.p.SetSize(80, 24)
+	if h.w == 0 {
+		h.w, h.h = 80, 24
+	}
+	if h.theme.Glyphs.Select == "" {
+		h.theme = ui.NewTheme(true, false, false)
+	}
+	h.p = New(tui.PaneEnv{Theme: h.theme, Actions: &tui.Registry{}, Backend: h.be}, h.deps)
+	h.p.SetSize(h.w, h.h)
 	h.send(tui.WorkspaceReloadedMsg{Workspace: h.ws})
 	h.send(tui.EnvironmentChangedMsg{Env: h.env})
 	h.send(tui.SelectionMsg{Ref: h.ref(), Open: true})

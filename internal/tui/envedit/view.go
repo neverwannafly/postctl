@@ -274,7 +274,7 @@ func (m *Model) rightPane(w, h int) string {
 func (m *Model) tablePane(w, h int, name, note string) string {
 	t := m.th
 	rows := m.rows()
-	header := t.Section(name, itoa(len(rows))+" variables", m.zone == zTable) + "  " + t.Render(ui.TextQuiet, t.Truncate(note, max(4, w-ui.Width(name)-16)))
+	header := t.Section(name, plural(len(rows), "variable"), m.zone == zTable) + "  " + t.Render(ui.TextQuiet, t.Truncate(note, max(4, w-ui.Width(name)-16)))
 	header = t.Truncate(header, w)
 	if len(rows) == 0 && !m.edit {
 		empty := t.Render(ui.TextSecondary, "No variables. Press a to add one.")
@@ -338,4 +338,11 @@ func scroll(top, cur, rows, n int) int {
 		top = cur - rows + 1
 	}
 	return max(0, min(top, max(0, n-rows)))
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return itoa(n) + " " + word + "s"
 }
