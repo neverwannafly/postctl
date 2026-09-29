@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7008-bef4-79cf4609f916
+name: Get customer
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/v1/customers/{{customerId}}'

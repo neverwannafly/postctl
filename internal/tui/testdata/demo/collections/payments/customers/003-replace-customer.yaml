@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7009-905c-035ffcf68fcd
+name: Replace customer
+kind: http
+method: PUT
+url:
+  raw: '{{baseUrl}}/v1/customers/{{customerId}}'

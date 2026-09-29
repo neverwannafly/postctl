@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-700a-80d1-d5f940743c51
+name: Health
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/health'

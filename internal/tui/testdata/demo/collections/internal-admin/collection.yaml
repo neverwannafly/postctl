@@ -1,0 +1,7 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-700b-9c38-ec7278dbd095
+name: Internal admin
+order:
+  - 001-list-users
+  - 002-ban-user
+  - 003-preflight

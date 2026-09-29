@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-700e-a5e9-3dc48a25fda5
+name: Preflight
+kind: http
+method: OPTIONS
+url:
+  raw: '{{baseUrl}}/admin/users'

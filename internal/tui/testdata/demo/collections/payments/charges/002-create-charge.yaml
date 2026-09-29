@@ -1,0 +1,14 @@
+id: 01a0ee73-dcba-7003-b55b-d2475bc05f06
+name: Create charge
+description: |-
+  Charge a card.
+
+  Second paragraph.
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/v1/charges'
+body:
+  mode: raw
+  raw: '{"amount": {{amount}}, "currency": "usd"}'
+  language: json

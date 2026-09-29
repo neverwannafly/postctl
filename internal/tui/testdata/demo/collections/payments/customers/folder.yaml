@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7006-9bd4-3d1ad9c72ce0
+name: Customers
+order:
+  - 001-create-customer
+  - 002-get-customer
+  - 003-replace-customer

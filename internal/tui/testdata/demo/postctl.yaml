@@ -1,0 +1,6 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-7013-9048-0d41f854b94a
+name: payments-api
+collections:
+  - payments
+  - internal-admin

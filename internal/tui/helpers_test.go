@@ -363,3 +363,5 @@ func newHarnessWith(t testing.TB, be *fakeBackend, w, h int, opts ...harnessOpt)
 	hs.run(hs.a.Init())
 	return hs
 }
+
+func waitMs(n int) { time.Sleep(time.Duration(n) * time.Millisecond) }

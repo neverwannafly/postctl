@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-700f-8c52-df22795820b7
+name: prod
+production: true
+variables:
+  - key: baseUrl
+    value: https://api.example.com
+  - key: apiKey
+    type: secret
+    secretRef: env/01a0ee73-dcba-700f-8c52-df22795820b7/apiKey
+  - key: webhookSecret
+    type: secret
+    secretRef: env/01a0ee73-dcba-700f-8c52-df22795820b7/webhookSecret

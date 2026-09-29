@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-700d-9fa7-ca5a29ca96e5
+name: Ban user
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/admin/users/{{userId}}/ban'

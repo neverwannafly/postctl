@@ -1,0 +1,6 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-7011-a1f0-a727fe96e9eb
+name: dev
+variables:
+  - key: baseUrl
+    value: https://dev.example.com

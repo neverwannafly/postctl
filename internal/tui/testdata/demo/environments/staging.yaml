@@ -1,0 +1,14 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-7010-8f84-508dd2a28748
+name: staging
+variables:
+  - key: baseUrl
+    value: https://staging.example.com
+  - key: apiKey
+    type: secret
+    secretRef: env/01a0ee73-dcba-7010-8f84-508dd2a28748/apiKey
+  - key: amount
+    value: "1200"
+  - key: currency
+    value: usd
+    disabled: true
