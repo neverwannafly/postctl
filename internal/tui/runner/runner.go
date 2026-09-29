@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,7 @@ const (
 	phSummary
 	phDetail
 	phConfirmCancel
+	phExport
 )
 
 type reqState int
@@ -92,13 +94,14 @@ type Model struct {
 	summary         *engine.RunSummary
 	detail          *engine.Outcome
 
-	runCancel context.CancelFunc
-	runCh     <-chan engine.RunEvent
-	conf      ui.Confirm
-	notice    string
-	fail      bool
-	elapsed   time.Duration
-	runStart  time.Time
+	runCancel  context.CancelFunc
+	runCh      <-chan engine.RunEvent
+	exportPath *textin.Input
+	conf       ui.Confirm
+	notice     string
+	fail       bool
+	elapsed    time.Duration
+	runStart   time.Time
 }
 
 // New builds the runner screen.
@@ -108,6 +111,7 @@ func New(env tui.ScreenEnv, d Deps) *Model {
 		iterations: textin.New("1"),
 		dataPath:   textin.New(""),
 		delayMS:    textin.New("0"),
+		exportPath: textin.New(""),
 		bail:       false,
 		persist:    true,
 		spin:       env.Theme.NewSpinner(),
@@ -146,6 +150,8 @@ func (m *Model) KeyHints() []ui.Hint {
 		return []ui.Hint{{Key: "Tab", Label: "Field", Priority: 2}, {Key: "Ctrl-Enter", Label: "Start run", Priority: 1}, {Key: "Esc", Label: "Close", Priority: 1}}
 	case phLive:
 		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}, {Key: "Enter", Label: "Detail", Priority: 2}, {Key: "f", Label: "Failures only", Priority: 3}}
+	case phExport:
+		return []ui.Hint{{Key: "Enter", Label: "Export", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
 	case phSummary:
 		return []ui.Hint{{Key: "r", Label: "Re-run", Priority: 1}, {Key: "R", Label: "Re-run failed", Priority: 2}, {Key: "e", Label: "Export JSON", Priority: 3}, {Key: "Esc", Label: "Close", Priority: 1}}
 	case phDetail:
@@ -188,13 +194,15 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 			return m, m.waitRunEvent()
 		}
 		return m, nil
-	case exportMsg:
+	case exportDoneMsg:
+		m.phase = phSummary
 		if v.err != nil {
 			m.notice, m.fail = v.err.Error(), true
-		} else {
-			m.notice, m.fail = "Exported "+v.path, false
+			return m, nil
 		}
-		return m, nil
+		return m, func() tea.Msg {
+			return tui.ToastMsg{Kind: ui.ToastSuccess, Text: "Exported to " + v.path}
+		}
 	case tickElapsedMsg:
 		m.elapsed = time.Since(m.runStart)
 		if m.phase == phLive {
@@ -214,6 +222,8 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 			return m.summaryKey(v)
 		case phDetail:
 			return m.detailKey(v)
+		case phExport:
+			return m.exportKey(v)
 		}
 	}
 	return m, nil
@@ -287,9 +297,42 @@ func (m *Model) summaryKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	case "R":
 		return m, m.startRunFailedOnly()
 	case "e":
-		return m, m.exportJSON()
+		return m.beginExport()
 	}
 	return m, nil
+}
+
+func (m *Model) exportKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	switch k.String() {
+	case "esc":
+		m.phase = phSummary
+	case "enter":
+		return m, m.confirmExport()
+	default:
+		m.exportPath.Update(k)
+	}
+	return m, nil
+}
+
+func (m *Model) beginExport() (tui.Screen, tea.Cmd) {
+	if m.summary == nil {
+		return m, nil
+	}
+	m.phase = phExport
+	m.exportPath.Set(defaultExportPath(m.env))
+	return m, nil
+}
+
+func defaultExportPath(env tui.ScreenEnv) string {
+	name := fmt.Sprintf("postctl-run-%d.json", time.Now().Unix())
+	dir, err := os.UserHomeDir()
+	if err != nil {
+		dir = "."
+	}
+	if env.Backend != nil {
+		dir = filepath.Join(env.Backend.Root(), ".postctl")
+	}
+	return filepath.Join(dir, name)
 }
 
 func (m *Model) detailKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
@@ -322,11 +365,15 @@ func (m *Model) confirmKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 }
 
 func (m *Model) startRun() tea.Cmd {
+	return m.startRunWith(nil)
+}
+
+func (m *Model) startRunWith(only []model.ID) tea.Cmd {
 	if m.deps.Runner == nil || m.coll == nil {
 		m.notice, m.fail = "Runner is not available.", true
 		return nil
 	}
-	in, err := m.buildInput(nil)
+	in, err := m.buildInput(only)
 	if err != nil {
 		m.notice, m.fail = err.Error(), true
 		return nil
@@ -369,14 +416,28 @@ func (m *Model) waitRunEvent() tea.Cmd {
 
 func (m *Model) startRunFailedOnly() tea.Cmd {
 	if m.summary == nil {
-		return m.startRun()
+		return m.startRunWith(nil)
 	}
-	// Re-run whole collection; engine has no failed-only mode yet.
-	m.notice = "Re-running the full collection (failed-only is CLI-only for now)."
-	return m.startRun()
+	seen := map[model.ID]struct{}{}
+	var only []model.ID
+	for _, f := range m.summary.Failures {
+		if f.RequestID == "" {
+			continue
+		}
+		if _, ok := seen[f.RequestID]; ok {
+			continue
+		}
+		seen[f.RequestID] = struct{}{}
+		only = append(only, f.RequestID)
+	}
+	if len(only) == 0 {
+		m.notice, m.fail = "No failed requests to re-run.", false
+		return nil
+	}
+	return m.startRunWith(only)
 }
 
-func (m *Model) buildInput(_ []model.ID) (engine.RunInput, error) {
+func (m *Model) buildInput(only []model.ID) (engine.RunInput, error) {
 	iters, _ := strconv.Atoi(strings.TrimSpace(m.iterations.Text()))
 	if iters <= 0 {
 		iters = 1
@@ -399,13 +460,15 @@ func (m *Model) buildInput(_ []model.ID) (engine.RunInput, error) {
 		envClone = env.Clone()
 	}
 	return engine.RunInput{
-		Collection:  m.coll.Clone(),
-		FolderID:    m.folderID,
-		Environment: envClone,
-		Iterations:  iters,
-		Data:        data,
-		Delay:       time.Duration(delay) * time.Millisecond,
-		Bail:        m.bail,
+		Collection:   m.coll.Clone(),
+		FolderID:     m.folderID,
+		Environment:  envClone,
+		Iterations:   iters,
+		Data:         data,
+		Delay:        time.Duration(delay) * time.Millisecond,
+		Bail:         m.bail,
+		NoPersist:    !m.persist,
+		OnlyRequests: append([]model.ID(nil), only...),
 	}, nil
 }
 
@@ -426,10 +489,20 @@ func (m *Model) planRows(in engine.RunInput) {
 		return
 	}
 	var walk func(items []model.Item, path []string)
+	allowed := map[model.ID]struct{}{}
+	for _, id := range in.OnlyRequests {
+		allowed[id] = struct{}{}
+	}
+	filter := len(in.OnlyRequests) > 0
 	walk = func(items []model.Item, path []string) {
 		for _, it := range items {
 			switch v := it.(type) {
 			case *model.Request:
+				if filter {
+					if _, ok := allowed[v.ID]; !ok {
+						continue
+					}
+				}
 				m.rows = append(m.rows, row{id: v.ID, name: v.Name, method: v.Method})
 			case *model.Folder:
 				if in.FolderID != "" && v.ID != in.FolderID && !folderContains(v, in.FolderID) {
@@ -526,23 +599,30 @@ func (m *Model) finishRow(out *engine.Outcome) {
 	}
 }
 
-type exportMsg struct {
+type exportDoneMsg struct {
 	path string
 	err  error
 }
 
-func (m *Model) exportJSON() tea.Cmd {
-	if m.summary == nil {
-		return nil
+func (m *Model) confirmExport() tea.Cmd {
+	path := strings.TrimSpace(m.exportPath.Text())
+	if path == "" {
+		return func() tea.Msg { return exportDoneMsg{err: fmt.Errorf("choose a file path")} }
 	}
 	sum := m.summary
 	return func() tea.Msg {
 		b, err := json.MarshalIndent(sum, "", "  ")
 		if err != nil {
-			return exportMsg{err: err}
+			return exportDoneMsg{err: err}
 		}
-		path := fmt.Sprintf("postctl-run-%d.json", time.Now().Unix())
-		return exportMsg{path: path, err: os.WriteFile(path, b, 0o600)}
+		abs, err := filepath.Abs(path)
+		if err != nil {
+			return exportDoneMsg{err: err}
+		}
+		if err := os.MkdirAll(filepath.Dir(abs), 0o700); err != nil {
+			return exportDoneMsg{err: err}
+		}
+		return exportDoneMsg{path: abs, err: os.WriteFile(abs, b, 0o600)}
 	}
 }
 
@@ -597,6 +677,8 @@ func (m *Model) View() string {
 	switch m.phase {
 	case phConfirmCancel:
 		return m.viewConfirm()
+	case phExport:
+		return m.viewExport()
 	case phSetup:
 		return m.viewSetup()
 	case phLive:
@@ -789,5 +871,12 @@ func findFolder(c *model.Collection, id model.ID) *model.Folder {
 func (m *Model) viewConfirm() string {
 	body := m.header("Run collection")
 	body += m.th.ConfirmView(m.conf, m.w)
+	return body
+}
+
+func (m *Model) viewExport() string {
+	body := m.header("Export run summary")
+	body += m.th.Render(ui.TextSecondary, "File path") + "\n"
+	body += m.th.Render(ui.AccentPrimary, m.exportPath.View(m.th, m.w-2, true))
 	return body
 }

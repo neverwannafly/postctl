@@ -128,11 +128,15 @@ func (s *session) persist(ctx context.Context, progress func(Step)) (saved, warn
 	if len(pending) == 0 {
 		return nil, nil
 	}
-	if progress != nil {
-		progress(Step{Kind: StepSave, Text: stepSave})
-	}
 	for scope := range pending {
 		s.applied[scope] = len(all[scope])
+	}
+	if s.noPersist {
+		s.applyPendingInMemory(pending)
+		return nil, nil
+	}
+	if progress != nil {
+		progress(Step{Kind: StepSave, Text: stepSave})
 	}
 
 	w := s.e.ws
@@ -262,4 +266,21 @@ func writable(variables []model.Variable, changes ...[]vars.Change) []model.Vari
 		}
 	}
 	return out
+}
+
+// applyPendingInMemory merges script variable writes into the session's model
+// clones without touching disk. The live vars store already holds the values
+// for the next request; this keeps env/collection/globals snapshots aligned.
+func (s *session) applyPendingInMemory(pending map[vars.Scope][]vars.Change) {
+	if changes, ok := pending[vars.Environment]; ok && s.env != nil {
+		vars.Apply(nil, s.env, nil, map[vars.Scope][]vars.Change{vars.Environment: changes})
+	}
+	if changes, ok := pending[vars.Collection]; ok {
+		vars.Apply(nil, nil, s.collection, map[vars.Scope][]vars.Change{vars.Collection: changes})
+	}
+	if changes, ok := pending[vars.Global]; ok {
+		workspace := &model.Workspace{Globals: s.globals}
+		vars.Apply(workspace, nil, nil, map[vars.Scope][]vars.Change{vars.Global: changes})
+		s.globals = workspace.Globals
+	}
 }

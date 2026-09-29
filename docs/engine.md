@@ -157,14 +157,19 @@ reverted on disk. Environment and globals writes are not affected.
   `Iterations` exceeds the rows they are reused in order (row `n mod rows`).
 - **Variables.** One variable store lives for the whole run, so environment,
   collection and global writes are visible to later requests and persisted as
-  they happen. `pm.variables` (Local) is cleared at the start of every
-  iteration (then re-seeded from `RunInput.Locals`), and the iteration's data
-  row becomes the Data scope (`pm.iterationData`).
+  they happen unless `RunInput.NoPersist` is set (changes stay in memory for
+  the rest of the run but are not written to disk). `pm.variables` (Local) is
+  cleared at the start of every iteration (then re-seeded from
+  `RunInput.Locals`), and the iteration's data row becomes the Data scope
+  (`pm.iterationData`).
+- **`OnlyRequests`.** When non-empty, only those request IDs run, in their
+  usual depth-first order within the scope. An empty slice runs every request
+  in the scope.
 - **`setNextRequest(name | id)`** jumps to the first request of the run scope
   with that name (names win over IDs) and continues in order from there, so it
   can loop. `setNextRequest(null)` stops the whole run (`StopNextNull`). A
-  target outside the scope stops the run and counts as a script error
-  (`StopNextMissing`).
+  target outside the scope, or outside `OnlyRequests` when that filter is set,
+  stops the run and counts as a script error (`StopNextMissing`).
 - **Failures.** A failing pre-request script skips that request only. `Bail`
   stops after the first request with a failing test, script error or transport
   error (`StopBail`); `StopOnScriptError` stops after a script error
