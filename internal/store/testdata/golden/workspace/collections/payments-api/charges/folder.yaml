@@ -1,0 +1,23 @@
+id: f-charges
+name: Charges
+auth:
+  type: basic
+  basic:
+    username: svc
+    password: '{{svcpass}}'
+variables:
+  - key: page
+    value: "1"
+  - key: folderSecret
+    type: secret
+    secretRef: folder/f-charges/folderSecret
+scripts:
+  preRequest:
+    file: pre.js
+  test:
+    file: test.js
+order:
+  - 001-list-charges
+  - 002-create-charge
+  - forms-uploads
+  - 004-graphql-query

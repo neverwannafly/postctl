@@ -1,0 +1,10 @@
+id: req-nobody
+name: Ping
+kind: http
+method: HEAD
+url:
+  raw: '{{baseUrl}}/ping'
+body:
+  mode: none
+auth:
+  type: none

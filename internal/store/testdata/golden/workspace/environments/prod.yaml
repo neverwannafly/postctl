@@ -1,0 +1,12 @@
+schemaVersion: 1
+id: env-prod
+name: Prod
+production: true
+variables:
+  - key: baseUrl
+    value: https://api.example.com
+  - key: empty
+    type: secret
+    secretRef: env/env-prod/empty
+extra:
+  _postman_variable_scope: environment

@@ -1,0 +1,14 @@
+id: req-oauth-code
+name: OAuth2 auth code
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/code'
+auth:
+  type: oauth2
+  oauth2:
+    grantType: authorization_code
+    authUrl: https://idp.test/authorize
+    accessTokenUrl: https://idp.test/token
+    clientId: c
+    clientSecret: '{{cs}}'

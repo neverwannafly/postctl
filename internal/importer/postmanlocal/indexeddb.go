@@ -14,12 +14,21 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
+// idbComparer only needs Chromium's comparator name to open the database;
+// reads are full sequential scans, so byte order is sufficient.
 type idbComparer struct{}
 
-func (idbComparer) Compare(a, b []byte) int           { return bytes.Compare(a, b) }
-func (idbComparer) Name() string                      { return "idb_cmp1" }
+// Compare orders keys bytewise.
+func (idbComparer) Compare(a, b []byte) int { return bytes.Compare(a, b) }
+
+// Name matches Chromium's IndexedDB comparator so LevelDB accepts the files.
+func (idbComparer) Name() string { return "idb_cmp1" }
+
+// Separator is unused for read-only access.
 func (idbComparer) Separator(dst, _, _ []byte) []byte { return nil }
-func (idbComparer) Successor(dst, _ []byte) []byte    { return nil }
+
+// Successor is unused for read-only access.
+func (idbComparer) Successor(dst, _ []byte) []byte { return nil }
 
 type idbDatabase struct {
 	ID     uint64
@@ -53,6 +62,7 @@ func openIndexedDB(path string) (*idbReader, error) {
 	return reader, nil
 }
 
+// Close releases the copied database.
 func (r *idbReader) Close() error { return r.db.Close() }
 
 func (r *idbReader) readMetadata() error {

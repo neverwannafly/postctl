@@ -1,0 +1,18 @@
+id: req-bin
+name: Send binary
+kind: http
+method: PUT
+url:
+  raw: '{{baseUrl}}/blob'
+body:
+  mode: binary
+  file: fixtures/blob.bin
+auth:
+  type: digest
+  digest:
+    username: u
+    password: '{{p}}'
+    realm: r
+    algorithm: SHA-256
+    qop: auth
+    nonceCount: "00000001"

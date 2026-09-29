@@ -24,6 +24,11 @@
 | R1 | gRPC | **Deferred to v1.1.** WS9 is WebSocket only in v1. Keep `model.Request` kind-extensible so gRPC slots in later. |
 | R2 | OAuth2 | Client credentials, authorization code + PKCE (browser + `127.0.0.1` loopback callback), password, implicit. No automatic refresh in v1; user triggers "Get new token". Tokens are secrets (Keychain). |
 | R3 | Script var writes | `pm.environment/collectionVariables/globals.set` persist to disk (Postman behavior); secret vars persist to Keychain. `pm.variables.set` stays local to the run. |
+| D1 | `POSTCTL_HOME` | Overrides only the global fallback directory. A global `--workspace DIR` flag / `POSTCTL_WORKSPACE` env forces a workspace and skips discovery. |
+| D2 | Literal credentials | The store stays literal. The **importer** moves literal secrets (bearer token, basic/digest/NTLM password, API key value, OAuth2 client secret/password, AWS secret key, Hawk key) into generated secret collection variables, stored in Keychain, and rewrites the field to `{{<name>}}`. It also marks environment values of Postman `type: secret` as `VarSecret`. `--keep-literal-secrets` opts out. |
+| D3 | Lenient load | Add `store.LoadLenient` returning the workspace plus `[]*FileError`; the TUI uses it and shows broken files as items in an error state. The CLI stays strict. |
+| D4 | Clone | Add deep `Clone()` on `Request`, `Collection`, `Folder`, `Environment` (clears secret refs per model rule 6 only when asked via `CloneFresh`). |
+| C1 | Shared contracts | Orchestrator committed `internal/httpx/types.go` (`Sender`, `Response`, `Timings`, `SentRequest`) and `internal/vars/scope.go` (`Scope`, `Store`, `Change`) so WS2, WS3 and WS4 can build in parallel. Changes must be additive. |
 | R4 | Local Postman data | WS1b may read the IndexedDB locally, read-only, from a temp copy. Never print variable values, tokens, headers values, or bodies in logs, ledger, or chat; only counts, key names, and structure. |
 
 ### Q15 findings — local Postman install
@@ -201,7 +206,7 @@ Compatibility test corpus: a fixture folder of real-world Postman scripts (and �
 - Sidebar: collection tree with fold/unfold, method badges, fuzzy filter, create/rename/duplicate/move/delete (delete confirms, defaults to Cancel).
 - Request editor tabs: Params, Auth, Headers, Body, Pre-request, Tests, Settings. Inline key-value tables with enable/disable toggle. Body/script edit: inline textarea **and** `e` → `$EDITOR` round-trip.
 - Response viewer tabs: Body (pretty/raw/preview-as-text, syntax-highlighted, collapsible JSON, `/` search, path filter), Headers, Cookies, Tests (pass/fail with messages), Console, Timeline (DNS/connect/TLS/TTFB/download).
-- Environments: switcher (`E`), editor, secret values masked (`••••`) with reveal-on-hold, "production" flag that turns header badge warning-colored and asks confirmation before sending non-GET requests (❓ Q10).
+- Environments: switcher (`E`), editor, secret values masked (`••••`) with reveal-on-hold, "production" flag that turns the header badge warning-colored (badge only, no send confirmation — §0 Q10).
 - Multiple open request tabs; unsaved marker; autosave.
 - Command palette (`Ctrl-P`): jump to request, run action, switch env.
 - History pane: re-open/re-send past requests with their exact resolved values.
@@ -241,7 +246,12 @@ Each workstream gets a **brief** file `docs/briefs/WSn-<name>.md` (scope, interf
 | WS8 | README, docs, GoReleaser, Homebrew tap, sample workspace | all | Gemini 3.8 Flash (high) | Docs/config, low risk. |
 | QA | Per-merge review: Bugbot-style review + integration smoke on the user's collections | each WS | Cursor Grok 4.6 (high, fast) / Bugbot | Independent second opinion. |
 
-Waves: **W1** WS0 + WS1b spike (independent) → **W2** WS1, WS2, WS5 in parallel → **W3** WS3, WS4 → **W4** WS6, WS7 → **W5** WS9 → **W6** WS8 + QA hardening. WS8 drops GoReleaser/Homebrew (Q12: local builds only). The orchestrator (me) only writes plans/briefs, merges, resolves cross-workstream interface conflicts, and reports progress; it does not implement features.
+Waves (revised after W1, thanks to contract C1): **W1 ✅** WS0 + WS1b → **W2** WS0.1 (lenient load + Clone), WS1, WS2, WS2b (OAuth2, split out of WS2), WS3, WS5 in parallel → **W3** WS4 engine → **W4** WS6, WS7 → **W5** WS9 → **W6** WS8 + QA hardening. WS8 drops GoReleaser/Homebrew (Q12: local builds only).
+
+| WS | Scope | Model |
+| --- | --- | --- |
+| WS0.1 | `store.LoadLenient`, deep `Clone` (D3, D4) | Sonnet 5.5 (resume WS0 agent) |
+| WS2b | `internal/oauth2`: client credentials, auth code + PKCE (browser + loopback), password, implicit; token stored as secret | Grok 4.7 (high, fast) | The orchestrator (me) only writes plans/briefs, merges, resolves cross-workstream interface conflicts, and reports progress; it does not implement features.
 
 ## 11. Definition of done (v1)
 

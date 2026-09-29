@@ -1,0 +1,76 @@
+id: req-list
+name: List charges
+description: |-
+  Lists charges.
+
+  Supports paging.
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/v1/charges/:id?limit=10&expand=customer'
+  query:
+    - key: limit
+      value: "10"
+      description: page size
+    - key: expand
+      value: customer
+    - key: debug
+      value: "1"
+      description: off by default
+      disabled: true
+  pathVariables:
+    - key: id
+      value: ch_1
+      description: charge id
+headers:
+  - key: Accept
+    value: application/json
+  - key: X-Trace
+    value: abc
+    description: tracing
+    disabled: true
+auth:
+  type: inherit
+scripts:
+  preRequest:
+    file: 001-list-charges.pre.js
+  test:
+    file: 001-list-charges.test.js
+    id: script-1
+    name: status check
+settings:
+  followRedirects: false
+  maxRedirects: 3
+  verifyTLS: true
+  timeout: 5s
+  httpVersion: http2
+  extra:
+    tlsCipherSelection: default
+examples:
+  - id: ex-1
+    name: 200 OK
+    originalRequest:
+      name: List charges
+      kind: http
+      method: GET
+      url:
+        raw: '{{baseUrl}}/v1/charges'
+    status: OK
+    code: 200
+    headers:
+      - key: Content-Type
+        value: application/json
+    cookies:
+      - name: sid
+        value: "1"
+        domain: x.test
+        path: /
+        httpOnly: true
+        secure: true
+    body: |-
+      {
+        "data": []
+      }
+    previewLanguage: json
+    extra:
+      _postman_previewlanguage: json

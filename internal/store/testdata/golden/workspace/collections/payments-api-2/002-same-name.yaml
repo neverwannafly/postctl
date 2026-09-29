@@ -1,0 +1,6 @@
+id: d2
+name: Same name
+kind: http
+method: GET
+url:
+  raw: https://x.test/2

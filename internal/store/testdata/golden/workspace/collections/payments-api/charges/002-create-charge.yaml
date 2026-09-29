@@ -1,0 +1,24 @@
+id: req-create
+name: Create charge
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/v1/charges'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  mode: raw
+  raw: |-
+    {
+      "amount": {{amount}},
+      "currency": "usd"
+    }
+  language: json
+  urlencoded:
+    - key: kept
+      value: "yes"
+auth:
+  type: bearer
+  bearer:
+    token: '{{token}}'

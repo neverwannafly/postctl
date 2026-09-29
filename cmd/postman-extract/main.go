@@ -1,3 +1,5 @@
+// Command postman-extract is a development tool that copies the local Postman
+// desktop cache and writes it as Collection v2.1 JSON with a coverage report.
 package main
 
 import (

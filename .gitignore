@@ -6,3 +6,4 @@ testdata/private/
 *.test
 *.out
 .DS_Store
+/.task/

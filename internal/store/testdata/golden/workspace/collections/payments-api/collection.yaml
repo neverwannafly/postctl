@@ -1,0 +1,40 @@
+schemaVersion: 1
+id: coll-pay
+name: Payments API
+description: |-
+  Payments.
+
+  See docs.
+version: 1.2.0
+auth:
+  type: bearer
+  bearer:
+    token: '{{token}}'
+variables:
+  - key: baseUrl
+    value: https://api.test
+    description: root
+  - key: apiSecret
+    type: secret
+    secretRef: collection/coll-pay/apiSecret
+  - key: "off"
+    value: x
+    dataType: string
+    disabled: true
+scripts:
+  preRequest:
+    file: pre.js
+  test:
+    file: test.js
+    disabled: true
+extra:
+  postman:
+    schema: v2.1.0
+    tags:
+      - a
+      - b
+order:
+  - charges
+  - 002-ping
+  - auth-schemes
+  - empty

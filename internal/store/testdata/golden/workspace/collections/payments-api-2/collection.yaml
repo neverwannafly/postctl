@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: coll-dup
+name: payments api
+order:
+  - 001-same-name
+  - 002-same-name
+  - same
+  - same-2

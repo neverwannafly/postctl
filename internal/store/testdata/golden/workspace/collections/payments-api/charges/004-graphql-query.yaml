@@ -1,0 +1,22 @@
+id: req-gql
+name: GraphQL query
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/graphql'
+body:
+  mode: graphql
+  graphql:
+    query: |-
+      query($id: ID!) {
+        charge(id: $id) { id }
+      }
+    variables: '{"id": "ch_1"}'
+auth:
+  type: awsv4
+  awsv4:
+    accessKey: '{{ak}}'
+    secretKey: '{{sk}}'
+    region: us-east-1
+    service: execute-api
+    sessionToken: '{{st}}'
