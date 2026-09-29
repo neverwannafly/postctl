@@ -1,0 +1,9 @@
+id: req-step-start
+name: Step start
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/get?step=1'
+scripts:
+  test:
+    file: 001-step-start.test.js

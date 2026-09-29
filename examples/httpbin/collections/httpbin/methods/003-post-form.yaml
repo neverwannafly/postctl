@@ -1,0 +1,16 @@
+id: req-post-form
+name: POST form urlencoded
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/post'
+body:
+  mode: urlencoded
+  urlencoded:
+    - key: username
+      value: postctl
+    - key: action
+      value: login
+scripts:
+  test:
+    file: 003-post-form.test.js

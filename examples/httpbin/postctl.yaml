@@ -1,0 +1,6 @@
+schemaVersion: 1
+id: ws-httpbin
+name: httpbin
+description: Sample workspace exercising postctl against httpbin.org
+collections:
+  - httpbin

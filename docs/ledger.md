@@ -32,7 +32,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Done, merged to main | ws/6a-request-editor | 2026-09-30 02:15 IST |
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
 | WS7 CLI | Grok 4.7 (high, fast) | Done, merged to main | ws/7-cli | 2026-09-30 03:15 IST |
-| WS8 docs/release | — | Not started | — | — |
+| WS8 docs/release | Gemini 3.8 Flash (high) | Done, ready for merge | ws/8-docs | 2026-09-30 04:00 IST |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
 
@@ -506,3 +506,23 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Final `go build ./... && go test -race ./... && golangci-lint run` passed. CLI local-server smoke passed (`ls` 2 lines, `send` and `run` exit 0, valid JUnit with one suite). Privacy-safe local dry-run and private staging import passed with the counts recorded above, using temporary workspaces and no Keychain writes. At 140x40 the help lists and opens `R` runner, `H` history and `Ctrl-E` environment editor; a demo collection run reached its rendered summary.
 - Blockers / questions: QA follow-ups: extract a reusable JUnit reporter for TUI runner export; move envedit, cookies and textarea scroll-offset adjustment out of `View`.
 - Next: none
+
+### 2026-09-30 03:35 IST · WS8 · Gemini 3.8 Flash (high) · STARTED
+- Branch/worktree: ws/8-docs in /Users/shubham/work/postctl-wt/ws8-docs
+- Did: Started WS8 docs, examples/httpbin workspace, keys reference, migrating-from-postman guide, and README. Created worktree ws/8-docs from main.
+- Files: docs/ledger.md
+- Decisions: Keep WebSocket section marked TODO as WS9 is in Wave 5. Test against httptest local servers so tests never hit the network.
+- Tests: None yet.
+- Blockers / questions: None.
+- Next: Explore codebase, create examples/httpbin sample workspace, generate/test docs/keys.md, write docs and README.
+
+### 2026-09-30 04:00 IST · WS8 · Gemini 3.8 Flash (high) · DONE
+- Branch/worktree: ws/8-docs (not merged, not pushed)
+- Did: Delivered all 5 WS8 deliverables: (1) Top-level README.md matching prod-console-tui tone with Quickstart, TUI cheat sheet, CLI summary, data paths, scripts, accessibility, troubleshooting, and dev guide. (2) docs/README.md documentation index with one-line summaries and explicit binding doc list for contributors. (3) Complete keys reference docs/keys.md generated via cmd/genkeys, verified by unit and reflection tests (cmd/genkeys/main_test.go, internal/tui/keys_test.go), with WebSocket marked TODO for WS9. (4) Committed sample workspace examples/httpbin/ with collection, environment, folders, raw JSON/form/multipart requests, Chai tests, pre-request HMAC script with crypto-js, runner flow jumping via pm.execution.setNextRequest, and hermetic tests in examples/httpbin/example_test.go using httptest. (5) docs/migrating-from-postman.md with concept mapping, import paths, secret migration to Keychain, pm.* & bundled libraries compatibility table, and Newman vs postctl run comparison.
+- Files: `README.md`, `docs/README.md`, `docs/keys.md`, `docs/migrating-from-postman.md`, `docs/ledger.md`, `cmd/genkeys/main.go`, `cmd/genkeys/main_test.go`, `internal/tui/keys_test.go`, `examples/httpbin/**`
+- Decisions: Keep WebSocket section marked TODO as WS9 is still working on Wave 5. Used httptest fake servers for all example workspace tests so tests never hit the public network. CLI tests verify ls, send, run, env, curl against example workspace.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). All tests pass with -race.
+- Blockers / questions: Noted inconsistencies between existing docs and CLI code: --workspace flag position on root command vs subcommands, lack of --var flag on postctl run, TUI runner JSON-only export vs CLI JUnit/NDJSON.
+- Next: Orchestrator review and merge ws/8-docs.
+
+

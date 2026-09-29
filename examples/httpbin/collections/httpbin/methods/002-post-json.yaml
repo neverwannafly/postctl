@@ -1,0 +1,20 @@
+id: req-post-json
+name: POST JSON body
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/post'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  mode: raw
+  language: json
+  raw: |-
+    {
+      "name": "postctl",
+      "type": "terminal-ui"
+    }
+scripts:
+  test:
+    file: 002-post-json.test.js

@@ -1,0 +1,9 @@
+id: req-step-finish
+name: Step finish
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/get?step=3'
+scripts:
+  test:
+    file: 003-step-finish.test.js
