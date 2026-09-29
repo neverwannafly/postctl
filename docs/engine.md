@@ -37,7 +37,7 @@ sequenceDiagram
 
     C->>E: SendInput, progress
     E->>D: hydrate secret variables (on clones)
-    E->>E: build vars store (global < collection < env < data < local)
+    E->>E: build vars store (global < collection < folder < env < data < local)
     loop collection, each folder, request
         E-->>C: "Running … pre-request script"
         E->>S: Run(prerequest, unresolved request)
@@ -104,6 +104,34 @@ Details that matter:
 
 `Outcome.Failed()` is true for a transport error, a script error or a failing
 test.
+
+## Variable precedence
+
+From lowest to highest, a `{{name}}` resolves to the first scope below that
+defines it: **global < collection < folder < environment < data < local**
+(`pm.variables.set`, `--var`).
+
+Folder variables (`folder.yaml`, Postman v2.1 `item[].variable` on a folder) are
+part of the collection tier, as in Postman: they beat collection variables and
+lose to the environment. With nested folders the inner one wins. Only the
+folders above the request being sent apply, and disabled variables are
+ignored.
+
+There is one resolution path. `vars.FolderVariables(chain)` collects the
+folders' variables and `MemStore.SetFolderVariables` installs them on the
+variable store; the engine does this per request in `execute` (so a run
+crossing folders resolves each request with its own chain), `postctl curl`
+does it before resolving, and the TUI preview and copy-as-curl build the same
+layering (`TestScopeMatchesEngineFolderPrecedence` keeps them equal). Secret
+folder variables are hydrated from the `SecretStore` and masked in history like
+any other secret.
+
+Folder variables are read-only for scripts. `pm.variables.get`, `pm.variables.has`
+and `{{name}}` see them; `pm.collectionVariables.get`, `.has`, `toObject()` and
+`pm.variables.toObject()` do not list them. `pm.collectionVariables.set(k, v)`
+writes the collection's own variable `k`, which a folder variable of the same
+name still shadows for requests below that folder. A send never writes a folder
+variable back to disk.
 
 ## Persistence
 

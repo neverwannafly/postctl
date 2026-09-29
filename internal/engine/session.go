@@ -84,6 +84,16 @@ func (e *Engine) newSession(
 	if err := hydrate(s.collection.Variables); err != nil {
 		return nil, fmt.Errorf("read secret variables: %w", err)
 	}
+	var hydrateErr error
+	_ = s.collection.Walk(func(it model.Item, _ model.Container, _ int) error {
+		if folder, ok := it.(*model.Folder); ok && hydrateErr == nil {
+			hydrateErr = hydrate(folder.Variables)
+		}
+		return nil
+	})
+	if hydrateErr != nil {
+		return nil, fmt.Errorf("read secret variables: %w", hydrateErr)
+	}
 	var envVars, globalVars []model.Variable
 	if s.env != nil {
 		if err := hydrate(s.env.Variables); err != nil {
@@ -117,6 +127,12 @@ func (s *session) refreshSecrets() {
 		}
 	}
 	add(s.collection.Variables)
+	_ = s.collection.Walk(func(it model.Item, _ model.Container, _ int) error {
+		if folder, ok := it.(*model.Folder); ok {
+			add(folder.Variables)
+		}
+		return nil
+	})
 	if s.env != nil {
 		add(s.env.Variables)
 	}
@@ -254,6 +270,9 @@ func (s *session) execute(
 		Iteration:      iteration,
 		IterationCount: s.iterationCount,
 	}
+	// Folder variables depend on where the request sits, so they are
+	// installed per request, before any script or resolution runs.
+	s.store.SetFolderVariables(vars.FolderVariables(chain))
 	opts := e.httpOptions()
 	sender := &varSender{inner: e.cfg.HTTP, store: s.store}
 

@@ -24,6 +24,10 @@ type MemStore struct {
 	layers  map[Scope]*layer
 	changes map[Scope][]Change
 	random  RandomSource
+	// folder holds the variables of the folders above the request being
+	// resolved. It sits between the Environment and Collection layers (see
+	// SetFolderVariables) and is not a Scope: scripts cannot write to it.
+	folder *layer
 }
 
 // New builds a store from the persisted scopes. Disabled variables are
@@ -45,6 +49,7 @@ func NewWithRandom(
 		layers:  make(map[Scope]*layer, int(Local)+1),
 		changes: make(map[Scope][]Change),
 		random:  source,
+		folder:  &layer{values: make(map[string]any)},
 	}
 	for scope := Global; scope <= Local; scope++ {
 		s.layers[scope] = &layer{values: make(map[string]any)}
@@ -78,7 +83,19 @@ func (s *MemStore) put(scope Scope, key string, value any) {
 func (s *MemStore) Get(key string) (any, Scope, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.lookup(key)
+}
+
+// lookup returns the value of key from the highest-precedence layer defining
+// it: Local, Data, Environment, folder variables, Collection, Global. Folder
+// variables report the Collection scope. The caller holds s.mu.
+func (s *MemStore) lookup(key string) (any, Scope, bool) {
 	for scope := Local; scope >= Global; scope-- {
+		if scope == Collection {
+			if value, ok := s.folder.values[key]; ok {
+				return value, Collection, true
+			}
+		}
 		if value, ok := s.layers[scope].values[key]; ok {
 			return value, scope, true
 		}
@@ -218,13 +235,7 @@ func (s *MemStore) resolve(
 	if resolving[name] {
 		return literal, false
 	}
-	var value any
-	found := false
-	for scope := Local; scope >= Global; scope-- {
-		if value, found = s.layers[scope].values[name]; found {
-			break
-		}
-	}
+	value, _, found := s.lookup(name)
 	if !found {
 		return "", false
 	}
@@ -271,3 +282,46 @@ func (cryptoSource) Intn(n int) int {
 
 // Read fills p with cryptographically secure random bytes.
 func (cryptoSource) Read(p []byte) (int, error) { return rand.Read(p) }
+
+// FolderVariables returns the enabled variables of the folders in chain, the
+// containers above a request as engine chains build them (the collection
+// first, then each folder, outermost first). The collection's own variables
+// are not included: pass them to New. When two folders define a name the
+// inner one wins. The result is a copy, safe to hydrate or mask.
+func FolderVariables(chain []model.Container) []model.Variable {
+	var out []model.Variable
+	for _, container := range chain {
+		if folder, ok := container.(*model.Folder); ok {
+			for _, variable := range folder.Variables {
+				if variable.Enabled() {
+					out = append(out, variable)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// SetFolderVariables installs the variables of the folders above the request
+// about to be resolved or sent, replacing any set before; pass
+// FolderVariables(chain). This is the one place folder variables enter
+// resolution, so the preview, copy-as-curl, the send pipeline and the runner
+// agree (docs/engine.md, "Variable precedence").
+//
+// Folder variables take precedence over collection variables and lose to the
+// environment, data and local variables, as in Postman. Within the list, later
+// entries win, so an inner folder overrides an outer one. They are visible to
+// Get, Replace and therefore to pm.variables.get and {{name}}, but they are
+// read-only: Keys and GetIn(Collection, ...) do not list them, and a script's
+// pm.collectionVariables.set writes the collection's own variable, which a
+// folder variable of the same name still shadows.
+func (s *MemStore) SetFolderVariables(variables []model.Variable) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.folder = &layer{values: make(map[string]any, len(variables))}
+	for _, variable := range variables {
+		if variable.Enabled() {
+			s.folder.values[variable.Key] = variable.Value
+		}
+	}
+}
