@@ -24,6 +24,13 @@ type Sender interface {
 	Send(ctx context.Context, req *model.Request, opts Options) (*Response, error)
 }
 
+// TokenSource obtains an OAuth 2.0 token for a request. Implementations may
+// perform an interactive flow; Send calls it only when no usable stored access
+// token is present.
+type TokenSource interface {
+	Token(ctx context.Context, config *model.OAuth2Config) (*model.OAuth2Token, error)
+}
+
 // Options are per-send knobs that are not part of the saved request.
 type Options struct {
 	// WorkspaceDir resolves relative file paths in binary and form-data bodies.
@@ -34,6 +41,10 @@ type Options struct {
 	MaxBodyBytes int64
 	// Defaults supplies settings for nil fields in the request's Settings.
 	Defaults model.RequestSettings
+	// OAuth2 obtains an access token when OAuth2 auth has no usable token.
+	OAuth2 TokenSource
+	// CookieJar stores and applies workspace cookies. Nil disables cookies.
+	CookieJar *CookieJar
 }
 
 // Response is the result of a completed exchange. A transport failure

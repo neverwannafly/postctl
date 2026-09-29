@@ -53,3 +53,10 @@ type Change struct {
 	// Unset reports that the key was removed rather than set.
 	Unset bool
 }
+
+// RandomSource supplies deterministic entropy for dynamic variables in tests.
+// math/rand.Rand implements this interface.
+type RandomSource interface {
+	Intn(n int) int
+	Read(p []byte) (n int, err error)
+}
