@@ -226,11 +226,12 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 		parent, index = coll, -1
 	}
 	var item model.Item
-	if kind == kindFolder {
+	switch kind {
+	case kindFolder:
 		item = model.NewFolder(name)
-	} else if kind == kindWebSocket {
+	case kindWebSocket:
 		item = model.NewWebSocketRequest(name, "")
-	} else {
+	default:
 		item = model.NewRequest(name, "GET", "")
 	}
 	if err := coll.Insert(parent.ContainerID(), index, item); err != nil {
