@@ -2,6 +2,7 @@ package response
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +86,33 @@ func TestSelectionShowsStoredResult(t *testing.T) {
 	p = pane2.(*Pane)
 	if !contains(p.View(), "404") {
 		t.Fatal("expected second result after selection")
+	}
+}
+
+func TestViewIsPure(t *testing.T) {
+	id := model.NewID()
+	p := &Pane{
+		th: ui.NewTheme(true, false, false), byID: map[model.ID]*storedResult{},
+		ref: tui.RequestRef{Request: &model.Request{ID: id}}, w: 40, h: 8,
+	}
+	p.applyResult(tui.SendResult{RequestID: id, Response: &httpx.Response{
+		StatusCode: 200, Status: "OK", Body: []byte("{\n  \"ok\": true\n}"),
+		Headers: []model.KV{{Key: "Content-Type", Value: "application/json"}},
+	}})
+	snapshot := func() any {
+		return struct {
+			Scroll               int
+			Mode                 bodyMode
+			Kind                 BodyKind
+			Key                  string
+			Offsets              []int
+			LastTransportRequest model.ID
+		}{p.scroll, p.bodyMode, p.bodyKind, p.bodyKey, append([]int(nil), p.rawIdx.offsets...), p.lastTransportRequest}
+	}
+	before := snapshot()
+	first, second := p.View(), p.View()
+	if first != second || !reflect.DeepEqual(before, snapshot()) {
+		t.Fatalf("View mutated response state: before=%+v after=%+v", before, snapshot())
 	}
 }
 

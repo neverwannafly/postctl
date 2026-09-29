@@ -227,6 +227,10 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width, a.height = msg.Width, msg.Height
 		a.layoutPanes()
+		if o, ok := a.ov.(interface{ setSize(int, int) }); ok {
+			g := a.geo()
+			o.setSize(g.width, g.bodyH)
+		}
 		return a, nil
 	case tea.BackgroundColorMsg:
 		return a, a.setDark(msg.IsDark())

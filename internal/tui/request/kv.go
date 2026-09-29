@@ -611,10 +611,10 @@ func (k *kvView) view(p *Pane, w, h int) string {
 		return th.EmptyState(title, body, "Press a to add a "+one+".", w)
 	}
 	rowsH := max(1, h-3)
-	k.top = scrollTo(k.top, k.cur, rowsH, len(items))
-	end := min(len(items), k.top+rowsH)
-	rows := make([]ui.KVRow, 0, end-k.top)
-	for _, it := range items[k.top:end] {
+	top := scrollTo(k.top, k.cur, rowsH, len(items))
+	end := min(len(items), top+rowsH)
+	rows := make([]ui.KVRow, 0, end-top)
+	for _, it := range items[top:end] {
 		r := ui.KVRow{Key: it.Key, Value: it.Value, Description: it.Description, Disabled: it.Disabled}
 		if it.path {
 			r.Key = ":" + it.Key
@@ -629,7 +629,7 @@ func (k *kvView) view(p *Pane, w, h int) string {
 	}
 	focus := -1
 	if p.zone == zBody {
-		focus = k.cur - k.top
+		focus = k.cur - top
 	}
 	table := th.KVTable(rows, ui.KVTableOptions{Width: w, Focus: focus, Header: true})
 	tl := strings.Count(table, "\n") + 1
@@ -672,9 +672,8 @@ func (k *kvView) statusLine(p *Pane, items []kvItem, w int) string {
 
 func (k *kvView) bulkView(p *Pane, w, h int) string {
 	th := p.th
-	k.area.resize(w, max(1, h-2))
 	head := th.Render(ui.TextSecondary, th.Truncate("Bulk edit "+th.Glyphs.Dot+" one key: value per line, // disables a row", w))
-	return head + "\n\n" + k.area.view()
+	return head + "\n\n" + k.area.render(w, max(1, h-2))
 }
 
 // scrollTo returns the first visible row so cur stays in a window of size

@@ -12,6 +12,8 @@ type screenOverlay struct {
 	s Screen
 }
 
+func (o *screenOverlay) setSize(w, h int) { o.s.SetSize(w, h) }
+
 func (o *screenOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	next, cmd := o.s.Update(msg)
 	if next == nil {
@@ -21,10 +23,7 @@ func (o *screenOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	return o, cmd
 }
 
-func (o *screenOverlay) view(_ *app, w, h int) string {
-	o.s.SetSize(w, h)
-	return o.s.View()
-}
+func (o *screenOverlay) view(_ *app, _, _ int) string { return o.s.View() }
 
 func (o *screenOverlay) hints(*app) []ui.Hint { return o.s.KeyHints() }
 

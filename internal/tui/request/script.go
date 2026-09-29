@@ -208,7 +208,6 @@ func (s *scriptView) view(p *Pane, w, h int) string {
 	if s.pick {
 		return s.pickerView(p, w, h)
 	}
-	s.ed.resize(w, max(1, h-1))
 	when := "before the request is sent"
 	if !s.pre {
 		when = "after the response arrives"
@@ -223,7 +222,7 @@ func (s *scriptView) view(p *Pane, w, h int) string {
 	default:
 		status = "JavaScript runs " + when
 	}
-	return s.ed.view() + "\n" + th.Render(ui.TextQuiet, th.Truncate(status, w))
+	return s.ed.render(w, max(1, h-1)) + "\n" + th.Render(ui.TextQuiet, th.Truncate(status, w))
 }
 
 func (s *scriptView) pickerView(p *Pane, w, h int) string {

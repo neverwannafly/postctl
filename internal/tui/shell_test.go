@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -45,6 +46,25 @@ func TestLayoutSwitchesAtBreakpoints(t *testing.T) {
 		if n := len(strings.Split(scr, "\n")); n != 30 {
 			t.Errorf("width %d: view is %d rows, want 30", c.width, n)
 		}
+	}
+}
+
+func TestShellViewIsPure(t *testing.T) {
+	h := newHarness(t, demo(), 80, 24)
+	h.keys("?")
+	help := h.a.ov.(*helpOverlay)
+	snapshot := func() any {
+		return struct {
+			TreeTop         int
+			TreeCache       []string
+			HelpScroll      int
+			HelpLines, Page int
+		}{h.a.tree.top, append([]string(nil), h.a.tree.cache...), help.scroll, help.lines, help.page}
+	}
+	before := snapshot()
+	first, second := h.a.View().Content, h.a.View().Content
+	if first != second || !reflect.DeepEqual(before, snapshot()) {
+		t.Fatalf("View mutated shell state: before=%+v after=%+v", before, snapshot())
 	}
 }
 

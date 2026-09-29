@@ -331,10 +331,10 @@ func (m *Model) listView(w, h int) string {
 	if top > 0 && top < len(lines) && lines[top].idx >= 0 && lines[top-1].idx == -1 && curLine-top+1 < rows {
 		top--
 	}
-	m.top = max(0, min(top, max(0, len(lines)-rows)))
-	end := min(len(lines), m.top+rows)
+	top = max(0, min(top, max(0, len(lines)-rows)))
+	end := min(len(lines), top+rows)
 	out := make([]string, 0, rows)
-	for _, l := range lines[m.top:end] {
+	for _, l := range lines[top:end] {
 		out = append(out, th.Truncate(l.text, w))
 	}
 	return strings.Join(out, "\n")

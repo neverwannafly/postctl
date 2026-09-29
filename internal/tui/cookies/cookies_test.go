@@ -3,6 +3,7 @@ package cookies
 import (
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -85,6 +86,24 @@ func jarWithCookies(t *testing.T) *httpx.CookieJar {
 	set("https://api.example.com/", &http.Cookie{Name: "theme", Value: "dark", Path: "/"})
 	set("https://other.test/", &http.Cookie{Name: "id", Value: "77", Path: "/"})
 	return jar
+}
+
+func TestViewIsPure(t *testing.T) {
+	s := newScreen(t, jarWithCookies(t), 80, 24)
+	m := s.m.(*Model)
+	m.cur, m.top = 1, 1
+	snapshot := func() any {
+		return struct {
+			Cur, Top int
+			Reveal   bool
+			Mode     mode
+		}{m.cur, m.top, m.reveal, m.mode}
+	}
+	before := snapshot()
+	first, second := s.m.View(), s.m.View()
+	if first != second || !reflect.DeepEqual(before, snapshot()) {
+		t.Fatalf("View mutated cookie manager state: before=%+v after=%+v", before, snapshot())
+	}
 }
 
 func TestListsGroupedByDomainWithMaskedValues(t *testing.T) {

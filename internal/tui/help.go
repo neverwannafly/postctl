@@ -16,7 +16,8 @@ type helpOverlay struct {
 	page   int
 }
 
-func (o *helpOverlay) update(_ *app, msg tea.Msg) (overlay, tea.Cmd) {
+func (o *helpOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
+	o.measure(a)
 	k, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return o, nil
@@ -39,6 +40,30 @@ func (o *helpOverlay) update(_ *app, msg tea.Msg) (overlay, tea.Cmd) {
 	}
 	o.scroll = max(0, min(o.scroll, max(0, o.lines-o.page)))
 	return o, nil
+}
+
+func (o *helpOverlay) measure(a *app) {
+	g := a.geo()
+	groups := a.keys.helpGroups(a.focusTitle(), a.focusHints(), a.responseHidden())
+	o.lines = 0
+	if g.width >= 110 {
+		left, right := 0, 0
+		for i, group := range groups {
+			n := len(group.Rows) + 2
+			if i%2 == 0 {
+				left += n
+			} else {
+				right += n
+			}
+		}
+		o.lines = max(left, right)
+	} else {
+		for _, group := range groups {
+			o.lines += len(group.Rows) + 2
+		}
+	}
+	o.page = max(1, g.bodyH-3)
+	o.scroll = max(0, min(o.scroll, max(0, o.lines-o.page)))
 }
 
 func (o *helpOverlay) view(a *app, w, h int) string {
@@ -94,13 +119,13 @@ func (o *helpOverlay) view(a *app, w, h int) string {
 	head := t.Bold().Render("Help")
 	esc := t.Render(ui.TextSecondary, "Esc Close")
 	title := head + strings.Repeat(" ", max(1, w-ui.Width(head)-ui.Width(esc))) + esc
-	o.page = max(1, h-3)
-	o.lines = len(body)
-	o.scroll = max(0, min(o.scroll, max(0, o.lines-o.page)))
-	end := min(len(body), o.scroll+o.page)
-	visible := strings.Join(body[o.scroll:end], "\n")
-	if o.lines > o.page {
-		more := "  " + strconv.Itoa(o.scroll+1) + "-" + strconv.Itoa(end) + " of " + strconv.Itoa(o.lines) + " lines, scroll for more"
+	page := max(1, h-3)
+	lines := len(body)
+	scroll := max(0, min(o.scroll, max(0, lines-page)))
+	end := min(len(body), scroll+page)
+	visible := strings.Join(body[scroll:end], "\n")
+	if lines > page {
+		more := "  " + strconv.Itoa(scroll+1) + "-" + strconv.Itoa(end) + " of " + strconv.Itoa(lines) + " lines, scroll for more"
 		visible += "\n" + t.Render(ui.TextQuiet, more)
 	}
 	return title + "\n" + t.Rule(w) + "\n" + visible
