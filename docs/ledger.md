@@ -21,7 +21,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | v1 locked | main | 2026-09-29 |
 | WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
-| WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-29 23:44 IST |
+| WS1 Postman importer | GPT-5.6 Sol (medium) | Done | ws/1-importer | 2026-09-29 23:47 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
@@ -149,3 +149,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Importer and CLI package tests pass under the race detector; package lint findings were fixed.
 - Blockers / questions: None.
 - Next: Finish CLI/local-cache integration checks, exercise private staging if present, run the full repository build/race/lint suite, and harden any failures.
+
+### 2026-09-29 23:47 IST · WS1 · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/1-importer
+- Did: Completed exported-file and local-cache import paths, workspace discovery/creation, global and command-level workspace flags, dry-run re-import reporting, Keychain-backed secret migration, privacy-safe text/JSON output, and local-cache coverage warnings. The private staging acceptance case imports 2 collections, 23 requests, 17 pre-request scripts, and 3 environments, then reloads successfully.
+- Files: `internal/importer/postman/`, `cmd/postctl/{main.go,main_test.go,import.go,import_test.go}`, `docs/model.md`, `docs/ledger.md`
+- Decisions: Local-only workspace items are retained on re-import; source items moved between folders are replaced once by stable ID. Reports expose names, counts, compatibility categories, and cache gaps only.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` passed; `postctl import postman-local --dry-run --json` passed with expected privacy-safe coverage counts.
+- Blockers / questions: None.
+- Next: none
