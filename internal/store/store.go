@@ -160,15 +160,56 @@ func (s *Store) decode(path string, kind FileKind, inherit int, v any) (version 
 // [Store.Hydrate] to fill values in.
 //
 // Load is strict: a malformed file fails the load with a *FileError naming it.
-// Nodes without an id (hand-written files) get a deterministic derived ID that
-// is persisted on the next save.
+// Use [Store.LoadLenient] to load everything that is readable. Nodes without
+// an id (hand-written files) get a deterministic derived ID that is persisted
+// on the next save.
 func (s *Store) Load() (*model.Workspace, error) {
+	ws, _, err := (&loader{s: s}).workspace()
+	return ws, err
+}
+
+// LoadLenient is [Store.Load] for interactive clients: a file that fails to
+// read, parse or migrate is skipped and reported instead of failing the load,
+// and everything else loads. Each problem is a *FileError naming the file.
+//
+// What is skipped: a broken request file, a broken folder.yaml (the folder and
+// its subtree), a broken collection.yaml (the collection and its subtree), a
+// broken environment or globals file, and a request whose script file is
+// missing. Problems are returned in load order. The error result is non-nil
+// only when the workspace itself cannot be loaded (postctl.yaml is missing or
+// malformed, or a directory cannot be listed); the returned workspace is then
+// nil.
+func (s *Store) LoadLenient() (*model.Workspace, []*FileError, error) {
+	return (&loader{s: s, lenient: true}).workspace()
+}
+
+// loader carries the strict/lenient mode and collected problems through one
+// load.
+type loader struct {
+	s        *Store
+	lenient  bool
+	problems []*FileError
+}
+
+// skip reports whether err is a per-file problem that lenient mode records
+// and moves past. Other errors, and every error in strict mode, propagate.
+func (l *loader) skip(err error) bool {
+	var fe *FileError
+	if l.lenient && errors.As(err, &fe) {
+		l.problems = append(l.problems, fe)
+		return true
+	}
+	return false
+}
+
+func (l *loader) workspace() (*model.Workspace, []*FileError, error) {
+	s := l.s
 	var wf workspaceFile
 	if _, err := s.decode(filepath.Join(s.root, workspaceYAML), KindWorkspace, 0, &wf); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%w: %s", ErrNotWorkspace, s.root)
+			return nil, nil, fmt.Errorf("%w: %s", ErrNotWorkspace, s.root)
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	ws := &wf.Workspace
 	if ws.ID == "" {
@@ -177,19 +218,22 @@ func (s *Store) Load() (*model.Workspace, error) {
 
 	cdirs, err := s.collectionDirs()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, name := range orderEntries(cdirs, wf.CollectionOrder) {
-		c, err := s.loadCollection(filepath.Join(s.root, collectionsDir, name), name)
+		c, err := l.collection(filepath.Join(s.root, collectionsDir, name), name)
 		if err != nil {
-			return nil, err
+			if l.skip(err) {
+				continue
+			}
+			return nil, nil, err
 		}
 		ws.Collections = append(ws.Collections, c)
 	}
 
-	envs, err := s.loadEnvironments()
+	envs, err := l.environments()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ws.Environments = envs
 
@@ -197,15 +241,18 @@ func (s *Store) Load() (*model.Workspace, error) {
 	if isFile(gpath) {
 		var gf globalsFile
 		if _, err := s.decode(gpath, KindGlobals, 0, &gf); err != nil {
-			return nil, err
+			if !l.skip(err) {
+				return nil, nil, err
+			}
+		} else {
+			g := gf.Globals
+			if g.ID == "" {
+				g.ID = model.DeriveID(ws.ID, "globals")
+			}
+			ws.Globals = &g
 		}
-		g := gf.Globals
-		if g.ID == "" {
-			g.ID = model.DeriveID(ws.ID, "globals")
-		}
-		ws.Globals = &g
 	}
-	return ws, nil
+	return ws, l.problems, nil
 }
 
 // LoadCollection reads a single collection by ID without loading the rest of
@@ -241,7 +288,13 @@ func (s *Store) collectionDirs() ([]string, error) {
 	return out, nil
 }
 
+// loadCollection strictly loads one collection directory.
 func (s *Store) loadCollection(dir, dirName string) (*model.Collection, error) {
+	return (&loader{s: s}).collection(dir, dirName)
+}
+
+func (l *loader) collection(dir, dirName string) (*model.Collection, error) {
+	s := l.s
 	var cf collectionFile
 	ver, err := s.decode(filepath.Join(dir, collectionYAML), KindCollection, 0, &cf)
 	if err != nil {
@@ -254,7 +307,7 @@ func (s *Store) loadCollection(dir, dirName string) (*model.Collection, error) {
 	if err := loadScripts(dir, preScript, testScript, &c.Scripts); err != nil {
 		return nil, err
 	}
-	c.Items, err = s.loadItems(dir, c.ID, cf.Order, ver)
+	c.Items, err = l.items(dir, c.ID, cf.Order, ver)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +319,7 @@ type childEntry struct {
 	isDir bool
 }
 
-func (s *Store) loadItems(dir string, parent model.ID, order []string, ver int) ([]model.Item, error) {
+func (l *loader) items(dir string, parent model.ID, order []string, ver int) ([]model.Item, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, &FileError{Path: dir, Err: err}
@@ -302,11 +355,14 @@ func (s *Store) loadItems(dir string, parent model.ID, order []string, ver int) 
 			var it model.Item
 			var err error
 			if ce.isDir {
-				it, err = s.loadFolder(filepath.Join(dir, ce.name), parent, ce.name, ver)
+				it, err = l.folder(filepath.Join(dir, ce.name), parent, ce.name, ver)
 			} else {
-				it, err = s.loadRequest(dir, parent, ce.name, ver)
+				it, err = l.request(dir, parent, ce.name, ver)
 			}
 			if err != nil {
+				if l.skip(err) {
+					continue
+				}
 				return nil, err
 			}
 			items = append(items, it)
@@ -315,7 +371,8 @@ func (s *Store) loadItems(dir string, parent model.ID, order []string, ver int) 
 	return items, nil
 }
 
-func (s *Store) loadFolder(dir string, parent model.ID, name string, ver int) (*model.Folder, error) {
+func (l *loader) folder(dir string, parent model.ID, name string, ver int) (*model.Folder, error) {
+	s := l.s
 	var ff folderFile
 	if _, err := s.decode(filepath.Join(dir, folderYAML), KindFolder, ver, &ff); err != nil {
 		return nil, err
@@ -328,11 +385,12 @@ func (s *Store) loadFolder(dir string, parent model.ID, name string, ver int) (*
 		return nil, err
 	}
 	var err error
-	f.Items, err = s.loadItems(dir, f.ID, ff.Order, ver)
+	f.Items, err = l.items(dir, f.ID, ff.Order, ver)
 	return f, err
 }
 
-func (s *Store) loadRequest(dir string, parent model.ID, stem string, ver int) (*model.Request, error) {
+func (l *loader) request(dir string, parent model.ID, stem string, ver int) (*model.Request, error) {
+	s := l.s
 	var r model.Request
 	if _, err := s.decode(filepath.Join(dir, stem+".yaml"), KindRequest, ver, &r); err != nil {
 		return nil, err
@@ -384,7 +442,8 @@ func loadScript(dir, conventional string, sc *model.Script) (*model.Script, erro
 	return sc, nil
 }
 
-func (s *Store) loadEnvironments() ([]*model.Environment, error) {
+func (l *loader) environments() ([]*model.Environment, error) {
+	s := l.s
 	entries, err := os.ReadDir(filepath.Join(s.root, environmentsDir))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -400,6 +459,9 @@ func (s *Store) loadEnvironments() ([]*model.Environment, error) {
 		}
 		var ef environmentFile
 		if _, err := s.decode(filepath.Join(s.root, environmentsDir, name), KindEnvironment, 0, &ef); err != nil {
+			if l.skip(err) {
+				continue
+			}
 			return nil, err
 		}
 		env := ef.Environment

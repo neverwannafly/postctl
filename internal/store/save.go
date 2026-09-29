@@ -76,7 +76,13 @@ func managed(name string) bool {
 
 // prune removes managed files under root that are not in expected, then
 // removes directories emptied by that.
-func prune(root string, expected map[string]bool) error {
+//
+// With safe set (used when saving a collection from memory) prune never
+// deletes a file that a lenient load would have skipped: an unparsable request
+// or folder file, or one whose script file is missing, is left in place, along
+// with the scripts that belong to it. Otherwise autosaving a leniently loaded
+// collection would destroy the very files the user needs to fix.
+func (s *Store) prune(root string, expected map[string]bool, safe bool) error {
 	var stale []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -89,6 +95,9 @@ func prune(root string, expected map[string]bool) error {
 	})
 	if err != nil {
 		return err
+	}
+	if safe {
+		stale = s.deletable(stale, expected)
 	}
 	dirs := map[string]bool{}
 	for _, p := range stale {
@@ -110,6 +119,88 @@ func prune(root string, expected map[string]bool) error {
 		_ = os.Remove(d)
 	}
 	return nil
+}
+
+// deletable filters stale files down to those that are safe to delete: valid
+// nodes that are no longer in the model, and scripts of such nodes or of
+// nodes that were rewritten.
+func (s *Store) deletable(stale []string, expected map[string]bool) []string {
+	yamlOK := map[string]bool{}
+	for _, p := range stale {
+		if strings.HasSuffix(p, ".yaml") {
+			yamlOK[p] = s.loadable(p) && !s.underBrokenFolder(p, expected)
+		}
+	}
+	var out []string
+	for _, p := range stale {
+		if strings.HasSuffix(p, ".yaml") {
+			if yamlOK[p] {
+				out = append(out, p)
+			}
+			continue
+		}
+		sib := siblingYAML(p)
+		if !isFile(sib) || expected[sib] || yamlOK[sib] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// underBrokenFolder reports whether an ancestor directory of path (below the
+// collection) has a folder.yaml that a lenient load would skip; everything
+// beneath such a folder was never loaded, so it is not "gone from the model".
+func (s *Store) underBrokenFolder(path string, expected map[string]bool) bool {
+	for d := filepath.Dir(path); ; d = filepath.Dir(d) {
+		fy := filepath.Join(d, folderYAML)
+		if fy != path && isFile(fy) && !expected[fy] && !s.loadable(fy) {
+			return true
+		}
+		if isFile(filepath.Join(d, collectionYAML)) || d == filepath.Dir(d) {
+			return false
+		}
+	}
+}
+
+// siblingYAML is the YAML file a script file belongs to.
+func siblingYAML(script string) string {
+	dir, name := filepath.Split(script)
+	switch {
+	case name == preScript || name == testScript:
+		if isFile(filepath.Join(dir, folderYAML)) {
+			return filepath.Join(dir, folderYAML)
+		}
+		return filepath.Join(dir, collectionYAML)
+	case strings.HasSuffix(name, preSuffix):
+		return filepath.Join(dir, strings.TrimSuffix(name, preSuffix)+".yaml")
+	default:
+		return filepath.Join(dir, strings.TrimSuffix(name, testSuffix)+".yaml")
+	}
+}
+
+// loadable reports whether a request or folder file would load cleanly.
+func (s *Store) loadable(path string) bool {
+	dir := filepath.Dir(path)
+	var sc *model.Scripts
+	if filepath.Base(path) == folderYAML {
+		var ff folderFile
+		if _, err := s.decode(path, KindFolder, model.SchemaVersion, &ff); err != nil {
+			return false
+		}
+		sc = &ff.Scripts
+	} else {
+		var r model.Request
+		if _, err := s.decode(path, KindRequest, model.SchemaVersion, &r); err != nil {
+			return false
+		}
+		sc = &r.Scripts
+	}
+	for _, x := range []*model.Script{sc.PreRequest, sc.Test} {
+		if x != nil && x.File != "" && (safeRel(x.File) != nil || !isFile(filepath.Join(dir, x.File))) {
+			return false
+		}
+	}
+	return true
 }
 
 // layout planning ------------------------------------------------------------
@@ -302,7 +393,9 @@ func (s *Store) Save(ctx context.Context, ws *model.Workspace) error {
 		return err
 	}
 	for name, id := range cidx {
-		if id != "" && !keepC[id] {
+		// A collection.yaml that does not parse is a file the user has to
+		// fix, not a deleted collection: leave it (LoadLenient reports it).
+		if id != "" && !keepC[id] && s.collectionParses(name) {
 			if err := s.removeCollectionDir(ctx, name); err != nil {
 				return err
 			}
@@ -317,7 +410,7 @@ func (s *Store) Save(ctx context.Context, ws *model.Workspace) error {
 		return err
 	}
 	for stem, id := range eidx {
-		if !keepE[id] {
+		if !keepE[id] && s.envParses(stem) {
 			if err := s.removeEnvFile(ctx, stem); err != nil {
 				return err
 			}
@@ -347,6 +440,18 @@ func (s *Store) Save(ctx context.Context, ws *model.Workspace) error {
 		}
 	}
 	return s.writeWorkspaceFile(ws, order)
+}
+
+func (s *Store) collectionParses(dirName string) bool {
+	var cf collectionFile
+	_, err := s.decode(filepath.Join(s.root, collectionsDir, dirName, collectionYAML), KindCollection, 0, &cf)
+	return err == nil
+}
+
+func (s *Store) envParses(stem string) bool {
+	var ef environmentFile
+	_, err := s.decode(filepath.Join(s.root, environmentsDir, stem+".yaml"), KindEnvironment, 0, &ef)
+	return err == nil
 }
 
 // SaveCollection writes one collection, including every folder, request and
@@ -440,7 +545,7 @@ func (s *Store) saveCollectionFiles(ctx context.Context, c *model.Collection) (n
 	if werr != nil {
 		return "", "", werr
 	}
-	if err := prune(dir, w.expected); err != nil {
+	if err := s.prune(dir, w.expected, true); err != nil {
 		return "", "", err
 	}
 	return name, old, nil
@@ -604,7 +709,7 @@ func (s *Store) removeCollectionDir(ctx context.Context, name string) error {
 	if c, err := s.loadCollection(dir, name); err == nil {
 		s.deleteRefs(ctx, collectionRefs(c), nil)
 	}
-	if err := prune(dir, map[string]bool{}); err != nil {
+	if err := s.prune(dir, map[string]bool{}, false); err != nil {
 		return err
 	}
 	_ = os.Remove(dir)

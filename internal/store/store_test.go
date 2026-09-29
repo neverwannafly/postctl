@@ -885,6 +885,7 @@ func TestDiscover(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv(EnvHome, "")
+	t.Setenv(EnvWorkspace, "")
 	t.Setenv(EnvXDGConfigHome, filepath.Join(base, "xdg"))
 
 	loc, err := Discover(deep)
@@ -1120,5 +1121,249 @@ func TestKeychainReal(t *testing.T) {
 	}
 	if _, err := k.Get(ctx, ref); !errors.Is(err, ErrSecretNotFound) {
 		t.Fatalf("after delete: %v", err)
+	}
+}
+
+func TestDiscoverExplicitWorkspace(t *testing.T) {
+	base := t.TempDir()
+	proj := filepath.Join(base, "proj")
+	deep := filepath.Join(proj, "a")
+	other := filepath.Join(base, "other")
+	fresh := filepath.Join(base, "fresh") // not initialized, not even created
+	for _, d := range []string{deep, other} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := Init(proj, "p"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init(other, "o"); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(EnvHome, "")
+	t.Setenv(EnvWorkspace, "")
+	t.Setenv(EnvXDGConfigHome, filepath.Join(base, "xdg"))
+
+	// The flag beats a project found by walking up.
+	loc, err := Discover(deep, WithWorkspace(other))
+	if err != nil || loc.Source != SourceFlag || loc.Root != other || !loc.Initialized {
+		t.Fatalf("flag: %+v %v", loc, err)
+	}
+	// An empty flag value is ignored.
+	if loc, _ := Discover(deep, WithWorkspace("")); loc.Source != SourceProject {
+		t.Fatalf("empty flag must fall through: %+v", loc)
+	}
+	// The env var beats discovery; the flag beats the env var.
+	t.Setenv(EnvWorkspace, other)
+	if loc, _ := Discover(deep); loc.Source != SourceEnv || loc.Root != other || !loc.Initialized {
+		t.Fatalf("env: %+v", loc)
+	}
+	if loc, _ := Discover(deep, WithWorkspace(proj)); loc.Source != SourceFlag || loc.Root != proj {
+		t.Fatalf("flag over env: %+v", loc)
+	}
+	// An explicit workspace need not exist yet; Initialized says so.
+	loc, err = Discover(deep, WithWorkspace(fresh))
+	if err != nil || loc.Initialized || loc.Root != fresh {
+		t.Fatalf("fresh: %+v %v", loc, err)
+	}
+	// A relative path is made absolute.
+	t.Chdir(base)
+	if loc, _ := Discover(deep, WithWorkspace("other")); loc.Root != other && evalSymlinks(t, loc.Root) != evalSymlinks(t, other) {
+		t.Fatalf("relative: %+v", loc)
+	}
+	// A file is not a workspace.
+	f := filepath.Join(base, "file")
+	_ = os.WriteFile(f, nil, 0o644)
+	if _, err := Discover(deep, WithWorkspace(f)); err == nil {
+		t.Fatal("file must be rejected")
+	}
+	// The result is usable.
+	loc, _ = Discover(deep, WithWorkspace(other))
+	if _, err := Open(loc.Root); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestLoadLenient(t *testing.T) {
+	s, _, root := newTestStore(t)
+	if err := s.Save(ctx, richWorkspace()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Clean workspace: no problems, identical to Load.
+	strict, err := s.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	lenient, problems, err := s.LoadLenient()
+	if err != nil || len(problems) != 0 {
+		t.Fatalf("clean: %v %v", err, problems)
+	}
+	requireEqual(t, strict, lenient)
+
+	pay := filepath.Join(root, "collections", "payments-api")
+	corrupt := func(rel, content string) string {
+		p := filepath.Join(root, rel)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	badReq := corrupt("collections/payments-api/charges/002-create-charge.yaml", "name: [unterminated\n")
+	badTypo := corrupt("collections/payments-api/002-ping.yaml", "name: Ping\nmehtod: HEAD\n")
+	badFolder := corrupt("collections/payments-api/auth-schemes/folder.yaml", "name: {\n")
+	badColl := corrupt("collections/payments-api-2/collection.yaml", "schemaVersion: 99\nname: future\n")
+	badEnv := corrupt("environments/prod.yaml", "schemaVersion: 1\nname: Prod\nbogus: 1\n")
+	badGlobals := corrupt("globals.yaml", "id: [\n")
+	// A request whose script file has gone missing.
+	if err := os.Remove(filepath.Join(pay, "charges", "001-list-charges.test.js")); err != nil {
+		t.Fatal(err)
+	}
+	missingScript := filepath.Join(pay, "charges", "001-list-charges.test.js")
+
+	// Strict Load fails.
+	if _, err := s.Load(); err == nil {
+		t.Fatal("strict Load must fail on a broken file")
+	}
+
+	ws, problems, err := s.LoadLenient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, p := range problems {
+		got[p.Path] = true
+		if p.Err == nil || p.Error() == "" {
+			t.Errorf("problem without error: %+v", p)
+		}
+	}
+	for _, want := range []string{badReq, badTypo, badFolder, badColl, badEnv, badGlobals, missingScript} {
+		if !got[want] {
+			t.Errorf("problem for %s not reported (got %v)", want, keys(got))
+		}
+	}
+	if len(problems) != 7 {
+		t.Errorf("want 7 problems, got %d: %v", len(problems), problems)
+	}
+	if !errors.Is(problems[indexOfPath(problems, badColl)], ErrNewerSchema) {
+		t.Error("problems must keep the underlying error for errors.Is")
+	}
+
+	// Everything else loaded.
+	if len(ws.Collections) != 1 || ws.Collections[0].ID != "coll-pay" {
+		t.Fatalf("collections: %d", len(ws.Collections))
+	}
+	c := ws.Collections[0]
+	if _, _, _, ok := c.Find("req-create"); ok {
+		t.Error("broken request must be skipped")
+	}
+	if _, _, _, ok := c.Find("req-nobody"); ok {
+		t.Error("request with an unknown field must be skipped")
+	}
+	if _, _, _, ok := c.Find("f-auth"); ok {
+		t.Error("folder with a broken folder.yaml must be skipped with its subtree")
+	}
+	if _, _, _, ok := c.Find("req-hawk"); ok {
+		t.Error("subtree of a broken folder must be skipped")
+	}
+	if _, _, _, ok := c.Find("req-list"); ok {
+		t.Error("request with a missing script file must be skipped")
+	}
+	for _, id := range []model.ID{"f-charges", "f-forms", "req-urlenc", "req-form", "req-bin", "req-gql", "f-empty"} {
+		if _, _, _, ok := c.Find(id); !ok {
+			t.Errorf("%s should have loaded", id)
+		}
+	}
+	if len(ws.Environments) != 1 || ws.Environments[0].ID != "env-dev" {
+		t.Errorf("environments: %v", ws.Environments)
+	}
+	if ws.Globals != nil {
+		t.Error("broken globals must be skipped")
+	}
+
+	// A malformed workspace file is fatal even when lenient.
+	corrupt("postctl.yaml", "name: [\n")
+	if ws, _, err := s.LoadLenient(); err == nil || ws != nil {
+		t.Fatalf("broken postctl.yaml must be an error: %v %v", ws, err)
+	}
+	if err := os.Remove(filepath.Join(root, "postctl.yaml")); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.LoadLenient(); !errors.Is(err, ErrNotWorkspace) {
+		t.Fatalf("missing postctl.yaml: %v", err)
+	}
+}
+
+func indexOfPath(ps []*FileError, path string) int {
+	for i, p := range ps {
+		if p.Path == path {
+			return i
+		}
+	}
+	return 0
+}
+
+// Saving what a lenient load returned must not destroy the files it skipped.
+func TestSaveAfterLenientLoadKeepsBrokenFiles(t *testing.T) {
+	s, _, root := newTestStore(t)
+	if err := s.Save(ctx, richWorkspace()); err != nil {
+		t.Fatal(err)
+	}
+	write := func(rel, content string) string {
+		p := filepath.Join(root, rel)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	charges := "collections/payments-api/charges/"
+	brokenReq := write(charges+"002-create-charge.yaml", "name: [broken\n")
+	brokenFolder := write("collections/payments-api/auth-schemes/folder.yaml", "name: {\n")
+	brokenColl := write("collections/payments-api-2/collection.yaml", "name: [\n")
+	brokenEnv := write("environments/prod.yaml", "name: [\n")
+	// list-charges has valid YAML but lost its test script.
+	lostScript := filepath.Join(root, charges, "001-list-charges.test.js")
+	if err := os.Remove(lostScript); err != nil {
+		t.Fatal(err)
+	}
+	preOfLost := filepath.Join(root, charges, "001-list-charges.pre.js")
+
+	ws, problems, err := s.LoadLenient()
+	if err != nil || len(problems) == 0 {
+		t.Fatalf("setup: %v %v", err, problems)
+	}
+	// Edit something that did load, then save via every path.
+	ws.Collections[0].Description = "edited"
+	ws.Environments[0].Description = "edited"
+	if err := s.SaveCollection(ctx, ws.Collections[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save(ctx, ws); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, p := range []string{brokenReq, brokenFolder, brokenColl, brokenEnv, filepath.Join(root, charges, "001-list-charges.yaml"), preOfLost,
+		filepath.Join(root, "collections/payments-api/auth-schemes/001-hawk-signed.yaml")} {
+		if !isFile(p) {
+			t.Errorf("%s was deleted", p)
+		}
+	}
+	// The same problems are still reported, and the edit landed.
+	_, again, err := s.LoadLenient()
+	if err != nil || len(again) != len(problems) {
+		t.Fatalf("problems changed: %d -> %d (%v)", len(problems), len(again), err)
+	}
+	ws2, _, _ := s.LoadLenient()
+	if ws2.Collections[0].Description != "edited" {
+		t.Error("edit was not saved")
+	}
+
+	// Explicit deletion still removes everything the store owns.
+	if err := s.DeleteCollection(ctx, "coll-pay"); err != nil {
+		t.Fatal(err)
+	}
+	if isDir(filepath.Join(root, "collections", "payments-api")) {
+		t.Error("explicit delete must remove broken files too")
 	}
 }
