@@ -26,7 +26,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
-| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:18 IST |
+| WS3 script runtime | Opus 5 Thinking (high) | Done, awaiting merge | ws/3-script | 2026-09-30 01:52 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
 | WS6 editor + response viewer | — | Not started | — | — |
@@ -167,3 +167,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: **Private data: 17 of 17 real pre-request scripts ran clean — no ScriptError, no unsupported-API warning.** Across the 17 chains the scripts made 30 variable writes and 17 `pm.sendRequest` calls, so they are doing real work, not exiting early. Counts only; nothing from that data is logged anywhere.
 - Blockers / questions: none.
 - Next: `docs/scripting.md`, then the full build/test/lint gate.
+
+### 2026-09-30 01:52 IST · WS3 · Opus 5 Thinking · DONE
+- Branch/worktree: ws/3-script (not merged, not pushed)
+- Did: `internal/script` is complete: the goja sandbox, the T1+T2 `pm.*` surface plus the cheap T3 legacy globals, ten embedded npm bundles, async `pm.sendRequest`, timers and the event loop, timeouts via `vm.Interrupt`, the cookie jar, error mapping to `Script.File` and line, a 46-case compatibility corpus, the private-data test, and `docs/scripting.md`.
+- Files: `internal/script/**`, `docs/scripting.md`, `internal/script/assets/README.md`, `Taskfile.yml` (new `assets` task), `go.mod`, `go.sum`
+- Decisions: No contract changes were needed — `internal/vars/scope.go` and `internal/httpx/types.go` are untouched, and `internal/model` is untouched. The only edits outside `internal/script/` and `docs/scripting.md` are the additive `task assets` target and the two goja dependencies. WS4 should call `script.Run(ctx, chain, script.Input{…})` once per event and persist `Input.Vars.Changes()` afterwards; `Result.Request` is always a distinct value from `Input.Request`, so the pipeline can diff them.
+- Deviations from Postman, all documented in `docs/scripting.md`: crypto-js 4.2.0 instead of 3.3.0 (CVE-2023-46233; only the PBKDF2 defaults differ); `pm.*` objects are postctl's own implementation of postman-collection's semantics, so `pm.request instanceof sdk.Request` is false; query strings are not percent-normalised, which keeps `{{variable}}` intact; `<scope>.values` is a snapshot because postctl holds no variable state of its own; `pm.visualizer`, `pm.vault`, `pm.require` and `pm.execution.runRequest` warn and no-op; `pm.info.collectionName` is an addition.
+- Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` all green. Corpus 46/46. **Private data: 17 of 17 real pre-request scripts run clean, no unsupported-API errors or warnings.** Warm run of a trivial script 0.47 ms, crypto-js signing 3.4 ms, five chai assertions 3.7 ms, against a 5 ms budget.
+- Blockers / questions: none.
+- Next: none. Ready for the orchestrator to review and merge.
