@@ -22,6 +22,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | Plan | Orchestrator | Draft v0, awaiting user answers | — | 2026-09-29 |
 | WS0 scaffold/model/store | — | Not started | — | — |
 | WS1 Postman importer | — | Not started | — | — |
+| WS1b Postman local extractor | GPT-5.6 Sol | Started | ws/1b-postman-local | 2026-09-29 23:09 IST |
 | WS2 vars + httpx | — | Not started | — | — |
 | WS3 script runtime | — | Not started | — | — |
 | WS4 engine/runner | — | Not started | — | — |
@@ -45,3 +46,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: WS1b outputs standard v2.1 JSON so the importer (WS1) stays format-stable. Private extracted data goes to gitignored `testdata/private/`.
 - Blockers / questions: Round-2 questions (gRPC/OAuth2 depth, launch approval).
 - Next: Write briefs for WS0 and WS1b, then launch Wave 1.
+
+### 2026-09-29 23:09 IST · WS1b · GPT-5.6 Sol · STARTED
+- Branch/worktree: ws/1b-postman-local
+- Did: Read the authoritative brief, plan §0 and Q15 findings, and ledger process. Began the read-only Phase A format spike.
+- Files: `docs/ledger.md`
+- Decisions: Real IndexedDB data will be copied to temporary storage before inspection; all diagnostics are restricted to non-sensitive structure, names, and counts.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Enumerate copied databases and object stores, identify record shapes and decoding feasibility, then document findings before Phase B.
+
+### 2026-09-29 23:34 IST · WS1b · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/1b-postman-local
+- Did: Completed Phase A against a temporary copy of the active partition. Identified current `v3-collections` and `environments` stores plus the legacy `variable_sessions` globals source; documented key prefixes, value envelopes, record field names, relationships, ordering, scripts, and environment/global shapes.
+- Files: `docs/postman-local-format.md`, `docs/ledger.md`, `go.mod`, `go.sum`
+- Decisions: Pure-Go extraction is feasible. Use `goleveldb` with comparator name `idb_cmp1` for an unbounded sequential scan; decode the IndexedDB/Blink envelopes, Snappy marker, and the V8 tags present. Treat missing/partial cache records as explicit coverage gaps and retain Postman File → Export as fallback.
+- Tests: A privacy-safe spike decoded current records without exposing values. Current live-cache probe found 2 root collections, 11 folders, 29 requests, 17 pre-request scripts, 0 test scripts, 3 environments, and no live globals record.
+- Blockers / questions: The cache is partial. External blob values are identifiable but were not needed by current live collection/environment records.
+- Next: Implement and test the package, staging writer, coverage report, and development CLI.
