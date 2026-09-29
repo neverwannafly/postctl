@@ -425,3 +425,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Full build, race tests and lint are green. Built `/tmp/postctl` and ran it through the pty harness at 140×40 against a temporary synthetic workspace and local HTTP server. Selected "List charges", pressed `Ctrl-S`, and the response pane rendered the real server's `404 File not found` status, timing and body.
 - Blockers / questions: none.
 - Next: final full check and DONE entry.
+
+### 2026-09-30 02:23 IST · INT1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `main` in `/Users/shubham/work/postctl`
+- Did: Completed the staged WS6a merge, removed its worktree, verified and merged WS4, wired real TUI sends with one shared cookie jar, implemented D7–D10, and passed a real-engine pty smoke test.
+- Files: `cmd/postctl/wire.go`, `internal/{engine,httpx,store,tui}/**`, `docs/{engine,plan,ledger}.md`
+- Decisions: D7–D10 are locked in plan §0. The fake sender is opt-in with `POSTCTL_FAKE_SENDER=1`; engine construction retries lazily after first-run workspace creation.
+- Tests: Final `go build ./... && go test -race ./... && golangci-lint run` passed.
+- Blockers / questions: none. Existing QA follow-up remains: move envedit, cookies and textarea scroll-offset adjustment out of `View` and into `Update`.
+- Next: WS7 can build CLI send/run against the merged engine.
