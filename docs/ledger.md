@@ -29,7 +29,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-29 23:35 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
-| WS6 editor + response viewer | — | Not started | — | — |
+| WS6a request editor + send wiring | Sonnet 5.5 (high) | Running | ws/6a-request-editor | 2026-09-30 00:20 IST |
+| WS6b response viewer | Composer 2.5 (fast) | Running | ws/6b-response-viewer | 2026-09-30 00:20 IST |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
@@ -277,3 +278,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green. Cold start to first frame with 1,000 requests: 44 ms in the harness, 2.9 ms of that in the app (benchmark); process start to first output about 45 ms in a pty.
 - Blockers / questions: (1) Fold state persistence needs a field in `store.State`. (2) kqueue uses a descriptor per watched directory; the polling fallback covers huge trees but is untested at that scale. (3) WS6: which of `Ctrl-Enter` and `Ctrl-S` sends? Both are reserved in the key map.
 - Next: merge `ws/5-tui-shell` after WS0.1 (swap `deepCopy` for `Clone`, drop the `LoadLenient` shim); then WS6 implements the Request and Response panes.
+
+### 2026-09-30 00:20 IST · WS5 · Orchestrator · PROGRESS
+- Did: Verified `ws/5-tui-shell` (in scope; golden renders reviewed by hand, e.g. the delete dialog at 200×60 defaults to Cancel and names the folder and request count). Merged into `main`, resolving `go.mod`/`go.sum`/ledger conflicts and a duplicate global `--workspace` flag between WS1 and WS5 in `cmd/postctl/main.go`. Build, race tests and lint are green.
+- Decisions: D5 (send keys) and D6 (persist fold state) answer WS5's questions. WS5's `deepCopy`/`LoadLenient`-probe stand-ins still work (the probe now finds the real method); their cleanup is assigned to WS6a. Added C2: `internal/tui/send.go` send contract.
+- Next: Launch WS6a (Sonnet 5.5) and WS6b (Composer 2.5) in parallel. WS4 (engine) starts when WS3 merges and will implement `tui.Sender`.
