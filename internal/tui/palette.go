@@ -15,6 +15,9 @@ func (a *app) builtinActions() []Action {
 			Run: func() tea.Cmd { a.ov = newEnvOverlay(a); return nil }},
 		{ID: "tree.new", Title: "New request, folder or collection", Group: "Collections", Keys: "n",
 			Run: func() tea.Cmd { return a.setFocusThen(SlotSidebar, a.openNew) }},
+		{ID: "tree.newWebSocket", Title: "New WebSocket request", Group: "Collections",
+			Enabled: func() bool { return a.hasKindPane(model.KindWebSocket) },
+			Run:     func() tea.Cmd { return a.setFocusThen(SlotSidebar, a.openNewWebSocket) }},
 		{ID: "tree.filter", Title: "Filter requests", Group: "Collections", Keys: "/",
 			Run: func() tea.Cmd { return tea.Batch(a.setFocus(SlotSidebar), a.tree.startFilter()) }},
 		{ID: "focus.collections", Title: "Go to collections", Group: "Navigation", Keys: "1", Run: in(SlotSidebar)},
@@ -88,7 +91,7 @@ func (a *app) openPalette() tea.Cmd {
 			_ = c.Walk(func(it model.Item, _ model.Container, _ int) error {
 				if r, ok := it.(*model.Request); ok {
 					n := a.tree.nodes[r.ID]
-					items = append(items, pickItem{label: strings.Join(n.path, arrow), method: r.Method, payload: requestPayload{r.ID}})
+					items = append(items, pickItem{label: strings.Join(n.path, arrow), method: methodBadge(r), payload: requestPayload{r.ID}})
 				}
 				return nil
 			})

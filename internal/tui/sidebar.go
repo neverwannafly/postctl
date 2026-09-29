@@ -18,10 +18,22 @@ const (
 	kindRequest itemKind = iota
 	kindFolder
 	kindCollection
+	kindWebSocket
 )
 
 func (k itemKind) String() string {
-	return [...]string{"Request", "Folder", "Collection"}[k]
+	return [...]string{"Request", "Folder", "Collection", "WebSocket request"}[k]
+}
+
+// hasKindPane reports whether a pane is registered for requests of kind, so
+// creating one would open in an editor rather than the placeholder.
+func (a *app) hasKindPane(kind model.Kind) bool {
+	r, ok := a.request.(*kindRouter)
+	if !ok {
+		return false
+	}
+	_, ok = r.byKind[kind]
+	return ok
 }
 
 // sidebarKey handles a key while the collection tree has focus.
@@ -127,6 +139,9 @@ func (a *app) openNew() tea.Cmd {
 		kinds = []string{"Request", "Collection"}
 		note = "in a new collection"
 	}
+	if a.hasKindPane(model.KindWebSocket) {
+		kinds = append(kinds[:1:1], append([]string{"WebSocket"}, kinds[1:]...)...)
+	}
 	p, cmd := newPrompt(a, "New", note, "", kinds, func(a *app, name string, sel int) (string, tea.Cmd) {
 		kind := kindRequest
 		switch kinds[sel] {
@@ -134,8 +149,23 @@ func (a *app) openNew() tea.Cmd {
 			kind = kindFolder
 		case "Collection":
 			kind = kindCollection
+		case "WebSocket":
+			kind = kindWebSocket
 		}
 		return a.create(kind, name)
+	})
+	a.ov = p
+	return cmd
+}
+
+// openNewWebSocket asks for a name and creates a WebSocket request.
+func (a *app) openNewWebSocket() tea.Cmd {
+	note := "in " + a.newTargetLabel()
+	if len(a.collections()) == 0 {
+		note = "in a new collection"
+	}
+	p, cmd := newPrompt(a, "New WebSocket request", note, "", nil, func(a *app, name string, _ int) (string, tea.Cmd) {
+		return a.create(kindWebSocket, name)
 	})
 	a.ov = p
 	return cmd
@@ -186,7 +216,7 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 	if kind == kindCollection {
 		c := model.NewCollection(name)
 		a.ws.Collections = append(a.ws.Collections, c)
-		return "", a.afterEdit(c, c.ID, kind == kindRequest)
+		return "", a.afterEdit(c, c.ID, false)
 	}
 
 	coll, parent, index := a.insertionPoint()
@@ -198,6 +228,8 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 	var item model.Item
 	if kind == kindFolder {
 		item = model.NewFolder(name)
+	} else if kind == kindWebSocket {
+		item = model.NewWebSocketRequest(name, "")
 	} else {
 		item = model.NewRequest(name, "GET", "")
 	}
@@ -207,7 +239,7 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 	if parent.ContainerID() != coll.ID {
 		a.tree.expanded[parent.ContainerID()] = true
 	}
-	return "", a.afterEdit(coll, item.ItemID(), kind == kindRequest)
+	return "", a.afterEdit(coll, item.ItemID(), kind == kindRequest || kind == kindWebSocket)
 }
 
 // insertionPoint picks where a new request or folder goes: inside a selected
