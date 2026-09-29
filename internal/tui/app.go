@@ -37,6 +37,13 @@ type Options struct {
 	// NewRequestPane and NewResponsePane supply the panes for the Request and
 	// Response slots. Nil selects the built-in placeholders.
 	NewRequestPane, NewResponsePane PaneFactory
+	// Sender runs the send pipeline for the Request pane's send key. Nil
+	// disables sending (the pane says so). cmd/postctl supplies the engine
+	// adapter, or a fake until the engine lands.
+	Sender Sender
+	// NewEnvEditor and NewCookieManager supply the environment editor
+	// (Ctrl-E) and the cookie manager screens. Nil hides their actions.
+	NewEnvEditor, NewCookieManager ScreenFactory
 	// Registry receives palette actions; a fresh one is used when nil.
 	Registry *Registry
 	// NoWatch disables file watching (tests).
@@ -110,6 +117,8 @@ type app struct {
 	toast    *toastState
 	toastSeq int
 
+	foldSeq        int
+	sends          map[model.ID]*flight
 	saver          saveQueue
 	quitting       bool
 	selfWriteUntil time.Time
@@ -156,6 +165,7 @@ func newApp(opts Options) *app {
 	a.request, a.response = newReq(env), newResp(env)
 	a.registry.AddFunc(a.builtinActions)
 	a.registry.AddFunc(a.paneActions)
+	a.registry.AddFunc(a.screenActions)
 	a.layoutPanes()
 	return a
 }
@@ -211,7 +221,7 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		return a, a.setDark(msg.IsDark())
 	case tea.KeyPressMsg:
-		return a, a.onKey(msg)
+		return a, tea.Batch(a.onKey(msg), a.syncFold())
 	case tea.PasteMsg:
 		return a, a.onPaste(msg)
 	case showLoadingMsg:
@@ -257,6 +267,21 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.loadCmd(nil)
 	case quitNowMsg:
 		return a, a.quit(true)
+	case SendRequestMsg:
+		return a, a.startSend(msg.Request)
+	case RetrySendMsg:
+		return a, a.retrySend(msg.RequestID)
+	case CancelSendMsg:
+		a.cancelSend(msg.RequestID)
+		return a, nil
+	case sendEventsMsg:
+		return a, a.onSendEvents(msg)
+	case SaveMsg:
+		return a, a.onSaveMsg(msg)
+	case OpenScreenMsg:
+		return a, a.openScreen(msg.Screen)
+	case foldPersistMsg:
+		return a, a.onFoldPersist(msg)
 	}
 	// Anything else (including pane-private messages) goes to both panes.
 	return a, a.forward(msg)
@@ -267,7 +292,11 @@ func (a *app) forward(msg tea.Msg) tea.Cmd {
 	var c1, c2 tea.Cmd
 	a.request, c1 = a.request.Update(msg)
 	a.response, c2 = a.response.Update(msg)
-	return tea.Batch(c1, c2)
+	var c3 tea.Cmd
+	if _, ok := a.ov.(*screenOverlay); ok {
+		c3 = a.updateOverlay(msg)
+	}
+	return tea.Batch(c1, c2, c3)
 }
 
 // broadcast is forward for shell-originated messages.
@@ -300,6 +329,9 @@ func (a *app) onLoaded(msg loadedMsg) tea.Cmd {
 	}
 	if a.activeEnv != "" && a.ws.Environment(a.activeEnv) == nil {
 		a.activeEnv = "" // the environment was deleted on disk
+	}
+	if first {
+		a.tree.seedFolds(a.state.Folded, a.ws)
 	}
 	a.tree.setWorkspace(a.ws, a.problems, a.be.Root())
 	a.layoutPanes()
@@ -379,6 +411,14 @@ type quitNowMsg struct{}
 // quit leaves the program. Pending saves finish first so no edit is lost;
 // force skips that wait.
 func (a *app) quit(force bool) tea.Cmd {
+	a.cancelAllSends()
+	if !force {
+		if flush, n := a.flushDirty(); n > 0 && !a.quitting {
+			// Edits whose autosave timer has not fired yet are written now.
+			a.quitting = true
+			return tea.Batch(flush, a.toastInfo("Saving before quit…"))
+		}
+	}
 	if !force && a.saver.busy() {
 		a.quitting = true
 		return a.toastInfo("Saving before quit…")
@@ -539,6 +579,8 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, a.keys.Env):
 		a.ov = newEnvOverlay(a)
 		return nil, true
+	case key.Matches(msg, a.keys.EnvEdit) && a.opts.NewEnvEditor != nil:
+		return a.openEnvEditor(""), true
 	case key.Matches(msg, a.keys.Quit):
 		return a.quit(false), true
 	case key.Matches(msg, a.keys.Next):
@@ -599,9 +641,14 @@ func (a *app) setFocus(s Slot) tea.Cmd {
 	if s == a.focus {
 		return nil
 	}
+	var blur tea.Cmd
 	switch a.focus {
 	case SlotRequest:
 		a.request.Blur()
+		// A pane that saves on blur returns the command that does it.
+		if b, ok := a.request.(interface{ BlurCmd() tea.Cmd }); ok {
+			blur = b.BlurCmd()
+		}
 	case SlotResponse:
 		a.response.Blur()
 	}
@@ -618,7 +665,7 @@ func (a *app) setFocus(s Slot) tea.Cmd {
 		a.rightShow = SlotResponse
 		cmd = a.response.Focus()
 	}
-	return cmd
+	return tea.Batch(blur, cmd)
 }
 
 // layoutKind is the layout in effect: accessible mode is always linear.

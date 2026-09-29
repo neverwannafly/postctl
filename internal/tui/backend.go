@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"reflect"
 
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
@@ -72,32 +71,13 @@ func (b *storeBackend) open() (*store.Store, error) {
 	return s, nil
 }
 
-// lenientLoader is what WS0.1 adds to the store. Both plausible signatures are
-// probed with type assertions so this file compiles before and after it
-// lands; until then Load is used and a broken file fails the whole load.
-type (
-	lenientLoader interface {
-		LoadLenient() (*model.Workspace, []*store.FileError, error)
-	}
-	lenientLoaderCtx interface {
-		LoadLenient(ctx context.Context) (*model.Workspace, []*store.FileError, error)
-	}
-)
-
 // Load implements the interface it is used through.
-func (b *storeBackend) Load(ctx context.Context) (*model.Workspace, []*store.FileError, error) {
+func (b *storeBackend) Load(_ context.Context) (*model.Workspace, []*store.FileError, error) {
 	s, err := b.open()
 	if err != nil {
 		return nil, nil, err
 	}
-	switch l := any(s).(type) {
-	case lenientLoaderCtx:
-		return l.LoadLenient(ctx)
-	case lenientLoader:
-		return l.LoadLenient()
-	}
-	ws, err := s.Load()
-	return ws, nil, err
+	return s.LoadLenient()
 }
 
 // Init implements the interface it is used through.
@@ -168,58 +148,50 @@ func (b *storeBackend) SaveState(st store.State) error {
 	return s.SaveState(st)
 }
 
-// deepCopy returns an independent copy of v. Saves run on another goroutine,
-// so they always work on a snapshot taken on the Update goroutine; that also
-// keeps a later in-place edit from racing with a write in flight.
-func deepCopy[T any](v T) T {
-	out := copyValue(reflect.ValueOf(&v).Elem())
-	return out.Interface().(T)
+// DeleteEnvironment implements [EnvironmentDeleter].
+func (b *storeBackend) DeleteEnvironment(ctx context.Context, id model.ID) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	return s.DeleteEnvironment(ctx, id)
 }
 
-func copyValue(src reflect.Value) reflect.Value {
-	switch src.Kind() {
-	case reflect.Pointer:
-		if src.IsNil() {
-			return src
-		}
-		dst := reflect.New(src.Type().Elem())
-		dst.Elem().Set(copyValue(src.Elem()))
-		return dst
-	case reflect.Interface:
-		if src.IsNil() {
-			return src
-		}
-		dst := reflect.New(src.Type()).Elem()
-		dst.Set(copyValue(src.Elem()))
-		return dst
-	case reflect.Slice:
-		if src.IsNil() {
-			return src
-		}
-		dst := reflect.MakeSlice(src.Type(), src.Len(), src.Len())
-		for i := 0; i < src.Len(); i++ {
-			dst.Index(i).Set(copyValue(src.Index(i)))
-		}
-		return dst
-	case reflect.Map:
-		if src.IsNil() {
-			return src
-		}
-		dst := reflect.MakeMapWithSize(src.Type(), src.Len())
-		for _, k := range src.MapKeys() {
-			dst.SetMapIndex(k, copyValue(src.MapIndex(k)))
-		}
-		return dst
-	case reflect.Struct:
-		dst := reflect.New(src.Type()).Elem()
-		dst.Set(src) // unexported fields are copied shallowly
-		for i := 0; i < src.NumField(); i++ {
-			if dst.Field(i).CanSet() {
-				dst.Field(i).Set(copyValue(src.Field(i)))
-			}
-		}
-		return dst
-	default:
-		return src
+// SaveGlobals implements [GlobalsSaver].
+func (b *storeBackend) SaveGlobals(ctx context.Context, g *model.Globals) error {
+	s, err := b.open()
+	if err != nil {
+		return err
 	}
+	return s.SaveGlobals(ctx, g)
+}
+
+// HydrateVariables implements [Hydrator]: it reads secret values from the
+// secret store into vars. Refs with no stored value stay empty.
+func (b *storeBackend) HydrateVariables(ctx context.Context, vars []model.Variable) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	_, err = s.HydrateVariables(ctx, vars)
+	return err
+}
+
+// HydrateAuth implements [Hydrator] for OAuth 2.0 token secrets.
+func (b *storeBackend) HydrateAuth(ctx context.Context, a *model.Auth) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	_, err = s.HydrateAuth(ctx, a)
+	return err
+}
+
+// PathOf implements [PathResolver].
+func (b *storeBackend) PathOf(c *model.Collection, id model.ID) (string, error) {
+	s, err := b.open()
+	if err != nil {
+		return "", err
+	}
+	return s.PathOf(c, id)
 }

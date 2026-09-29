@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
@@ -238,3 +239,112 @@ type DirtyMsg struct {
 // ReloadMsg asks the shell to reload the workspace from disk, preserving the
 // selection.
 type ReloadMsg struct{}
+
+// ---- saving (additive, WS6a) ------------------------------------------------
+
+// SaveKind says what a [SaveMsg] persists.
+type SaveKind int
+
+// Save kinds.
+const (
+	// SaveRequest writes one request of a collection (autosave).
+	SaveRequest SaveKind = iota
+	// SaveCollection writes a whole collection (collection variables).
+	SaveCollection
+	// SaveEnvironment writes one environment.
+	SaveEnvironment
+	// SaveGlobals writes the workspace globals.
+	SaveGlobals
+	// DeleteEnvironment removes one environment from disk.
+	DeleteEnvironment
+)
+
+// SaveMsg asks the shell to persist data a pane or screen has already applied
+// to the in-memory workspace. The shell snapshots it on the Update goroutine,
+// writes it through the [Backend] one write at a time, keeps the file watcher
+// from mistaking the write for an outside change, and answers every pane and
+// screen with a [SaveDoneMsg].
+type SaveMsg struct {
+	// Kind picks what to write.
+	Kind SaveKind
+	// Collection owns the request for [SaveRequest] and is the collection for
+	// [SaveCollection].
+	Collection model.ID
+	// ID is the request or environment ID; empty for [SaveGlobals] and
+	// [SaveCollection].
+	ID model.ID
+}
+
+// SaveDoneMsg reports a finished [SaveMsg]. Err is nil on success.
+type SaveDoneMsg struct {
+	// Kind and ID echo the request.
+	Kind SaveKind
+	// ID is the request, environment or collection ID that was written.
+	ID model.ID
+	// Err is the failure, or nil.
+	Err error
+}
+
+// Optional Backend capabilities. The shell type-asserts for them, so a Backend
+// that lacks one simply cannot do that operation.
+type (
+	// EnvironmentDeleter removes an environment file and its secrets.
+	EnvironmentDeleter interface {
+		DeleteEnvironment(ctx context.Context, id model.ID) error
+	}
+	// GlobalsSaver writes globals.yaml.
+	GlobalsSaver interface {
+		SaveGlobals(ctx context.Context, g *model.Globals) error
+	}
+	// Hydrator fills in secret variable values (and OAuth2 token secrets)
+	// from the secret store, in place, on demand.
+	Hydrator interface {
+		HydrateVariables(ctx context.Context, vars []model.Variable) error
+		HydrateAuth(ctx context.Context, a *model.Auth) error
+	}
+	// PathResolver maps a saved request to its YAML file, for $EDITOR.
+	PathResolver interface {
+		PathOf(c *model.Collection, id model.ID) (string, error)
+	}
+)
+
+// ---- screens (additive, WS6a) -----------------------------------------------
+
+// Screen is a full-body screen another package supplies: the environment
+// editor and the cookie manager. While one is open it receives every key and
+// every non-key message the shell does not consume itself.
+type Screen interface {
+	// Update handles a message. Returning a nil Screen closes it.
+	Update(msg tea.Msg) (Screen, tea.Cmd)
+	// View renders the screen at the size given to SetSize.
+	View() string
+	// SetSize sets the drawing area in cells.
+	SetSize(w, h int)
+	// KeyHints are the footer hints while the screen is open.
+	KeyHints() []ui.Hint
+}
+
+// ScreenEnv is what the shell gives a [ScreenFactory].
+type ScreenEnv struct {
+	// PaneEnv carries the theme, registry and backend.
+	PaneEnv
+	// Workspace is the live in-memory workspace. Screens may edit it on the
+	// Update goroutine and must persist edits with [SaveMsg].
+	Workspace *model.Workspace
+	// ActiveEnv is the active environment ID, or empty.
+	ActiveEnv model.ID
+	// Focus is the environment to open on, or empty for the active one.
+	Focus model.ID
+	// ASCII reports the ASCII glyph set.
+	ASCII bool
+}
+
+// ScreenFactory builds a screen.
+type ScreenFactory func(env ScreenEnv) Screen
+
+// OpenScreenMsg asks the shell to show a screen (return it from a command or
+// a palette action).
+type OpenScreenMsg struct {
+	// Screen is the screen to open.
+	Screen Screen
+}

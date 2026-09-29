@@ -116,24 +116,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 // openUI resolves the workspace and runs the interactive UI. NO_COLOR,
 // POSTCTL_ACCESSIBLE and POSTCTL_ASCII are honored by tui.Run.
 func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
-	if workspace == "" {
-		workspace = os.Getenv("POSTCTL_WORKSPACE")
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "Cannot read the current directory: %v. Pass --workspace DIR.\n", err)
+		return exitUsage
 	}
-	root := workspace
-	if root == "" {
-		cwd, err := os.Getwd()
-		if err != nil {
-			fmt.Fprintf(stderr, "Cannot read the current directory: %v. Pass --workspace DIR.\n", err)
-			return exitUsage
-		}
-		loc, err := store.Discover(cwd)
-		if err != nil {
-			fmt.Fprintf(stderr, "Cannot find a workspace: %v. Pass --workspace DIR.\n", err)
-			return exitUsage
-		}
-		root = loc.Root
+	// --workspace wins, then POSTCTL_WORKSPACE, then discovery (plan §0, D1).
+	loc, err := store.Discover(cwd, store.WithWorkspace(workspace))
+	if err != nil {
+		fmt.Fprintf(stderr, "Cannot find a workspace: %v. Pass --workspace DIR.\n", err)
+		return exitUsage
 	}
-	root, err := filepath.Abs(root)
+	root := loc.Root
+	root, err = filepath.Abs(root)
 	if err != nil {
 		fmt.Fprintf(stderr, "Invalid workspace path: %v\n", err)
 		return exitUsage

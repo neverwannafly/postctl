@@ -10,9 +10,9 @@ import (
 // vim bindings (plan §0, Q11).
 type keyMap struct {
 	// Global.
-	Help, Palette, Env, Quit, ForceQuit, Next, Prev, Sidebar, Filter, Reload key.Binding
-	Pane1, Pane2, Pane3                                                      key.Binding
-	Back                                                                     key.Binding
+	Help, Palette, Env, EnvEdit, Quit, ForceQuit, Next, Prev, Sidebar, Filter, Reload key.Binding
+	Pane1, Pane2, Pane3                                                               key.Binding
+	Back                                                                              key.Binding
 
 	// Tree.
 	Up, Down, PageUp, PageDown, Home, End, Fold, Unfold, Open, Toggle key.Binding
@@ -35,6 +35,7 @@ func newKeyMap(ascii bool) keyMap {
 		Help:      b("?", "Help", "?"),
 		Palette:   b("Ctrl-P", "Command palette", "ctrl+p"),
 		Env:       b("E", "Environments", "E"),
+		EnvEdit:   b("Ctrl-E", "Edit environments", "ctrl+e"),
 		Quit:      b("q", "Quit", "q"),
 		ForceQuit: b("Ctrl-C", "Quit", "ctrl+c"),
 		Next:      b("Tab", "Next pane", "tab"),
@@ -91,7 +92,7 @@ func rows(bs ...key.Binding) []helpRow {
 // focusHints are the focused pane's own hints, appended as their own group.
 func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint) []helpGroup {
 	groups := []helpGroup{
-		{"Everywhere", rows(k.Palette, k.Env, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
+		{"Everywhere", rows(k.Palette, k.Env, k.EnvEdit, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
 		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.New, k.Rename, k.Duplicate, k.Move, k.Delete, k.MoveUp)},
 		{"Request and response", rows(k.Send, k.Edit)},
 		{"Lists and dialogs", []helpRow{

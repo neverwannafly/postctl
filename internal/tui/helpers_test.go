@@ -36,6 +36,13 @@ type fakeBackend struct {
 	saveErr  error
 	loads    int
 	gate     chan struct{} // when set, SaveCollection blocks until it is closed
+
+	// Recorded by the WS6 write paths (see save_test.go).
+	envSaved     []*model.Environment
+	envDeleted   []model.ID
+	globalsSaved []*model.Globals
+	reqSaved     []model.ID
+	envGate      chan struct{} // when set, SaveEnvironment blocks until it is closed
 }
 
 func newFake(ws *model.Workspace) *fakeBackend {
@@ -108,8 +115,39 @@ func (f *fakeBackend) DeleteCollection(_ context.Context, id model.ID) error {
 	return nil
 }
 
-func (f *fakeBackend) SaveRequest(context.Context, *model.Collection, model.ID) error { return nil }
-func (f *fakeBackend) SaveEnvironment(context.Context, *model.Environment) error      { return nil }
+func (f *fakeBackend) SaveRequest(_ context.Context, _ *model.Collection, id model.ID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reqSaved = append(f.reqSaved, id)
+	return f.saveErr
+}
+
+func (f *fakeBackend) SaveEnvironment(_ context.Context, e *model.Environment) error {
+	if f.envGate != nil {
+		<-f.envGate
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.saveErr != nil {
+		return f.saveErr
+	}
+	f.envSaved = append(f.envSaved, e.Clone())
+	return nil
+}
+
+func (f *fakeBackend) DeleteEnvironment(_ context.Context, id model.ID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.envDeleted = append(f.envDeleted, id)
+	return f.saveErr
+}
+
+func (f *fakeBackend) SaveGlobals(_ context.Context, g *model.Globals) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.globalsSaved = append(f.globalsSaved, g.Clone())
+	return f.saveErr
+}
 
 func (f *fakeBackend) LoadState() (store.State, error) {
 	f.mu.Lock()

@@ -309,7 +309,7 @@ func (a *app) duplicateSelected() tea.Cmd {
 		return a.toastInfo("Pick a request, folder or collection to duplicate.")
 	}
 	if n.kind == rowCollection {
-		c := deepCopy(n.coll)
+		c := n.coll.Clone()
 		freshCollectionIDs(c)
 		c.Name += " copy"
 		at := 0
@@ -322,7 +322,7 @@ func (a *app) duplicateSelected() tea.Cmd {
 		a.ws.Collections = append(append(cs, c), a.ws.Collections[at:]...)
 		return tea.Batch(a.afterEdit(c, c.ID, false), a.toastOK("Duplicated "+n.coll.Name))
 	}
-	item := deepCopy(n.item)
+	item := model.CloneItem(n.item)
 	freshIDs(item)
 	switch v := item.(type) {
 	case *model.Request:
