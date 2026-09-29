@@ -106,10 +106,6 @@ func run(ctx context.Context, scripts []*model.Script, in Input) (*Result, error
 	})
 	close(finished)
 
-	// Cancel anything still scheduled (a setInterval a script never
-	// cleared) before touching the VM again.
-	loop.Terminate()
-
 	switch reason.Load() {
 	case interruptedTimeout:
 		res.TimedOut = true
@@ -127,7 +123,10 @@ func run(ctx context.Context, scripts []*model.Script, in Input) (*Result, error
 		return nil, fatal
 	}
 
-	finish(loop, br, res, units, in)
+	// The loop has stopped, so the VM belongs to this goroutine again. It
+	// cannot be restarted (Terminate leaves cancelled jobs counted), so the
+	// wrap-up runs directly; it schedules nothing.
+	finish(vm, res, units, in)
 	return res, nil
 }
 
@@ -198,19 +197,13 @@ func start(vm *goja.Runtime, boot *goja.Program, br *bridge, units []unit, res *
 // finish settles unfinished tests, folds in the legacy tests object and reads
 // the possibly mutated request back. It runs after the loop has drained, so a
 // script's asynchronous work is already accounted for.
-func finish(loop *eventloop.EventLoop, br *bridge, res *Result, units []unit, in Input) {
+func finish(vm *goja.Runtime, res *Result, units []unit, in Input) {
 	var payload string
-	loop.Run(func(vm *goja.Runtime) {
-		fn, ok := goja.AssertFunction(vm.Get("__postctl_finish"))
-		if !ok {
-			return
+	if fn, ok := goja.AssertFunction(vm.Get("__postctl_finish")); ok {
+		if v, err := fn(goja.Undefined()); err == nil {
+			payload = v.String()
 		}
-		v, err := fn(goja.Undefined())
-		if err != nil {
-			return
-		}
-		payload = v.String()
-	})
+	}
 
 	// Map the error the sandbox reported (which carries a script index, not
 	// a file) onto the script that raised it.
