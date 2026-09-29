@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-700c-b4e2-5926abe43e6a
+name: List users
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/admin/users'

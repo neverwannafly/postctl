@@ -28,7 +28,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-29 23:35 IST |
 | WS4 engine/runner | — | Not started | — | — |
-| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-29 23:35 IST |
+| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6 editor + response viewer | — | Not started | — | — |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
@@ -250,3 +250,30 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Verified `ws/2b-oauth2`. It touched only `internal/oauth2/` and the ledger; standard library only; no logging of tokens. Merged into `main` and added a compile-time assertion that `oauth2.Source` implements `httpx.TokenSource`. Build, race tests and lint are green.
 - Decisions: Accepted deviations. The loopback note comes through `FetchOptions.OnNote`. `Save` takes an owner ID (the ref is `oauth2/<owner>`). Non-loopback or https redirect URIs bind an ephemeral `127.0.0.1` listener, as Postman does. The TUI sequence for auth code is documented in WS2b's DONE entry; WS6 will implement "Get new token" against it.
 - Next: WS4 engine wires `oauth2.Source` into `httpx.Options.OAuth2`.
+
+### 2026-09-29 23:41 IST · WS5 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/5-tui-shell
+- Did: Read brief, design language, tui-stack, AGENTS, plan §0/§3/§8, `internal/ui/theme.go`, model/store API and the prod-console-tui reference (app.go, keys.go, components.go).
+- Files: `docs/ledger.md`
+- Decisions: Charm versions pinned to prod-console-tui (bubbletea v2.0.9, bubbles v2.2.1, lipgloss v2.0.5, x/ansi v0.11.7). `store.LoadLenient` not yet available on this branch: the TUI codes against a small `Loader` interface with a `Load`-based fallback adapter.
+- Tests: n/a
+- Blockers / questions: none
+- Next: components in `internal/ui`, then `internal/tui` (root, layout, tree, env switcher, palette, help, first run, watcher), then `cmd/postctl` launch.
+
+### 2026-09-30 00:55 IST · WS5 · Sonnet 5.5 · PROGRESS
+- Branch/worktree: ws/5-tui-shell
+- Did: `internal/ui` components with 80/140-column snapshots (unicode, NO_COLOR, ASCII). `internal/tui` shell: three/two/single-pane layouts, focus cycling, `Pane` and action-registry API, collection tree (fold, filter, new/rename/duplicate/move/reorder/delete with async coalescing saves), environment switcher, palette, help, first-run guide, fsnotify watcher with debounced reload that keeps selection, accessible/ASCII/NO_COLOR modes.
+- Files: `internal/ui/*`, `internal/tui/**`, `cmd/postctl/main.go`, `docs/tui-stack.md`
+- Decisions: see DONE.
+- Tests: shell, tree, flow, watcher, golden (11 scenes x 3 sizes, 5 modes x 2 sizes) tests green.
+- Next: `cmd/postctl` launch, demo fixture, lint, manual check at 80x24 and 200x60.
+
+### 2026-09-30 01:20 IST · WS5 · Sonnet 5.5 · DONE
+- Branch/worktree: ws/5-tui-shell
+- Did: Shipped the TUI shell and shared UI components, and `postctl` with no args (plus `--workspace`, `--accessible`, `--ascii`, `NO_COLOR`, `POSTCTL_WORKSPACE`, `POSTCTL_ACCESSIBLE`, `POSTCTL_ASCII`) opens it. `go run ./cmd/postctl --workspace internal/tui/testdata/demo` opens a demo workspace. Checked by hand through a pty at 80x24 and 200x60, dark, NO_COLOR + ASCII, and accessible.
+- Files: `internal/ui/{text,header,badges,kvtable,modal,states}.go` (+ additive `theme.go` glyphs `RuleActive`, `VRule`, `Mask`, `Dirty`), `internal/tui/*`, `internal/tui/tuitest/demo.go`, `internal/tui/testdata/{golden,demo}`, `cmd/postctl/main.go` (no-args launch and global flags only), `docs/tui-stack.md` (fsnotify).
+- Decisions: (1) WS6 plugs in through `Options.NewRequestPane/NewResponsePane` (`PaneFactory`) and the shared `Registry`; panes get `PaneEnv{Theme, Actions, Backend}`. (2) `Backend` adapts `*store.Store`; it gained `SaveRequest`/`SaveEnvironment` for WS6. (3) Edits change the in-memory workspace at once; a save queue snapshots with a reflect `deepCopy` (until `Clone` lands), runs one save at a time and coalesces repeated saves of one collection. (4) `LoadLenient` is probed by type assertion, falling back to `Load`. Broken files show as error rows (D3). (5) Watcher events during and 900 ms after our own saves are ignored; Ctrl-R and quit wait for pending saves. (6) Fold state is not persisted (`store.State` holds only the active environment). (7) Extras: Alt-Up/Down reorder; first-run import rows copy their command to the clipboard. (8) Accessible mode forces the single-pane layout, no alt screen, no color, ASCII; bold is still used.
+- Design checklist: (a) First-time user sees the active environment (header, `env  none`) and the primary action (`Enter Create a request`) at once: pass. (b) Every waiting/error state names what happened, what is intact and what to do (load error, problem row, save failure, reload failure): pass. (c) Whole flow works without mouse, color or Unicode (NO_COLOR/ASCII/accessible goldens): pass. (d) Selection uses a marker plus style; method names and status are text: pass. (e) Readable at 80x24 and reflows at 100/140 (goldens at 80x24, 120x40, 200x60 and breakpoint tests): pass. (f) Secrets absent from every state: env preview masks `••••`/`****`, the test asserts no secret value in the frame, and the workspace is saved unhydrated so the Keychain is never read: pass. (g) Tree reserves method and name width before counts and long path text: pass. (h) Borders only for the modal and pane separators; overlays use a rule, not a box: pass.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green. Cold start to first frame with 1,000 requests: 44 ms in the harness, 2.9 ms of that in the app (benchmark); process start to first output about 45 ms in a pty.
+- Blockers / questions: (1) Fold state persistence needs a field in `store.State`. (2) kqueue uses a descriptor per watched directory; the polling fallback covers huge trees but is untested at that scale. (3) WS6: which of `Ctrl-Enter` and `Ctrl-S` sends? Both are reserved in the key map.
+- Next: merge `ws/5-tui-shell` after WS0.1 (swap `deepCopy` for `Clone`, drop the `LoadLenient` shim); then WS6 implements the Request and Response panes.

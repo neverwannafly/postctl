@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7007-89d4-77f35251a5f8
+name: Create customer
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/v1/customers'

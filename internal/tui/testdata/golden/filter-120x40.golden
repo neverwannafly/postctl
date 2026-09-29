@@ -1,0 +1,40 @@
+ postctl  payments-api                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ › Collections  11 requests    │   2 Request    3 Response                                                             
+ / charge                      │ GET     {{baseUrl}}/v1/charges?limit=10                                               
+ › GET   …arges › List charges │ Payments › Charges › List charges                                                     
+   POST  …rges › Create charge │                                                                                       
+   DEL   …rges › Refund charge │ Query 1                                                                               
+   PATCH …rges › Update charge │                                                                                       
+                               │ Newest first.                                                                         
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Enter Keep results   Esc Clear filter   ↑↓ Move   Ctrl-P Palette

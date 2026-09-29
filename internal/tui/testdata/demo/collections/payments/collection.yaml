@@ -1,0 +1,7 @@
+schemaVersion: 1
+id: 01a0ee73-dcba-7000-b747-57ac31effc7c
+name: Payments
+order:
+  - charges
+  - customers
+  - 003-health

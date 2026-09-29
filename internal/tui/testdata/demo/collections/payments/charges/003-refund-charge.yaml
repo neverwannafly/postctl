@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7004-bf59-f74d8b3588d6
+name: Refund charge
+kind: http
+method: DELETE
+url:
+  raw: '{{baseUrl}}/v1/charges/{{chargeId}}'

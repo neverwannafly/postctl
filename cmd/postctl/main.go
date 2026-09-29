@@ -11,7 +11,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/shubham/postctl/internal/store"
+	"github.com/shubham/postctl/internal/tui"
 )
 
 // version is set at build time: go build -ldflags "-X main.version=1.2.3".
@@ -38,6 +42,9 @@ var commands = []command{
 	{"env", "env ls|use|set|get", "List, select and edit environments."},
 }
 
+// launchUI starts the interactive UI; tests replace it.
+var launchUI = tui.Run
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -48,9 +55,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("postctl", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "print the version and exit")
-	workspace := fs.String("workspace", "", "use this workspace directory")
 	fs.Bool("help", false, "show help")
 	fs.Bool("h", false, "show help")
+	workspace := fs.String("workspace", "", "workspace directory (default: found from the current directory)")
+	accessible := fs.Bool("accessible", false, "linear, screen-reader friendly presentation")
+	ascii := fs.Bool("ascii", false, "use ASCII instead of Unicode glyphs")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			usage(stdout)
@@ -76,8 +85,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	rest := fs.Args()
 	if len(rest) == 0 {
-		fmt.Fprintln(stderr, "The interactive UI is not implemented yet. Run: postctl --help")
-		return exitUsage
+		return openUI(*workspace, *accessible, *ascii, stderr)
 	}
 	if rest[0] == "help" {
 		usage(stdout)
@@ -104,6 +112,43 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return exitUsage
 }
 
+// openUI resolves the workspace and runs the interactive UI. NO_COLOR,
+// POSTCTL_ACCESSIBLE and POSTCTL_ASCII are honored by tui.Run.
+func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
+	if workspace == "" {
+		workspace = os.Getenv("POSTCTL_WORKSPACE")
+	}
+	root := workspace
+	if root == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(stderr, "Cannot read the current directory: %v. Pass --workspace DIR.\n", err)
+			return exitUsage
+		}
+		loc, err := store.Discover(cwd)
+		if err != nil {
+			fmt.Fprintf(stderr, "Cannot find a workspace: %v. Pass --workspace DIR.\n", err)
+			return exitUsage
+		}
+		root = loc.Root
+	}
+	root, err := filepath.Abs(root)
+	if err != nil {
+		fmt.Fprintf(stderr, "Invalid workspace path: %v\n", err)
+		return exitUsage
+	}
+	err = launchUI(tui.Options{
+		Backend:    tui.NewStoreBackend(root, store.WithSecretStore(store.NewKeychain(""))),
+		Accessible: accessible,
+		ASCII:      ascii,
+	})
+	if err != nil {
+		fmt.Fprintf(stderr, "Could not run the interactive UI: %v. It needs a terminal; for scripts use the subcommands (postctl --help).\n", err)
+		return exitUsage
+	}
+	return exitOK
+}
+
 func hasHelpFlag(args []string) bool {
 	for _, a := range args {
 		if a == "-h" || a == "--help" || a == "-help" {
@@ -125,7 +170,8 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "postctl - a terminal API client for Postman collections")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  postctl                 Open the interactive UI (not implemented yet)")
+	fmt.Fprintln(w, "  postctl [--workspace DIR] [--accessible] [--ascii]")
+	fmt.Fprintln(w, "      Open the interactive UI.")
 	for _, c := range commands {
 		fmt.Fprintf(w, "  postctl %s\n      %s\n", c.usage, c.summary)
 	}
@@ -134,6 +180,10 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "  --version   Print the version and exit")
 	fmt.Fprintln(w, "  --workspace Use this workspace directory")
 	fmt.Fprintln(w, "  --help      Show this help")
+	fmt.Fprintln(w, "  --workspace DIR  Workspace to open (or POSTCTL_WORKSPACE); default: found from the current directory")
+	fmt.Fprintln(w, "  --accessible     Linear presentation, no alternate screen or animation (or POSTCTL_ACCESSIBLE=1)")
+	fmt.Fprintln(w, "  --ascii          ASCII glyphs instead of Unicode (or POSTCTL_ASCII=1)")
+	fmt.Fprintln(w, "  NO_COLOR         Set to disable color")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Exit codes: 0 ok, 1 test failures, 2 request errors, 3 usage or configuration errors.")
 }

@@ -1,0 +1,6 @@
+id: 01a0ee73-dcba-7005-a786-d9c281d09878
+name: Update charge
+kind: http
+method: PATCH
+url:
+  raw: '{{baseUrl}}/v1/charges/{{chargeId}}'

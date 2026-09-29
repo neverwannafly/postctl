@@ -1,0 +1,24 @@
+postctl  payments-api                                                  env  none
+--------------------------------------------------------------------------------
+> 1 Collections    2 Request    3 Response
+  v Payments                                                                   8
+    v Charges                                                                  4
+        GET   List charges                                                      
+>       POST  Create charge                                                     
+        DEL   Refund charge                                                     
+        PATCH Update charge                                                     
+    v Customers                                                                3
+        POST  Create customer                                                   
+        GET   Get customer                                                      
+        PUT   Replace customer                                                  
+      GET   Health                                                              
+  v Internal admin                                                             3
+      GET   List users                                                          
+      POST  Ban user                                                            
+      OPT   Preflight                                                           
+                                                                                
+                                                                                
+                                                                                
+--------------------------------------------------------------------------------
+
+Enter Open   n New   / Filter   Esc Close   ? Help   Ctrl-P Palette

@@ -1,0 +1,60 @@
+ postctl  payments-api                                                                                                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ › Collections  11 requests                  │   Request                                                                         │   Response                                                          
+   ▾ Payments                              8 │ POST    {{baseUrl}}/v1/charges                                                    │ No response yet                                                     
+     ▾ Charges                             4 │ Payments › Charges › Create charge                                                │ Responses appear here after a request is sent.                      
+         GET   List charges                  │                                                                                   │                                                                     
+ ›       POST  Create charge                 │ Body raw                                                                          │                                                                     
+         DEL   Refund charge                 │                                                                                   │                                                                     
+         PATCH Update charge                 │ Charge a card.                                                                    │                                                                     
+     ▾ Customers                           3 │                                                                                   │                                                                     
+         POST  Create customer               │                                                                                   │                                                                     
+         GET   Get customer                  │                                                                                   │                                                                     
+         PUT   Replace customer              │                                                                                   │                                                                     
+       GET   Health                          │                                                                                   │                                                                     
+   ▾ Internal admin                        3 │                                                                                   │                                                                     
+       GET   List users                      │                                                                                   │                                                                     
+       POST  Ban user                        │                                                                                   │                                                                     
+       OPT   Preflight                       │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+                                             │                                                                                   │                                                                     
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Enter Open   n New   / Filter   r Rename   d Delete   m Move   D Duplicate   ? Help   Ctrl-P Palette   E Environments   q Quit

@@ -1,0 +1,40 @@
+ postctl  payments-api                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ › Collections  11 requests    │   2 Request    3 Response                                                             
+   ▾ Payments                8 │ Payments › Customers                                                                  
+     ▾ Charges               4 │ A folder or collection. Enter folds or unfolds it.                                    
+         GET   List charges    │                                                                                       
+         POST  Create charge   │                                                                                       
+         DEL   Refund charge   │                                                                                       
+         PATCH Update charge   │                                                                                       
+ ›   ▾ Customers             3 │                                                                                       
+         POST  Create custome╭────────────────────────────────────────────────────────────╮                            
+         GET   Get customer  │ ! Delete folder                                            │                            
+         PUT   Replace custom│                                                            │                            
+       GET   Health          │ Delete folder "Customers" and its 3 requests?              │                            
+   ▾ Internal admin          │ Payments › Customers                                       │                            
+       GET   List users      │                                                            │                            
+       POST  Ban user        │ This removes the files from disk. If the workspace is in   │                            
+       OPT   Preflight       │ git you can restore them.                                  │                            
+                             │                                                            │                            
+                             │ › [ Cancel ]    [ Delete ]                                 │                            
+                             ╰────────────────────────────────────────────────────────────╯                            
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Enter Confirm choice   ←→ Choose   y Select delete   Esc Cancel

@@ -1,0 +1,24 @@
+ postctl  payments-api                                                env  none
+ ──────────────────────────────────────────────────────────────────────────────
+   1 Collections  › 2 Request    3 Response                                    
+ DELETE  {{baseUrl}}/v1/charges/{{chargeId}}                                   
+ Payments › Charges › Refund charge                                            
+                                                                               
+ Nothing else set on this request.                                             
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+ ──────────────────────────────────────────────────────────────────────────────
+ 
+ Tab Next pane   Ctrl-B Collections   ? Help   Ctrl-P Palette   E Environments
