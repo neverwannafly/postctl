@@ -35,8 +35,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS8 docs/release | Gemini 3.8 Flash (high) | Done, merged to main | ws/8-docs | 2026-09-30 03:34 IST |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
-| QA/INT4 final integration | GPT-5.6 Sol | Fixes done, ready to merge | fix/security | 2026-09-30 03:45 IST |
-| QA-fixes | GPT-5.6 Sol (medium) | Done | qa/fixes | 2026-09-30 03:29 IST |
+| QA/INT4 final integration | GPT-5.6 Sol | Done, merged to main | fix/security | 2026-09-30 03:46 IST |
+| QA-fixes | GPT-5.6 Sol (medium) | Done, merged to main | qa/fixes | 2026-09-30 03:34 IST |
 
 ## Entries
 
@@ -609,3 +609,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed. The generated-key consistency tests and expanded `internal/qa` leak sweep passed.
 - Blockers / questions: none.
 - Next: Merge `fix/security` into `main` with `--no-ff`, gate main, and remove this worktree.
+
+### 2026-09-30 03:46 IST · INT4 · gpt-5.6 · DONE
+- Branch/worktree: `main`
+- Did: Merged `fix/security` with `--no-ff`, passed the final main gate, removed its worktree, and updated the WS8 and QA/INT4 status rows. The `fix-data` worktree was not modified or removed.
+- Files: merged `fix/security` changes and `docs/ledger.md`
+- Decisions: All requested work is integrated; no assigned finding was skipped.
+- Tests: Final main `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed.
+- Blockers / questions: none.
+- Next: none.
