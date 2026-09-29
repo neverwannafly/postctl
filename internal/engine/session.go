@@ -212,13 +212,6 @@ func scriptsFor(chain []model.Container, req *model.Request, event script.Event)
 	return out
 }
 
-func stepKindFor(event script.Event) StepKind {
-	if event == script.EventPreRequest {
-		return StepPreRequest
-	}
-	return StepTest
-}
-
 // unresolvedRef finds {{name}} references left after resolution.
 var unresolvedRef = regexp.MustCompile(`\{\{\s*([^{}]+?)\s*\}\}`)
 
@@ -440,7 +433,7 @@ func sendError(ctx context.Context, err error, r *history.Redactor) error {
 		return &OAuthTokenMissingError{Err: err}
 	}
 	var ue *url.Error
-	if errors.As(err, &ue) && error(ue) == err {
+	if errors.As(err, &ue) {
 		return &url.Error{Op: ue.Op, URL: r.URL(ue.URL), Err: ue.Err}
 	}
 	return err
@@ -455,6 +448,7 @@ type varSender struct {
 	store vars.Store
 }
 
+// Send resolves req against the live variable store and sends it.
 func (v *varSender) Send(ctx context.Context, req *model.Request, opts httpx.Options) (*httpx.Response, error) {
 	resolved, err := vars.ResolveRequest(req, nil, v.store)
 	if err != nil {
