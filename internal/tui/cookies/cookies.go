@@ -126,17 +126,17 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
-	case "up", "k":
+	case "up":
 		m.move(-1)
-	case "down", "j":
+	case "down":
 		m.move(1)
 	case "pgup":
 		m.move(-rows)
 	case "pgdown":
 		m.move(rows)
-	case "home", "g":
+	case "home":
 		m.move(-len(m.list))
-	case "end", "G":
+	case "end":
 		m.move(len(m.list))
 	case "r":
 		m.reveal = !m.reveal

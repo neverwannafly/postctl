@@ -89,6 +89,24 @@ The tree may be adjusted as workstreams land. Avoid splitting every screen into 
 - If the Keychain is unavailable, do not silently fall back to plaintext files. Explain the limitation and allow a process-only (in-memory) session.
 - Writes are atomic (temp file plus rename) and unchanged files are not rewritten, so autosave is cheap and git diffs stay minimal.
 
+### Request pane, environment editor and cookie manager
+
+`internal/tui/request` (Request pane), `internal/tui/envedit` (Ctrl-E, palette "Edit environments") and `internal/tui/cookies` (palette "Cookies") plug in through `Options.NewRequestPane`, `NewEnvEditor` and `NewCookieManager`; `cmd/postctl/wire.go` fills them in. Panes edit the live workspace on the Update goroutine and persist through `tui.SaveMsg` (debounced 500 ms, flushed on blur, selection change and close). Anything slow (curl build, OAuth, secret reads, `$EDITOR`) runs in a `tea.Cmd` on snapshots.
+
+Request pane keys (arrows and standard keys only):
+
+| Where | Keys |
+| --- | --- |
+| Anywhere in the pane | `Ctrl-S` send (also `Ctrl-Enter` with an enhanced keyboard), `Ctrl-Z` / `Ctrl-Y` undo / redo, `Ctrl-O` open in `$EDITOR`, `Ctrl-L` focus the URL, `Esc` cancel send or OAuth |
+| URL bar | `Enter` send, `Shift-Tab` method, `Tab` / `Down` to the tabs |
+| Tab row | `←` `→` switch tab, `↑` URL, `↓` / `Enter` into the tab, `m` method, `y` copy as curl (secrets masked), `Y` copy with secrets |
+| Key-value tables | `a` add, `Enter` edit, `Tab` / `Shift-Tab` next / previous field, `Space` toggle, `d` delete, `Alt-↑` `Alt-↓` (or `Shift`) move, `b` bulk edit, `t` text / file (form-data) |
+| Body / Scripts / Auth | `f` format JSON; `s` or `Ctrl-G` snippets; `r` reveal secrets (`Ctrl-R` while typing), `g` get OAuth token, `c` copy sign-in link |
+
+Environment editor: `[` `]` or `1` `2` `3` switch Environments / Globals / Collections. List: `n` new, `r` rename, `c` duplicate, `d` delete (asks, defaults to Cancel), `p` production, `Enter` / `Tab` to the variables, `Esc` close. Variables: `a` add, `Enter` edit, `Space` enable, `d` delete, `Alt-↑` `Alt-↓` move, `s` toggle secret (secret to plain asks first), `r` reveal (reads the Keychain in a command), `Esc` back.
+
+Cookie manager: `↑` `↓` `PgUp` `PgDn` `Home` `End` move, `r` reveal value, `d` delete cookie, `x` clear domain and `X` clear all (both ask, default Cancel), `Esc` close.
+
 ## Versioning and dependency policy
 
 - Use the stable v2 module paths: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, and `charm.land/huh/v2`.
