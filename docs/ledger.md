@@ -25,7 +25,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
-| WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
+| WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, awaiting merge | ws/0-scaffold | 2026-09-29 23:43 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
@@ -131,3 +131,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-29 23:38 IST · WS0.1 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/0-scaffold
+- Did: Read plan §0 D1–D4. Scope: `store.LoadLenient`, deep `Clone`/`CloneFresh` on model types, `--workspace`/`POSTCTL_WORKSPACE` in `store.Discover`, docs/model.md.
+- Files: `docs/ledger.md`
+- Decisions: none yet.
+- Tests: n/a
+- Blockers / questions: none
+- Next: Clone, LoadLenient, Discover options, docs.
+
+### 2026-09-29 23:43 IST · WS0.1 · Sonnet 5.5 · DONE
+- Branch/worktree: ws/0-scaffold
+- Did: (D3) `store.LoadLenient() (*model.Workspace, []*FileError, error)`: broken request/folder/collection/environment/globals files and requests with a missing script file are skipped and reported; `Load` stays strict. (D4) Deep `Clone()` on `Request`, `Folder`, `Collection`, `Environment`, `Globals`, `Auth`, `OAuth2Config`, `Body`, `URL`, `Scripts`, `Script`, `RequestSettings`, `Example`, plus `CloneItem`; `CloneFresh()` on `Request`, `Folder`, `Collection`, `Environment` and `CloneItemFresh` (new IDs recursively, cleared `SecretRef`/`Token.Ref`/`Script.File`, in-memory secret values kept). (D1) `store.Discover(start, opts ...DiscoverOption)` with `WithWorkspace(dir)`, `$POSTCTL_WORKSPACE` (`EnvWorkspace`), new `SourceFlag`/`SourceEnv`; precedence flag > env > walk up > global. `cmd/postctl` untouched. Updated `docs/model.md`.
+- Files: `internal/model/clone.go`, `internal/model/clone_test.go`, `internal/store/store.go`, `internal/store/discover.go`, `internal/store/save.go`, `internal/store/store_test.go`, `docs/model.md`, `docs/ledger.md`
+- Decisions: Beyond the brief: saving a leniently loaded workspace must not destroy the files it skipped, so `SaveCollection`/`SaveRequest`/`Save` never delete a stale file that fails to load (or whose script is missing, or that sits under a broken folder.yaml), nor a collection/environment file that does not parse; explicit `DeleteCollection`/`DeleteEnvironment` still delete everything. Clone tests are reflection-driven (fill every field, no-alias walk, scribble the clone, original must equal a twin), so a future model field that is not cloned deeply fails them; that test already caught a missed `URL.PathVars` secret ref in `CloneFresh` during development. `Discover` stays source-compatible for existing callers (variadic options).
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green.
+- Blockers / questions: none.
+- Next: merge `ws/0-scaffold`. WS5 can call `store.LoadLenient`; the CLI/WS1/WS5 wire `--workspace` via `store.WithWorkspace`.
