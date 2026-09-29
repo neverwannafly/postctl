@@ -1,0 +1,60 @@
+{
+  "description": "pm.cookies get/has/one/toObject over the jar plus the legacy responseCookies global.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{}",
+    "setCookies": [
+      {
+        "Name": "session",
+        "Value": "sess-2",
+        "Domain": "api.example.com",
+        "Path": "/",
+        "Expires": "",
+        "MaxAge": "",
+        "HostOnly": false,
+        "HTTPOnly": true,
+        "Secure": false,
+        "Session": false
+      }
+    ]
+  },
+  "cookies": [
+    {
+      "Name": "session",
+      "Value": "sess-1",
+      "Domain": "api.example.com",
+      "Path": "/",
+      "Expires": "",
+      "MaxAge": "",
+      "HostOnly": false,
+      "HTTPOnly": true,
+      "Secure": true,
+      "Session": false
+    },
+    {
+      "Name": "locale",
+      "Value": "en-GB",
+      "Domain": "api.example.com",
+      "Path": "/",
+      "Expires": "",
+      "MaxAge": "",
+      "HostOnly": false,
+      "HTTPOnly": false,
+      "Secure": false,
+      "Session": false
+    }
+  ],
+  "expect": {
+    "tests": [
+      "PASS session cookie is present",
+      "PASS cookie attributes are visible",
+      "PASS the response carried its own Set-Cookie"
+    ],
+    "console": [
+      "log: jar {\"session\":\"sess-1\",\"locale\":\"en-GB\"}",
+      "log: count 2",
+      "log: from the response {\"session\":\"sess-2\"}"
+    ]
+  }
+}

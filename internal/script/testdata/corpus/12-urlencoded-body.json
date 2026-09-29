@@ -1,0 +1,29 @@
+{
+  "description": "urlencoded request body edited through the PropertyList API.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://auth.example.com/oauth/token",
+    "bodyMode": "urlencoded",
+    "body": "grant_type=password\u0026unused=x"
+  },
+  "vars": {
+    "environment": {
+      "refreshToken": "rt-99"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: mode urlencoded",
+      "log: count 3",
+      "log: object {\"grant_type\":\"refresh_token\",\"refresh_token\":\"rt-99\",\"scope\":\"read write\"}",
+      "log: encoded grant_type=refresh_token\u0026refresh_token=rt-99\u0026scope=read write"
+    ],
+    "request": [
+      "POST https://auth.example.com/oauth/token",
+      "body urlencoded grant_type=refresh_token",
+      "body urlencoded refresh_token=rt-99",
+      "body urlencoded scope=read write"
+    ]
+  }
+}

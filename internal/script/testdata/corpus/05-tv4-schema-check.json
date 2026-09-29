@@ -1,0 +1,15 @@
+{
+  "description": "tv4 schema validation combined with a legacy tests[] entry.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"users\":[{\"id\":1,\"email\":\"a@example.com\"},{\"id\":2,\"email\":\"b@example.com\"}]}"
+  },
+  "expect": {
+    "tests": [
+      "PASS tv4 reports no error",
+      "PASS tv4 catches a missing property",
+      "PASS Schema is valid"
+    ]
+  }
+}

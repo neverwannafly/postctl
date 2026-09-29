@@ -1,0 +1,34 @@
+{
+  "description": "Pre-request script logs in with pm.sendRequest and sets the bearer token on the outgoing request.",
+  "event": "prerequest",
+  "vars": {
+    "environment": {
+      "authUrl": "https://auth.example.com",
+      "clientId": "svc-reporting"
+    }
+  },
+  "sendResponses": [
+    {
+      "code": 200,
+      "body": "{\"access_token\":\"tok-abc123\",\"expires_in\":3600}"
+    }
+  ],
+  "expect": {
+    "console": [
+      "log: token acquired, expires in 3600"
+    ],
+    "varChanges": {
+      "environment": [
+        "set accessToken=tok-abc123",
+        "set tokenExpiresIn=3600"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header Authorization: Bearer tok-abc123"
+    ],
+    "sentRequests": [
+      "POST https://auth.example.com/oauth/token"
+    ]
+  }
+}

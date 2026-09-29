@@ -1,0 +1,42 @@
+{
+  "description": "setTimeout/setInterval and an async pm.test whose done callback fires from a timer.",
+  "event": "test",
+  "response": {
+    "code": 202,
+    "body": "{\"state\":\"pending\"}"
+  },
+  "vars": {
+    "environment": {
+      "statusUrl": "https://api.example.com/v1/jobs/1"
+    }
+  },
+  "sendResponses": [
+    {
+      "code": 200,
+      "body": "{\"state\":\"pending\"}"
+    },
+    {
+      "code": 200,
+      "body": "{\"state\":\"pending\"}"
+    },
+    {
+      "code": 200,
+      "body": "{\"state\":\"ready\"}"
+    }
+  ],
+  "expect": {
+    "tests": [
+      "PASS polls until the job is ready"
+    ],
+    "console": [
+      "log: attempt 1 state pending",
+      "log: attempt 2 state pending",
+      "log: attempt 3 state ready"
+    ],
+    "sentRequests": [
+      "GET https://api.example.com/v1/jobs/1",
+      "GET https://api.example.com/v1/jobs/1",
+      "GET https://api.example.com/v1/jobs/1"
+    ]
+  }
+}

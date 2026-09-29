@@ -1,0 +1,24 @@
+{
+  "description": "pm.test.skip for assertions that do not apply, and pm.test.index.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"debug\":{\"trace\":true}}"
+  },
+  "vars": {
+    "environment": {
+      "envName": "staging"
+    }
+  },
+  "expect": {
+    "tests": [
+      "PASS status is 200",
+      "SKIP debug payload is absent",
+      "PASS records the environment",
+      "SKIP load test only"
+    ],
+    "console": [
+      "log: tests registered 4"
+    ]
+  }
+}

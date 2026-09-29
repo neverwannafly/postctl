@@ -1,0 +1,41 @@
+{
+  "description": "Top-level await chaining two pm.sendRequest calls, login then profile.",
+  "event": "prerequest",
+  "vars": {
+    "environment": {
+      "authUrl": "https://auth.example.com",
+      "user": "svc-reporting"
+    }
+  },
+  "sendResponses": [
+    {
+      "code": 200,
+      "body": "{\"token\":\"tok-xyz\"}"
+    },
+    {
+      "code": 200,
+      "body": "{\"tenantId\":\"tenant-3\"}"
+    }
+  ],
+  "expect": {
+    "console": [
+      "log: login 200 profile 200",
+      "log: tenant tenant-3"
+    ],
+    "varChanges": {
+      "environment": [
+        "set token=tok-xyz",
+        "set tenantId=tenant-3"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header Authorization: Bearer tok-xyz",
+      "header X-Tenant: tenant-3"
+    ],
+    "sentRequests": [
+      "GET https://auth.example.com/me",
+      "POST https://auth.example.com/login"
+    ]
+  }
+}

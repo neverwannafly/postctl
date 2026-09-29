@@ -1,0 +1,30 @@
+{
+  "description": "multipart/form-data parts read and edited from a pre-request script.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example.com/v1/uploads",
+    "bodyMode": "formdata",
+    "body": "report=file:./exports/q1.csv\u0026title=Draft\u0026notes=initial upload"
+  },
+  "vars": {
+    "environment": {
+      "operator": "ops-team"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: mode formdata",
+      "log: count 4",
+      "log: title Quarterly report",
+      "log: parts report:./exports/q1.csv|title:Quarterly report|notes:initial upload|uploadedBy:ops-team"
+    ],
+    "request": [
+      "POST https://api.example.com/v1/uploads",
+      "body formdata report=./exports/q1.csv",
+      "body formdata title=Quarterly report",
+      "body formdata notes=initial upload",
+      "body formdata uploadedBy=ops-team"
+    ]
+  }
+}

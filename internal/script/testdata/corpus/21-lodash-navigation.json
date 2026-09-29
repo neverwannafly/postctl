@@ -1,0 +1,23 @@
+{
+  "description": "lodash get/has/map/sumBy/chain over a nested response payload.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"data\":{\"orders\":[{\"id\":1,\"status\":\"open\",\"customer\":{\"email\":\"z@example.com\"},\"lines\":[{\"sku\":\"A-1\",\"amount\":10},{\"sku\":\"B-2\",\"amount\":20}]},{\"id\":2,\"status\":\"open\",\"customer\":{\"email\":\"a@example.com\"},\"lines\":[{\"sku\":\"C-3\",\"amount\":15}]}]}}"
+  },
+  "expect": {
+    "tests": [
+      "PASS lodash reads nested paths",
+      "PASS lodash aggregates"
+    ],
+    "console": [
+      "log: emails a@example.com,z@example.com",
+      "log: grouped {\"open\":2}"
+    ],
+    "varChanges": {
+      "collection": [
+        "set orderIds=1,2"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "description": "json() throwing JSONError on an HTML error page, handled with try/catch.",
+  "event": "test",
+  "response": {
+    "code": 502,
+    "headers": {
+      "Content-Type": "text/html"
+    },
+    "body": "\u003chtml\u003e\u003chead\u003e\u003ctitle\u003e502 Bad Gateway\u003c/title\u003e\u003c/head\u003e\u003cbody\u003enginx\u003c/body\u003e\u003c/html\u003e"
+  },
+  "expect": {
+    "tests": [
+      "PASS the response is not JSON",
+      "PASS the text body is still readable",
+      "PASS the failure is reported upstream"
+    ],
+    "varChanges": {
+      "collection": [
+        "set lastFailureReason=Bad Gateway"
+      ]
+    }
+  }
+}

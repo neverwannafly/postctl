@@ -1,0 +1,19 @@
+{
+  "description": "pm.visualizer and pm.vault warn and no-op instead of crashing the script.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"ok\":true}"
+  },
+  "expect": {
+    "tests": [
+      "PASS the script keeps running past the no-ops"
+    ],
+    "console": [
+      "warn: pm.visualizer.set is not supported by postctl; the call did nothing.",
+      "warn: pm.vault is not supported by postctl; the call resolved to undefined.",
+      "log: vault get returns undefined",
+      "log: visualizer and vault did not throw"
+    ]
+  }
+}

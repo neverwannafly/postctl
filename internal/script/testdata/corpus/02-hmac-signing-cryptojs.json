@@ -1,0 +1,33 @@
+{
+  "description": "HMAC-SHA256 request signing with crypto-js, using the url and method accessors on pm.request.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example.com/v1/payments?currency=EUR",
+    "body": "{\"amount\":1250}"
+  },
+  "vars": {
+    "environment": {
+      "fixedNonce": "n-0001",
+      "fixedTimestamp": "1700000000",
+      "signingSecret": "s3cr3t"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: signature b9mLtwPiKERBjPxAHO9Ioxm1ubHpU8dR1nNb5oyn8P0="
+    ],
+    "varChanges": {
+      "local": [
+        "set canonicalString=POST\n/v1/payments\ncurrency=EUR\n1700000000\nn-0001"
+      ]
+    },
+    "request": [
+      "POST https://api.example.com/v1/payments?currency=EUR",
+      "header X-Timestamp: 1700000000",
+      "header X-Nonce: n-0001",
+      "header X-Signature: b9mLtwPiKERBjPxAHO9Ioxm1ubHpU8dR1nNb5oyn8P0=",
+      "body raw {\"amount\":1250}"
+    ]
+  }
+}

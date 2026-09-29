@@ -1,0 +1,22 @@
+{
+  "description": "pm.response.to.have.status/header/body/jsonBody and the status-class properties.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Request-Id": "rid-7"
+    },
+    "body": "{\"data\":{\"id\":7,\"label\":\"seven\"}}",
+    "timeMs": 31
+  },
+  "expect": {
+    "tests": [
+      "PASS status by code and by reason",
+      "PASS status classes",
+      "PASS headers",
+      "PASS body shapes",
+      "PASS timing and size"
+    ]
+  }
+}

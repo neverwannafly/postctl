@@ -1,0 +1,16 @@
+{
+  "description": "Common chai assertion chains through pm.expect: arrays, objects, strings and negation.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"name\":\"ord-42\",\"flag\":true,\"nothing\":null,\"tags\":[\"alpha\",\"beta\",\"gamma\"],\"meta\":{\"page\":1,\"total\":9}}"
+  },
+  "expect": {
+    "tests": [
+      "PASS array chains",
+      "PASS object chains",
+      "PASS string and negation chains",
+      "PASS custom failure message"
+    ]
+  }
+}

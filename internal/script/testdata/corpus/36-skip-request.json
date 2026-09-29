@@ -1,0 +1,19 @@
+{
+  "description": "pm.execution.skipRequest() when a feature flag is absent.",
+  "event": "prerequest",
+  "vars": {
+    "environment": {
+      "features": "orders,reporting"
+    }
+  },
+  "expect": {
+    "console": [
+      "warn: billing is not enabled here, skipping Corpus request",
+      "log: features orders|reporting"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1"
+    ],
+    "skipRequest": true
+  }
+}

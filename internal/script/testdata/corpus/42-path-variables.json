@@ -1,0 +1,26 @@
+{
+  "description": "URL path variables read and filled in, plus a pushed path segment.",
+  "event": "prerequest",
+  "request": {
+    "url": "https://api.example.com/v1/orders/:orderId/lines/:lineId"
+  },
+  "vars": {
+    "collection": {
+      "lastOrderId": "ord-88"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: before https://api.example.com/v1/orders/:orderId/lines/:lineId",
+      "log: variables 2",
+      "log: var orderId ",
+      "log: var lineId ",
+      "log: after https://api.example.com/v1/orders/ord-88/lines/3/receipt",
+      "log: resolved path /v1/orders/ord-88/lines/3/receipt",
+      "log: raw path /v1/orders/:orderId/lines/:lineId/receipt"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders/:orderId/lines/:lineId/receipt"
+    ]
+  }
+}

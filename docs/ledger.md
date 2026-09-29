@@ -26,7 +26,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Done, merged to main | ws/2-vars-httpx | 2026-09-29 23:55 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Done, merged to main | ws/2b-oauth2 | 2026-09-29 23:58 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
-| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-29 23:35 IST |
+| WS3 script runtime | Opus 5 Thinking (high) | Done, merged to main | ws/3-script | 2026-09-30 01:55 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Running | ws/6a-request-editor | 2026-09-30 00:20 IST |
@@ -307,3 +307,49 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Found WS3 and WS6a had stopped mid-run. WS3 had committed up to a17f1ca with no DONE entry; WS6a had only its STARTED entry and no implementation. Resumed both agents with their context and asked them to commit after each milestone. Verified WS6b: in scope, race tests and lint green, 10 MB JSON first render 4.8 ms (target < 50 ms), golden renders reviewed by hand (NO_COLOR JSON body, ASCII timeline with Authorization masked). Merged WS6b into `main`.
 - Decisions: Accepted WS6b's additive contract `RetrySendMsg` in `internal/tui/send.go`. WS6a's shell send wiring must handle it; check this when merging WS6a.
 - Next: Wait for WS3 and WS6a. WS4 (engine, implements `tui.Sender`) starts when WS3 merges.
+
+### 2026-09-30 00:18 IST · WS3 · Opus 5 Thinking · STARTED
+- Branch/worktree: ws/3-script
+- Did: Read the brief, plan §0 (Q4/R3/C1), §4.1, §7, `AGENTS.md`, `docs/model.md`, `internal/model`, and the C1 contracts `internal/vars/scope.go` and `internal/httpx/types.go`. Confirmed the toolchain (Go 1.26.1, node 22 via nvm for development-time bundle fetching only) and added `github.com/dop251/goja` + `github.com/dop251/goja_nodejs` to `go.mod`.
+- Files: `go.mod`, `go.sum`, `docs/ledger.md`
+- Decisions: Engine is goja + goja_nodejs (pure Go, no cgo) per plan §4. npm libraries will be vendored as pinned, minified, ES5 CommonJS bundles under `internal/script/assets/` and embedded; node/npm is a development-time-only dependency.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: Build the bundle pipeline and the core `pm.*` surface against in-package fakes for `vars.Store` and `httpx.Sender`.
+
+### 2026-09-30 00:06 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Built the development-time bundle pipeline (browserify + terser, ES5) and embedded ten pinned npm libraries under `internal/script/assets/bundles/`; each one was checked to actually load and run in goja. Implemented the core `pm.*` surface in JavaScript against a narrow Go bridge: `PropertyList` and the property types, `Url`, `Request`, `Response`, `VariableScope`, `pm.test`/`pm.expect` on real chai + chai-postman, and the `Run`/`Input`/`Result` API.
+- Files: `internal/script/{script,convert,programs,bridge,run}.go`, `internal/script/assets/{package.json,build.js,assets.go,bundles/,sandbox/}`
+- Decisions: (1) The `pm.*` objects are hand-written against postman-collection's source rather than built on the `postman-collection` bundle, because that bundle costs ~26 ms to evaluate per VM against a 5 ms budget for a whole script; the bundle stays requirable by name. (2) `crypto` and `console` globals are polyfilled before any bundle loads — uuid and postman-collection need `crypto.getRandomValues`, ajv needs `console` — with randomness from Go's `crypto/rand`. (3) crypto-js is pinned to 4.2.0 rather than Postman's 3.3.0, which carries CVE-2023-46233; the only visible difference is the PBKDF2 defaults. (4) Go↔JS passes Postman v2.1 definitions as JSON strings, so the wire format is the one both sides already understand.
+- Tests: Unit tests for console capture, variable scopes, pm.test and request mutation; a load-and-run test per bundle.
+- Blockers / questions: none.
+- Next: `pm.sendRequest`, timers and the timeout/interrupt path.
+
+### 2026-09-30 00:16 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Added async `pm.sendRequest` in both callback and promise form, the event loop with `setTimeout`/`setInterval`, the timeout and interrupt path, the cookie jar, the tier-3 legacy globals, and error mapping from goja positions back to `Script.File` and line. Added benchmarks.
+- Files: `internal/script/{run,bridge}.go`, `internal/script/assets/sandbox/{70-cookies,80-pm,90-legacy,99-boot}.js`, `internal/script/*_test.go`
+- Decisions: (1) `pm.sendRequest` creates its keep-alive timer in JavaScript, not Go: `eventloop.SetTimeout` increments the job count asynchronously, which lets the loop exit before an in-flight send lands. (2) `eventloop.Terminate` leaves the job count inflated, so the finish step talks to the runtime directly instead of scheduling one more loop job. (3) goja reports syntax errors as `file: Line L:C msg`, not `file:line:col`, so positions are parsed from that form.
+- Tests: `go test -race ./internal/script` green, including timeout, pending-timer and context-cancellation cases. Warm run of a trivial script 0.47 ms; crypto-js signing 3.4 ms; five chai assertions 3.7 ms — all inside the 5 ms budget.
+- Blockers / questions: none.
+- Next: The compatibility corpus and the private-data run.
+
+### 2026-09-30 01:45 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Wrote the 46-case compatibility corpus (golden `.js` + `.json` pairs under `internal/script/testdata/corpus/`, regenerable with `-update`) and the private-data test over the extracted collections.
+- Files: `internal/script/{corpus,private}_test.go`, `internal/script/testdata/corpus/`, `internal/script/assets/sandbox/{10-util,30-url,60-varscope}.js`, `internal/script/bridge.go`, `internal/script/assets/README.md`, `Taskfile.yml`
+- Decisions: Writing the corpus found four fidelity bugs, now fixed: `Url.update` ignored a `{raw: …}` definition so host/path/protocol were empty for every script that read `pm.request.url`; `Url.toString` left `:name` path segments unresolved where postman-collection substitutes them (`toJSON` still emits the unresolved form, since the values travel separately and `model.URL` keeps them apart); `console` did no printf substitution; and `toObject()` crossed into JavaScript as a Go map, so its key order changed between runs.
+- Tests: **Private data: 17 of 17 real pre-request scripts ran clean — no ScriptError, no unsupported-API warning.** Across the 17 chains the scripts made 30 variable writes and 17 `pm.sendRequest` calls, so they are doing real work, not exiting early. Counts only; nothing from that data is logged anywhere.
+- Blockers / questions: none.
+- Next: `docs/scripting.md`, then the full build/test/lint gate.
+
+### 2026-09-30 01:52 IST · WS3 · Opus 5 Thinking · DONE
+- Branch/worktree: ws/3-script (not merged, not pushed)
+- Did: `internal/script` is complete: the goja sandbox, the T1+T2 `pm.*` surface plus the cheap T3 legacy globals, ten embedded npm bundles, async `pm.sendRequest`, timers and the event loop, timeouts via `vm.Interrupt`, the cookie jar, error mapping to `Script.File` and line, a 46-case compatibility corpus, the private-data test, and `docs/scripting.md`.
+- Files: `internal/script/**`, `docs/scripting.md`, `internal/script/assets/README.md`, `Taskfile.yml` (new `assets` task), `go.mod`, `go.sum`
+- Decisions: No contract changes were needed — `internal/vars/scope.go` and `internal/httpx/types.go` are untouched, and `internal/model` is untouched. The only edits outside `internal/script/` and `docs/scripting.md` are the additive `task assets` target and the two goja dependencies. WS4 should call `script.Run(ctx, chain, script.Input{…})` once per event and persist `Input.Vars.Changes()` afterwards; `Result.Request` is always a distinct value from `Input.Request`, so the pipeline can diff them.
+- Deviations from Postman, all documented in `docs/scripting.md`: crypto-js 4.2.0 instead of 3.3.0 (CVE-2023-46233; only the PBKDF2 defaults differ); `pm.*` objects are postctl's own implementation of postman-collection's semantics, so `pm.request instanceof sdk.Request` is false; query strings are not percent-normalised, which keeps `{{variable}}` intact; `<scope>.values` is a snapshot because postctl holds no variable state of its own; `pm.visualizer`, `pm.vault`, `pm.require` and `pm.execution.runRequest` warn and no-op; `pm.info.collectionName` is an addition.
+- Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` all green. Corpus 46/46. **Private data: 17 of 17 real pre-request scripts run clean, no unsupported-API errors or warnings.** Warm run of a trivial script 0.47 ms, crypto-js signing 3.4 ms, five chai assertions 3.7 ms, against a 5 ms budget.
+- Blockers / questions: none.
+- Next: none. Ready for the orchestrator to review and merge.

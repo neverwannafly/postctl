@@ -1,0 +1,37 @@
+{
+  "description": "postman.get/set/clearEnvironmentVariable and GlobalVariable, plus the legacy request global.",
+  "event": "prerequest",
+  "request": {
+    "headers": {
+      "Accept": "application/json"
+    }
+  },
+  "vars": {
+    "environment": {
+      "seeded": "yes"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: env two",
+      "log: global run-1",
+      "log: seeded yes",
+      "log: after clear false",
+      "log: legacy request GET https://api.example.com/v1/orders?page=1",
+      "log: legacy headers object application/json"
+    ],
+    "varChanges": {
+      "environment": [
+        "set stage=two",
+        "unset seeded"
+      ],
+      "globals": [
+        "set runId=run-1"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header Accept: application/json"
+    ]
+  }
+}
