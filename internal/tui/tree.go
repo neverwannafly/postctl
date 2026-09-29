@@ -85,8 +85,7 @@ type treeState struct {
 	filtering bool // the filter input has focus
 	query     string
 
-	cache  []string
-	cacheW int
+	cache []string
 }
 
 func newTree(th ui.Theme) *treeState {

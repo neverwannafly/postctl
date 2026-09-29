@@ -31,6 +31,7 @@ func newResponsePlaceholder(env PaneEnv) Pane {
 	return &placeholderPane{th: env.Theme, slot: SlotResponse}
 }
 
+// Update implements the interface it is used through.
 func (p *placeholderPane) Update(msg tea.Msg) (Pane, tea.Cmd) {
 	switch msg := msg.(type) {
 	case SelectionMsg:
@@ -43,12 +44,19 @@ func (p *placeholderPane) Update(msg tea.Msg) (Pane, tea.Cmd) {
 	return p, nil
 }
 
+// SetSize implements the interface it is used through.
 func (p *placeholderPane) SetSize(w, h int) { p.w, p.h = w, h }
-func (p *placeholderPane) Focus() tea.Cmd   { p.focused = true; return nil }
-func (p *placeholderPane) Blur()            { p.focused = false }
 
+// Focus implements the interface it is used through.
+func (p *placeholderPane) Focus() tea.Cmd { p.focused = true; return nil }
+
+// Blur implements the interface it is used through.
+func (p *placeholderPane) Blur() { p.focused = false }
+
+// KeyHints implements the interface it is used through.
 func (p *placeholderPane) KeyHints() []ui.Hint { return nil }
 
+// View implements the interface it is used through.
 func (p *placeholderPane) View() string {
 	if p.slot == SlotResponse {
 		return p.responseView()

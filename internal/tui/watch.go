@@ -174,8 +174,10 @@ func (w *fsWatcher) loop() {
 	}
 }
 
+// Events implements the interface it is used through.
 func (w *fsWatcher) Events() <-chan struct{} { return w.out }
 
+// Close implements the interface it is used through.
 func (w *fsWatcher) Close() error {
 	var err error
 	w.once.Do(func() {
@@ -249,8 +251,10 @@ func (p *pollWatcher) loop() {
 	}
 }
 
+// Events implements the interface it is used through.
 func (p *pollWatcher) Events() <-chan struct{} { return p.out }
 
+// Close implements the interface it is used through.
 func (p *pollWatcher) Close() error {
 	p.once.Do(func() {
 		close(p.done)

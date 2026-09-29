@@ -257,15 +257,6 @@ func (h *harness) selectByName(name string) {
 	h.t.Fatalf("no tree row %q in:\n%s", name, h.screen())
 }
 
-// flush waits until queued saves have been written.
-func (h *harness) flush() {
-	h.t.Helper()
-	for i := 0; i < 50 && h.a.saver.busy(); i++ {
-		time.Sleep(10 * time.Millisecond)
-		// The save command already ran in run(); nothing else to pump.
-	}
-}
-
 // keyPress builds a key press from a name like "ctrl+p", "shift+tab", "esc",
 // "down", "E" or "alt+1".
 func keyPress(name string) tea.KeyPressMsg {

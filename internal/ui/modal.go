@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -22,7 +21,7 @@ func (t Theme) Modal(content string, width int, danger bool) string {
 	if danger {
 		tok = StatusDanger
 	}
-	var c color.Color = t.Color(tok)
+	c := t.Color(tok)
 	if c != nil {
 		s = s.BorderForeground(c)
 	}

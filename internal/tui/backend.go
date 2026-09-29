@@ -56,6 +56,7 @@ func NewStoreBackend(root string, opts ...store.Option) Backend {
 	return b
 }
 
+// Root implements the interface it is used through.
 func (b *storeBackend) Root() string { return b.root }
 
 // open returns the store, opening it if the workspace appeared after start.
@@ -83,6 +84,7 @@ type (
 	}
 )
 
+// Load implements the interface it is used through.
 func (b *storeBackend) Load(ctx context.Context) (*model.Workspace, []*store.FileError, error) {
 	s, err := b.open()
 	if err != nil {
@@ -98,6 +100,7 @@ func (b *storeBackend) Load(ctx context.Context) (*model.Workspace, []*store.Fil
 	return ws, nil, err
 }
 
+// Init implements the interface it is used through.
 func (b *storeBackend) Init(_ context.Context, name string) error {
 	s, err := store.Init(b.root, name, b.opts...)
 	if err != nil {
@@ -111,6 +114,7 @@ func (b *storeBackend) Init(_ context.Context, name string) error {
 	return nil
 }
 
+// SaveCollection implements the interface it is used through.
 func (b *storeBackend) SaveCollection(ctx context.Context, c *model.Collection) error {
 	s, err := b.open()
 	if err != nil {
@@ -119,6 +123,7 @@ func (b *storeBackend) SaveCollection(ctx context.Context, c *model.Collection) 
 	return s.SaveCollection(ctx, c)
 }
 
+// DeleteCollection implements the interface it is used through.
 func (b *storeBackend) DeleteCollection(ctx context.Context, id model.ID) error {
 	s, err := b.open()
 	if err != nil {
@@ -127,6 +132,7 @@ func (b *storeBackend) DeleteCollection(ctx context.Context, id model.ID) error 
 	return s.DeleteCollection(ctx, id)
 }
 
+// SaveRequest implements the interface it is used through.
 func (b *storeBackend) SaveRequest(ctx context.Context, c *model.Collection, id model.ID) error {
 	s, err := b.open()
 	if err != nil {
@@ -135,6 +141,7 @@ func (b *storeBackend) SaveRequest(ctx context.Context, c *model.Collection, id 
 	return s.SaveRequest(ctx, c, id)
 }
 
+// SaveEnvironment implements the interface it is used through.
 func (b *storeBackend) SaveEnvironment(ctx context.Context, e *model.Environment) error {
 	s, err := b.open()
 	if err != nil {
@@ -143,6 +150,7 @@ func (b *storeBackend) SaveEnvironment(ctx context.Context, e *model.Environment
 	return s.SaveEnvironment(ctx, e)
 }
 
+// LoadState implements the interface it is used through.
 func (b *storeBackend) LoadState() (store.State, error) {
 	s, err := b.open()
 	if err != nil {
@@ -151,6 +159,7 @@ func (b *storeBackend) LoadState() (store.State, error) {
 	return s.LoadState()
 }
 
+// SaveState implements the interface it is used through.
 func (b *storeBackend) SaveState(st store.State) error {
 	s, err := b.open()
 	if err != nil {
