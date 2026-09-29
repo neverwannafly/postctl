@@ -20,7 +20,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS | Owner (model) | Status | Branch | Last update |
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | Draft v0, awaiting user answers | — | 2026-09-29 |
-| WS0 scaffold/model/store | Sonnet 5.5 (high) | In progress | ws/0-scaffold | 2026-09-29 |
+| WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, awaiting merge | ws/0-scaffold | 2026-09-29 |
 | WS1 Postman importer | — | Not started | — | — |
 | WS2 vars + httpx | — | Not started | — | — |
 | WS3 script runtime | — | Not started | — | — |
@@ -63,3 +63,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go test -race ./...` green.
 - Blockers / questions: see final report (POSTCTL_HOME semantics, literal credentials in auth fields).
 - Next: cmd/postctl, Taskfile, lint config, theme skeleton, docs (model.md, design-language.md, tui-stack.md, AGENTS.md).
+
+### 2026-09-29 23:32 IST · WS0 · Sonnet 5.5 · DONE
+- Branch/worktree: ws/0-scaffold
+- Did: Added repo scaffold (`cmd/postctl` with --version/--help and stub subcommands exiting 3, `Taskfile.yml`, `.golangci.yml`), `internal/ui/theme.go` token skeleton (dark/light, method, syntax, status classes, production badge, layout breakpoints, glyphs), and docs: `docs/model.md`, `docs/design-language.md` (Clear Signal ported for postctl), `docs/tui-stack.md`, `AGENTS.md`. Fixed lint (godoc enforced on exported identifiers).
+- Files: `cmd/postctl/*`, `Taskfile.yml`, `.golangci.yml`, `AGENTS.md`, `docs/{model,design-language,tui-stack}.md`, `internal/ui/*`, `internal/model/*`, `internal/store/*`, `.gitignore`, `go.mod`, `go.sum`
+- Decisions: Module deps are only `go.yaml.in/yaml/v3` and `charm.land/lipgloss/v2`. Keychain via `/usr/bin/security -i` over stdin (go-keyring rejected: secrets on argv). Load of 1000 requests ~70 ms. Plan §0 Q10 followed (no send confirmation) even though plan §8 still mentions one.
+- Tests: `task build test lint` green; `go test -race ./...` green; `POSTCTL_KEYCHAIN_TESTS=1` run verified against the real Keychain.
+- Blockers / questions: (1) `POSTCTL_HOME` overrides only the global fallback dir, not project discovery: OK? (2) Literal credentials in auth fields are written to YAML as-is; should the store auto-move non-`{var}` literals to Keychain? (3) Load is strict (a malformed file fails the whole load); want a lenient mode that reports per-file problems? (4) plan §8 line on prod confirmation contradicts §0 Q10; suggest updating.
+- Next: merge `ws/0-scaffold`; WS1/WS2/WS5 can start against `internal/model`, `internal/store`, `internal/ui`.
