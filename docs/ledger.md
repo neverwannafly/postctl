@@ -46,7 +46,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: Round-2 questions (gRPC/OAuth2 depth, launch approval).
 - Next: Write briefs for WS0 and WS1b, then launch Wave 1.
 
-### 2026-09-29 23:15 IST · WS0 · Sonnet 5.5 · STARTED
+### 2026-09-29 23:10 IST · WS0 · Sonnet 5.5 · STARTED
 - Branch/worktree: ws/0-scaffold
 - Did: Read brief, plan §0, ledger, and reference repo docs/code (design-language, tui-stack, AGENTS, theme, cli, keychain). Confirmed toolchain (Go 1.26.1, task, golangci-lint 2.11.4) and module cache.
 - Files: `docs/ledger.md`
