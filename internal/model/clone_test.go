@@ -249,6 +249,7 @@ func TestCloneDeepNoAliasing(t *testing.T) {
 	deepCloneCase(t, "URL", func(u *URL) *URL { c := u.Clone(); return &c })
 	deepCloneCase(t, "Scripts", func(s *Scripts) *Scripts { c := s.Clone(); return &c })
 	deepCloneCase(t, "RequestSettings", func(s *RequestSettings) *RequestSettings { c := s.Clone(); return &c })
+	deepCloneCase(t, "WebSocketSettings", (*WebSocketSettings).Clone)
 	deepCloneCase(t, "Example", func(e *Example) *Example { c := e.Clone(); return &c })
 }
 

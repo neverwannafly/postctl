@@ -38,3 +38,4 @@ order:
   - 002-ping
   - auth-schemes
   - empty
+  - 005-live-prices

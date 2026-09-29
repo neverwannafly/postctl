@@ -204,6 +204,27 @@ func richWorkspace() *model.Workspace {
 		}},
 	}
 
+	socket := &model.Request{
+		ID: "req-ws", Name: "Live prices", Kind: model.KindWebSocket,
+		Description: "Streams price ticks.",
+		URL:         model.URL{Raw: "wss://{{wsHost}}/prices?feed=eur", Query: []model.KV{{Key: "feed", Value: "eur"}}},
+		Headers:     []model.KV{{Key: "Origin", Value: "https://app.test"}},
+		Auth:        &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: "{{token}}"}},
+		Settings:    model.RequestSettings{VerifyTLS: ptr(false), Timeout: ptr(10 * time.Second)},
+		WebSocket: &model.WebSocketSettings{
+			Messages: []model.WSMessage{
+				{ID: "msg-sub", Name: "Subscribe", Format: model.WSJSON, Body: "{\n  \"op\": \"subscribe\",\n  \"symbol\": \"{{symbol}}\"\n}"},
+				{ID: "msg-ping", Name: "Hello", Format: model.WSText, Body: "hello"},
+				{ID: "msg-bin", Name: "Binary blob", Format: model.WSBinaryBase64, Body: "AQID"},
+			},
+			Draft:           &model.WSMessage{Format: model.WSJSON, Body: "{\"op\": \"unsubscribe\"}"},
+			Subprotocols:    []string{"v1.prices", "v2.prices"},
+			PingInterval:    ptr(30 * time.Second),
+			MaxMessageBytes: ptr(int64(1 << 20)),
+			Extra:           map[string]any{"note": "kept"},
+		},
+	}
+
 	formsFolder := &model.Folder{
 		ID: "f-forms", Name: "Forms & uploads",
 		Description: "Body modes.",
@@ -242,7 +263,7 @@ func richWorkspace() *model.Workspace {
 			Test:       &model.Script{Source: "pm.test('t', () => {});", Disabled: true},
 		},
 		Extra: map[string]any{"postman": map[string]any{"schema": "v2.1.0", "tags": []any{"a", "b"}}},
-		Items: []model.Item{chargesFolder, noBody, authFolder, emptyFolder},
+		Items: []model.Item{chargesFolder, noBody, authFolder, emptyFolder, socket},
 	}
 	dup := &model.Collection{
 		ID: "coll-dup", Name: "payments api",

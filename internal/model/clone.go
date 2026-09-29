@@ -23,6 +23,7 @@ func (r *Request) Clone() *Request {
 	c.Auth = r.Auth.Clone()
 	c.Scripts = r.Scripts.Clone()
 	c.Settings = r.Settings.Clone()
+	c.WebSocket = r.WebSocket.Clone()
 	c.Examples = cloneExamples(r.Examples)
 	c.Extra = cloneAnyMap(r.Extra)
 	return &c
@@ -43,6 +44,7 @@ func (r *Request) freshen() {
 	freshenAuth(r.Auth)
 	freshenVars(r.URL.PathVars)
 	freshenScripts(&r.Scripts)
+	r.WebSocket.freshen()
 	for i := range r.Examples {
 		e := &r.Examples[i]
 		if e.ID != "" {

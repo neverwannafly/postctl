@@ -19,6 +19,8 @@ Workspace                       id, name, description, defaults (RequestSettings
 │                 ├── Auth      *Auth (nil = inherit)
 │                 ├── Scripts   {preRequest, test} *Script
 │                 ├── Settings  RequestSettings (tri-state pointers)
+│                 ├── WebSocket *WebSocketSettings (kind: websocket only) messages []WSMessage{id, name, body, format},
+│                 │             draft, subprotocols, pingInterval, maxMessageBytes, extra
 │                 └── Examples  []Example (saved responses, originalRequest, cookies)
 ├── Environments []*Environment id, name, production, variables []Variable, extra
 └── Globals *Globals            id, name, variables []Variable, extra
@@ -36,7 +38,7 @@ Variable ── key, value, type (default|secret), dataType, description, disabl
 ## Rules every consumer must follow
 
 1. **IDs.** Every node has a stable `model.ID` (string). Importers keep Postman IDs; new nodes use `model.NewID()` (UUIDv7, strictly increasing within a process). Hand-written files without `id` get `model.DeriveID(parent, name)`, a deterministic value that becomes permanent on the next save. IDs are unique within a collection.
-2. **Zero values are safe.** `Disabled` (not `Enabled`) on `KV`, `Variable`, `FormPart` means a literal is enabled by default. A nil `*bool`/`*int`/`*Duration` in `RequestSettings` means "use the workspace default" (`Workspace.Defaults`, then built-in). A nil `*Auth` on a request or folder means **inherit**; a nil collection `Auth` means no auth. `Body{}` (mode empty) is no body. `model.KindHTTP` must be set explicitly (`Validate` rejects an empty kind; `NewRequest` sets it).
+2. **Zero values are safe.** `Disabled` (not `Enabled`) on `KV`, `Variable`, `FormPart` means a literal is enabled by default. A nil `*bool`/`*int`/`*Duration` in `RequestSettings` (and in `WebSocketSettings`) means "use the workspace default" (`Workspace.Defaults`, then built-in). A nil `*Auth` on a request or folder means **inherit**; a nil collection `Auth` means no auth. `Body{}` (mode empty) is no body. `model.KindHTTP` must be set explicitly (`Validate` rejects an empty kind; `NewRequest` sets it).
 3. **`Extra` / `Auth.Raw` keep unknown data.** Importers must put fields they do not model here rather than dropping them (Postman `proxy`, `certificate`, `protocolProfileBehavior` extras, unknown auth parameters, environment `_postman_*` keys). YAML decoding is strict, so anything not modelled *and* not in an `extra` map is an error on load.
 4. **URL.** `Raw` is what is sent. `Query` lists all parameters in order, **including disabled ones** (which are not in `Raw`); use `URL.EnabledQuery()` and `URL.SyncRaw()` when editing. `model.ParseURL(raw)` builds a URL with query and `:path` variables.
 5. **Scripts.** `Script.Source` is the program text (Postman `exec` lines joined with `\n`; `ScriptFromExec` / `Script.Exec`). It is **never** written to YAML: the store writes a sibling `.js` file and records its name in `Script.File`, which the store sets on load and derives on save. Postman allows several events of one kind; importers concatenate them, in order, into one `Source`. `Language` empty means JavaScript. Descriptions are plain strings; Postman's description `type` (text/markdown/html) is not preserved.
@@ -217,6 +219,38 @@ variables:
     type: secret
     secretRef: env/env-prod/apiKey
 ```
+
+A WebSocket request (`kind: websocket`) uses the same URL, headers, auth and settings fields as an HTTP request (`verifyTLS` and `timeout` apply to the handshake; `method`, `body` and scripts are unused) plus a `websocket:` block:
+
+```yaml
+id: req-ws
+name: Live prices
+kind: websocket
+url:
+  raw: wss://{{wsHost}}/prices?feed=eur
+  query:
+    - key: feed
+      value: eur
+auth:
+  type: bearer
+  bearer:
+    token: '{{token}}'
+websocket:
+  messages:                 # saved message templates, in display order
+    - id: msg-sub
+      name: Subscribe
+      format: json          # text (default) | json | binary-base64
+      body: |-
+        {"op": "subscribe", "symbol": "{{symbol}}"}
+  draft:                    # unsent composer content, so it survives a restart
+    format: json
+    body: '{"op": "unsubscribe"}'
+  subprotocols: [v1.prices, v2.prices]
+  pingInterval: 30s         # keep-alive ping while connected; omitted = off
+  maxMessageBytes: 1048576  # cap for one received message; omitted = 16 MiB
+```
+
+`{{variables}}` in the URL, headers, auth and message bodies are resolved at connect (or send) time; pre-request and test scripts are not run for WebSocket requests. The block is additive: files without it load unchanged, so the schema version stays 1. A message with no `id` gets one when it is opened in the editor (`WebSocketSettings.EnsureIDs`).
 
 More complete samples (every body mode, auth type, disabled rows, scripts, examples) are the golden files in `internal/store/testdata/golden/workspace/`; regenerate them with `go test ./internal/store -run TestGolden -update`.
 

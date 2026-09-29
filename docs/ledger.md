@@ -33,7 +33,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
-| WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
+| WS9 WebSocket requests | Sonnet 5.5 (high) | In progress (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 02:30 IST |
 
 ## Entries
 
@@ -434,3 +434,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Final `go build ./... && go test -race ./... && golangci-lint run` passed.
 - Blockers / questions: none. Existing QA follow-up remains: move envedit, cookies and textarea scroll-offset adjustment out of `View` and into `Update`.
 - Next: WS7 can build CLI send/run against the merged engine.
+
+### 2026-09-30 02:30 IST · WS9 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/9-websocket (`~/work/postctl-wt/ws9-websocket`, from `main` at b921258)
+- Did: Read the WS9 brief, plan §0, model.md, design-language.md, tui-stack.md, engine.md, AGENTS.md and the shell, request pane, response pane and httpx code. Created the worktree.
+- Files: `docs/ledger.md`
+- Decisions: (1) Model change is one additive pointer field, `Request.WebSocket *WebSocketSettings` (`websocket:` in YAML), so no schema bump or migration. (2) `internal/wsx` owns handshake building (variables, inherited auth, cookies) as well as the connection, so the pane stays thin and testable with a fake client. (3) Shell hook: `Options.NewPaneForKind map[model.Kind]PaneFactory`; the shell wraps the request slot in a router that shows the kind's pane for the selected request and forwards non-key messages to every pane. (4) `coder/websocket` v1.8.14 (already in the module cache) is the client library, as the stack doc prefers.
+- Tests: n/a
+- Blockers / questions: `httpx.applyAuth` is unexported. I plan to add one tiny exported wrapper (`httpx.ApplyAuth`, new file `internal/httpx/applyauth.go`, no edits to existing httpx files) so the handshake reuses the HTTP auth code. Tell me if you would rather own that.
+- Next: model + store round trip + goldens, then `wsx`, then the pane, then shell/tree/palette/wiring.
