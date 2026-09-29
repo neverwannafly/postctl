@@ -17,8 +17,9 @@ const (
 
 // Request is a single API request: the leaf of a collection tree.
 type Request struct {
-	// ID is the stable identifier (Postman: item.id).
-	ID ID `yaml:"id"`
+	// ID is the stable identifier (Postman: item.id). Omitted from YAML
+	// only for the OriginalRequest embedded in an [Example], which has none.
+	ID ID `yaml:"id,omitempty"`
 	// Name is the display name.
 	Name string `yaml:"name"`
 	// Description is free-form text (Markdown by convention).

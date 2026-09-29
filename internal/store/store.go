@@ -80,7 +80,7 @@ func Init(root, name string, opts ...Option) (*Store, error) {
 	}
 	gi := filepath.Join(abs, ".gitignore")
 	if !exists(gi) {
-		if _, err := writeFileAtomic(gi, []byte(stateDir+"/\n")); err != nil {
+		if _, err := writeFileAtomic(gi, []byte(stateDir+"/\n"), true); err != nil {
 			return nil, err
 		}
 	}

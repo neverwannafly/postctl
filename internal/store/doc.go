@@ -18,9 +18,13 @@
 //
 // Guarantees:
 //
-//   - Writes are atomic per file (temp file in the same directory, fsync,
-//     rename) and skipped when the bytes are unchanged, so saves do not touch
-//     unmodified files.
+//   - Writes are atomic per file (temp file in the same directory, rename) and
+//     skipped when the bytes are unchanged, so saves do not touch unmodified
+//     files. Single-file saves (SaveRequest, SaveEnvironment, SaveGlobals,
+//     SaveMeta) also fsync, so autosaved edits survive power loss. Bulk saves
+//     (Save, SaveCollection) skip fsync because flushing thousands of files
+//     on macOS takes many seconds; rename atomicity still prevents torn files
+//     if the process dies.
 //   - Output is deterministic: the same model always produces the same bytes,
 //     which keeps git diffs minimal.
 //   - Secret variable values and OAuth 2.0 tokens never reach YAML. They are

@@ -54,3 +54,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: n/a
 - Blockers / questions: none
 - Next: model types, then store, then scaffold/CLI, theme skeleton, docs.
+
+### 2026-09-29 23:50 IST · WS0 · Sonnet 5.5 · PROGRESS
+- Branch/worktree: ws/0-scaffold
+- Did: Shipped `internal/model` (Workspace/Collection/Folder/Request/Item tree with ops, URL, KV, Body modes, Auth types incl. OAuth2 grants, Variable/SecretRef/Environment/Globals, Scripts, Settings, Examples, IDs via UUIDv7, Validate) and `internal/store` (Discover/Open/Init, Load, Save/SaveCollection/SaveRequest, env/globals, atomic writes, prune, slug collisions, ordering, SecretStore + MemorySecrets + macOS Keychain via `/usr/bin/security -i`, schema migration hook, local state). Round-trip, golden, secrets-leak, ordering, prune and Keychain tests green (real Keychain test opt-in via `POSTCTL_KEYCHAIN_TESTS=1`, verified once).
+- Files: `internal/model/*`, `internal/store/*`, `internal/store/testdata/golden/**`
+- Decisions: `Disabled` (not `Enabled`) on KV/Variable/FormPart so zero value = enabled. Nil `*Auth` == inherit. Script `Source` is never in YAML; the store writes sibling `.js` and sets `Script.File` on load. Secret var values and OAuth2 tokens are `yaml:"-"`/cleared and stored under deterministic refs (`env/<id>/<key>`, `oauth2/<ownerID>`, ...). `Load` never reads Keychain; call `Store.Hydrate`. Bulk saves skip fsync (macOS full-fsync of 1000s of files takes seconds); single-file saves fsync.
+- Tests: `go test -race ./...` green.
+- Blockers / questions: see final report (POSTCTL_HOME semantics, literal credentials in auth fields).
+- Next: cmd/postctl, Taskfile, lint config, theme skeleton, docs (model.md, design-language.md, tui-stack.md, AGENTS.md).

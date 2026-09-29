@@ -1,0 +1,13 @@
+id: req-oauth-imp
+name: OAuth2 implicit
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/imp'
+auth:
+  type: oauth2
+  oauth2:
+    grantType: implicit
+    authUrl: https://idp.test/authorize
+    clientId: c
+    addTokenTo: query

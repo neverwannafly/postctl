@@ -1,0 +1,14 @@
+id: req-oauth1
+name: OAuth1 legacy
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/oauth1'
+auth:
+  type: unsupported
+  originalType: oauth1
+  raw:
+    addParamsToHeader: true
+    consumerKey: ck
+    signatureMethod: HMAC-SHA1
+    timestamp: 12

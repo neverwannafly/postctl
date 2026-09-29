@@ -1,0 +1,9 @@
+schemaVersion: 1
+id: globals-1
+name: Globals
+variables:
+  - key: g1
+    value: v1
+  - key: gsecret
+    type: secret
+    secretRef: globals/globals-1/gsecret

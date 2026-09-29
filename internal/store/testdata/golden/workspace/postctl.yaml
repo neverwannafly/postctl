@@ -1,0 +1,12 @@
+schemaVersion: 1
+id: ws-1
+name: payments-api
+description: Demo workspace.
+defaults:
+  followRedirects: true
+  timeout: 30s
+extra:
+  owner: team-x
+collections:
+  - payments-api
+  - payments-api-2

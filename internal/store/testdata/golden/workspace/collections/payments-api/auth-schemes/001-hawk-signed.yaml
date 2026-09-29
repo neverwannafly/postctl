@@ -1,0 +1,14 @@
+id: req-hawk
+name: Hawk signed
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/hawk'
+auth:
+  type: hawk
+  hawk:
+    id: '{{hid}}'
+    key: '{{hkey}}'
+    algorithm: sha256
+    extraData: ext
+    includePayloadHash: true

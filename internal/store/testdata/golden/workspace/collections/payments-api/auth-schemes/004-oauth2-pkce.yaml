@@ -1,0 +1,30 @@
+id: req-oauth
+name: OAuth2 PKCE
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/me'
+auth:
+  type: oauth2
+  oauth2:
+    grantType: authorization_code_pkce
+    tokenName: main
+    authUrl: https://idp.test/authorize
+    accessTokenUrl: https://idp.test/token
+    refreshTokenUrl: https://idp.test/refresh
+    clientId: cid
+    clientSecret: '{{csecret}}'
+    scope: read write
+    redirectUri: http://127.0.0.1:8123/cb
+    audience: api
+    clientAuth: body
+    codeChallengeMethod: S256
+    addTokenTo: header
+    headerPrefix: Bearer
+    token:
+      tokenType: Bearer
+      scope: read write
+      expiresAt: 2026-09-30T12:00:00Z
+      secretRef: oauth2/req-oauth
+    extra:
+      grant_extra: x

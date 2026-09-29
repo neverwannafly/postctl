@@ -15,13 +15,19 @@ import (
 )
 
 // writer tracks the files a save produced so leftovers can be pruned.
-type writer struct{ expected map[string]bool }
+type writer struct {
+	expected map[string]bool
+	durable  bool
+}
 
-func newWriter() *writer { return &writer{expected: map[string]bool{}} }
+// newWriter returns a writer. Bulk saves pass durable=false: unchanged files
+// are skipped, atomic rename still prevents torn files, and fsyncing thousands
+// of files on import would take many seconds.
+func newWriter(durable bool) *writer { return &writer{expected: map[string]bool{}, durable: durable} }
 
 func (w *writer) file(path string, data []byte) error {
 	w.expected[path] = true
-	if _, err := writeFileAtomic(path, data); err != nil {
+	if _, err := writeFileAtomic(path, data, w.durable); err != nil {
 		return &FileError{Path: path, Err: err}
 	}
 	return nil
@@ -253,7 +259,7 @@ func (s *Store) writeWorkspaceFile(ws *model.Workspace, order []string) error {
 		return err
 	}
 	path := filepath.Join(s.root, workspaceYAML)
-	if _, err := writeFileAtomic(path, data); err != nil {
+	if _, err := writeFileAtomic(path, data, true); err != nil {
 		return &FileError{Path: path, Err: err}
 	}
 	return nil
@@ -392,7 +398,7 @@ func (s *Store) updateCollectionOrder(mut func([]string) []string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := writeFileAtomic(path, data); err != nil {
+	if _, err := writeFileAtomic(path, data, true); err != nil {
 		return &FileError{Path: path, Err: err}
 	}
 	return nil
@@ -415,7 +421,7 @@ func (s *Store) saveCollectionFiles(ctx context.Context, c *model.Collection) (n
 	}
 	dir := filepath.Join(base, name)
 	lay := planCollection(c, dir)
-	w := newWriter()
+	w := newWriter(false)
 	sw := newSecretWriter(ctx, s.secrets)
 
 	if err := s.writeContainerFile(w, sw, c, lay); err != nil {
@@ -520,7 +526,7 @@ func (s *Store) SaveRequest(ctx context.Context, c *model.Collection, id model.I
 	if !isFile(filepath.Join(loc.dir, loc.stem+".yaml")) {
 		return s.SaveCollection(ctx, c)
 	}
-	w := newWriter()
+	w := newWriter(true)
 	if err := s.writeRequest(w, newSecretWriter(ctx, s.secrets), r, loc); err != nil {
 		return err
 	}
@@ -659,7 +665,7 @@ func (s *Store) SaveEnvironment(ctx context.Context, e *model.Environment) error
 	if ef.Variables, err = sw.vars(ScopeEnvironment, e.ID, e.Variables); err != nil {
 		return err
 	}
-	w := newWriter()
+	w := newWriter(true)
 	if err := w.yaml(filepath.Join(dir, name+".yaml"), &ef); err != nil {
 		return err
 	}
@@ -717,7 +723,7 @@ func (s *Store) SaveGlobals(ctx context.Context, g *model.Globals) error {
 	if gf.Variables, err = sw.vars(ScopeGlobals, g.ID, g.Variables); err != nil {
 		return err
 	}
-	if err := newWriter().yaml(path, &gf); err != nil {
+	if err := newWriter(true).yaml(path, &gf); err != nil {
 		return err
 	}
 	s.deleteRefs(ctx, oldRefs, sw.used)

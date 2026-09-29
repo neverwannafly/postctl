@@ -1,0 +1,20 @@
+id: req-urlenc
+name: Form login
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/login'
+body:
+  mode: urlencoded
+  urlencoded:
+    - key: user
+      value: alex
+    - key: otp
+      value: "000000"
+      description: optional
+      disabled: true
+auth:
+  type: basic
+  basic:
+    username: '{{user}}'
+    password: '{{pass}}'

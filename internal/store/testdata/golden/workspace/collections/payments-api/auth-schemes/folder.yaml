@@ -1,0 +1,11 @@
+id: f-auth
+name: Auth schemes
+order:
+  - 001-hawk-signed
+  - 002-ntlm
+  - 003-oauth1-legacy
+  - 004-oauth2-pkce
+  - 005-oauth2-client-credentials
+  - 006-oauth2-password
+  - 007-oauth2-implicit
+  - 008-oauth2-auth-code

@@ -42,7 +42,7 @@ func (s *Store) SaveState(st State) error {
 	if err != nil {
 		return err
 	}
-	if _, err := writeFileAtomic(path, data); err != nil {
+	if _, err := writeFileAtomic(path, data, true); err != nil {
 		return &FileError{Path: path, Err: err}
 	}
 	return nil

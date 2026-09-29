@@ -78,8 +78,12 @@ func unmarshalYAML(data []byte, v any) error {
 }
 
 // writeFileAtomic writes data to path via a temp file in the same directory
-// and renames it into place. It reports whether the file changed.
-func writeFileAtomic(path string, data []byte) (changed bool, err error) {
+// and renames it into place, so readers and a crashed process never observe a
+// torn file. With durable set it also fsyncs the data first (on macOS this is
+// a full flush and costs milliseconds per file), which additionally survives
+// power loss. It reports whether the file changed; identical content is not
+// rewritten.
+func writeFileAtomic(path string, data []byte, durable bool) (changed bool, err error) {
 	if old, rerr := os.ReadFile(path); rerr == nil && bytes.Equal(old, data) {
 		return false, nil
 	}
@@ -101,9 +105,11 @@ func writeFileAtomic(path string, data []byte) (changed bool, err error) {
 		_ = tmp.Close()
 		return false, err
 	}
-	if err = tmp.Sync(); err != nil {
-		_ = tmp.Close()
-		return false, err
+	if durable {
+		if err = tmp.Sync(); err != nil {
+			_ = tmp.Close()
+			return false, err
+		}
 	}
 	if err = tmp.Close(); err != nil {
 		return false, err

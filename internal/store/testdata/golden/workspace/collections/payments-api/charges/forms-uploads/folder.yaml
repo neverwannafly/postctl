@@ -1,0 +1,7 @@
+id: f-forms
+name: Forms & uploads
+description: Body modes.
+order:
+  - 001-form-login
+  - 002-upload
+  - 003-send-binary

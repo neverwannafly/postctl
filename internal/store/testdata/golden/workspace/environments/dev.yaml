@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: env-dev
+name: Dev
+description: Local dev
+variables:
+  - key: baseUrl
+    value: http://localhost:8080
+  - key: apiKey
+    type: secret
+    secretRef: env/env-dev/apiKey
+  - key: unused
+    value: "1"
+    disabled: true

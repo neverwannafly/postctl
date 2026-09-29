@@ -1,0 +1,13 @@
+id: req-ntlm
+name: NTLM
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/ntlm'
+auth:
+  type: ntlm
+  ntlm:
+    username: u
+    password: '{{p}}'
+    domain: corp
+    workstation: ws1

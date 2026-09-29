@@ -1,0 +1,27 @@
+id: req-form
+name: Upload
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/upload'
+body:
+  mode: formdata
+  formData:
+    - key: title
+      type: text
+      value: hello
+      description: text part
+    - key: file
+      type: file
+      src: fixtures/a.png
+      contentType: image/png
+    - key: skip
+      type: text
+      value: x
+      disabled: true
+auth:
+  type: apikey
+  apikey:
+    key: X-Key
+    value: '{{key}}'
+    in: header
