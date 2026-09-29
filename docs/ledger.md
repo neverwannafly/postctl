@@ -34,7 +34,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
-| WS6c runner + history TUI | Composer 2.5 (fast) | Done (branch) | ws/6c-runner-history | 2026-09-30 02:45 IST |
+| WS6c runner + history TUI | Composer 2.5 (fast) | Done (branch) | ws/6c-runner-history | 2026-09-30 03:10 IST |
 
 ## Entries
 
@@ -453,3 +453,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). Commits `529a8bc` (runner), `e349d06` (history).
 - Blockers / questions: none
 - Next: none
+
+### 2026-09-30 03:10 IST · WS6c · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/6c-runner-history
+- Did: Fixed runner deviations: `RunInput.NoPersist` and `OnlyRequests` in the engine (with tests), wired setup “Persist variables” and “Re-run failed”, documented `OnlyRequests`/`setNextRequest` in `docs/engine.md`, and JSON export now uses a prefilled editable path plus a toast with the absolute path.
+- Files: `internal/engine/{run.go,persist.go,session.go,run_options_test.go}`, `internal/tui/runner/runner.go`, `docs/engine.md`, `docs/ledger.md`
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). Commit `bcaa029`.
+- Blockers / questions: none
+- Next: merge ws/6c-runner-history
