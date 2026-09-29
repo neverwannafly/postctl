@@ -340,6 +340,14 @@ type Glyphs struct {
 	Check string
 	// Expanded and Collapsed mark tree folders.
 	Expanded, Collapsed string
+	// RuleActive underlines the active tab.
+	RuleActive string
+	// VRule separates side-by-side panes.
+	VRule string
+	// Mask replaces secret values.
+	Mask string
+	// Dirty marks unsaved changes after a name.
+	Dirty string
 }
 
 // GlyphSet returns the Unicode glyphs, or the ASCII fallback.
@@ -349,11 +357,13 @@ func GlyphSet(ascii bool) Glyphs {
 			Select: ">", OK: "*", Pending: "~", Fail: "x", Warn: "!", Expired: "o", Ellipsis: "...",
 			BarFull: "#", BarEmpty: "-", Rule: "-", Dot: "|", Arrow: ">", Check: "+",
 			Expanded: "v", Collapsed: ">",
+			RuleActive: "=", VRule: "|", Mask: "****", Dirty: "*",
 		}
 	}
 	return Glyphs{
 		Select: "›", OK: "●", Pending: "◐", Fail: "×", Warn: "!", Expired: "○", Ellipsis: "…",
 		BarFull: "▰", BarEmpty: "▱", Rule: "─", Dot: "·", Arrow: "›", Check: "✓",
 		Expanded: "▾", Collapsed: "▸",
+		RuleActive: "━", VRule: "│", Mask: "••••", Dirty: "●",
 	}
 }

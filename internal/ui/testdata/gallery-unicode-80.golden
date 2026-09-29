@@ -1,0 +1,81 @@
+## header staging
+postctl  payments-api                                                  ● staging
+────────────────────────────────────────────────────────────────────────────────
+
+## header prod
+postctl  payments-api                                                     ! prod
+────────────────────────────────────────────────────────────────────────────────
+
+## header none
+postctl  payments-api                                                  env  none
+────────────────────────────────────────────────────────────────────────────────
+
+## header long
+postctl  very-long-workspace-very-long-workspace-very-lo…  ! eu-west-live (prod)
+────────────────────────────────────────────────────────────────────────────────
+
+## hints
+Ctrl-Enter Send   E Environments   / Filter   Ctrl-P Palette   ? Help
+
+## methods
+GET   List charges
+POST  Create
+PATCH Update
+DEL   Refund
+OPT   Preflight
+PURGE Custom
+
+## status
+● Ready
+… Waiting for response 1.2s
+! Slow response
+× Request failed
+
+## response chips
+201 Created  184 ms  1.2 KB
+404 Not Found  2.3 s  92 B
+503 Service Unavailable  1m 15s  3.0 MB
+× No response: connection refused
+
+## kv table
+      Key            Value                                     Description
+  [x] Authorization  ••••                                      Bearer token for…
+› [x] Content-Type   application/json                          
+  [ ] X-Debug        1                                         Turn on verbose …
+
+## tabs
+Params  Auth  Headers(3)  Body  Pre ●  Tests
+──────────────━━━━━━━━━━────────────────────────────────────────────────────────
+
+## confirm danger
+╭──────────────────────────────────────────────────────────╮
+│ ! Delete request                                         │
+│                                                          │
+│ Delete Create charge in Payments? This removes its file  │
+│ from disk.                                               │
+│                                                          │
+│ › [ Cancel ]    [ Delete ]                               │
+╰──────────────────────────────────────────────────────────╯
+
+## empty
+No requests yet
+This folder is empty.
+
+Press n to create a request.
+
+## error
+× Could not read payments/create.yaml
+  Everything else in this workspace is intact.
+
+  Fix the file in your editor; postctl reloads it when you save.
+
+## toast
+● Environment: staging
+
+## busy
+… Running pre-request script
+
+## section
+› Collections  12
+  Request
+
