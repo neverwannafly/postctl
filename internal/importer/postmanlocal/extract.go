@@ -106,8 +106,8 @@ func buildResult(records, environmentRecords, sessions []map[string]any) *Result
 		result.Coverage.PerCollection = append(result.Coverage.PerCollection, coverage)
 		result.Coverage.Folders += coverage.Folders
 		result.Coverage.Requests += coverage.Requests
-		result.Coverage.PreRequestScripts += coverage.PreRequestScripts
-		result.Coverage.TestScripts += coverage.TestScripts
+		result.Coverage.RequestsWithPreRequestScripts += coverage.RequestsWithPreRequestScripts
+		result.Coverage.RequestsWithTestScripts += coverage.RequestsWithTestScripts
 		result.Coverage.Examples += coverage.Examples
 		result.Coverage.MissingBodies += coverage.MissingBodies
 		result.Coverage.Unresolved += coverage.Unresolved
@@ -157,7 +157,7 @@ func collectionDocument(root map[string]any, entities map[string]map[string]any,
 		"info": info,
 		"item": buildItems(root, entities, coverage, map[string]bool{}),
 	}
-	copyCommon(document, root, coverage)
+	copyCommon(document, root)
 	return document
 }
 
@@ -180,7 +180,7 @@ func buildItems(parent map[string]any, entities map[string]map[string]any, cover
 				"item": buildItems(entity, entities, coverage, visiting),
 			}
 			copyOptional(item, entity, "description")
-			copyCommon(item, entity, coverage)
+			copyCommon(item, entity)
 			result = append(result, item)
 			coverage.Folders++
 		case "http-request":
@@ -217,7 +217,14 @@ func requestItem(entity map[string]any, entities map[string]map[string]any, cove
 		"name":    text(entity["name"]),
 		"request": request,
 	}
-	copyEvents(item, entity, coverage)
+	copyEvents(item, entity)
+	hasPreRequest, hasTest := requestScriptKinds(entity)
+	if hasPreRequest {
+		coverage.RequestsWithPreRequestScripts++
+	}
+	if hasTest {
+		coverage.RequestsWithTestScripts++
+	}
 	for _, exampleRef := range array(entity["examples"]) {
 		ref := object(exampleRef)
 		example := entities[text(ref["id"])]
@@ -236,17 +243,17 @@ func requestItem(entity map[string]any, entities map[string]map[string]any, cove
 	return item
 }
 
-func copyCommon(target Document, source map[string]any, coverage *CollectionCoverage) {
+func copyCommon(target Document, source map[string]any) {
 	if auth := authBlock(source["auth"]); auth != nil {
 		target["auth"] = auth
 	}
 	if variables := array(source["variables"]); len(variables) > 0 {
 		target["variable"] = cloneArray(variables)
 	}
-	copyEvents(target, source, coverage)
+	copyEvents(target, source)
 }
 
-func copyEvents(target Document, source map[string]any, coverage *CollectionCoverage) {
+func copyEvents(target Document, source map[string]any) {
 	var events []any
 	for _, raw := range array(source["scripts"]) {
 		script := object(raw)
@@ -254,10 +261,8 @@ func copyEvents(target Document, source map[string]any, coverage *CollectionCove
 		switch text(script["type"]) {
 		case "beforeRequest":
 			listen = "prerequest"
-			coverage.PreRequestScripts++
 		case "afterResponse", "test":
 			listen = "test"
-			coverage.TestScripts++
 		default:
 			continue
 		}
@@ -273,6 +278,18 @@ func copyEvents(target Document, source map[string]any, coverage *CollectionCove
 	if len(events) > 0 {
 		target["event"] = events
 	}
+}
+
+func requestScriptKinds(source map[string]any) (preRequest, test bool) {
+	for _, raw := range array(source["scripts"]) {
+		switch text(object(raw)["type"]) {
+		case "beforeRequest":
+			preRequest = true
+		case "afterResponse", "test":
+			test = true
+		}
+	}
+	return preRequest, test
 }
 
 func headers(value any) []any {

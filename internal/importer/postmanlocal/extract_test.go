@@ -24,7 +24,10 @@ func TestBuildResultPreservesTreeAndScripts(t *testing.T) {
 			"method": "POST", "url": "https://example.invalid/resource",
 			"headers": []any{map[string]any{"key": "Content-Type", "value": "application/json"}},
 			"body":    map[string]any{"type": "json", "content": "{}"},
-			"scripts": []any{map[string]any{"type": "afterResponse", "code": "pm.test('synthetic', function () {});"}},
+			"scripts": []any{
+				map[string]any{"type": "beforeRequest", "code": "pm.variables.set('synthetic', true);"},
+				map[string]any{"type": "afterResponse", "code": "pm.test('synthetic', function () {});"},
+			},
 		}),
 	}
 	environments := []map[string]any{wrapped(map[string]any{
@@ -38,7 +41,7 @@ func TestBuildResultPreservesTreeAndScripts(t *testing.T) {
 	if result.Coverage.Collections != 1 || result.Coverage.Folders != 1 || result.Coverage.Requests != 1 {
 		t.Fatalf("unexpected tree coverage: %+v", result.Coverage)
 	}
-	if result.Coverage.PreRequestScripts != 1 || result.Coverage.TestScripts != 1 {
+	if result.Coverage.RequestsWithPreRequestScripts != 1 || result.Coverage.RequestsWithTestScripts != 1 {
 		t.Fatalf("unexpected script coverage: %+v", result.Coverage)
 	}
 	if result.Coverage.Environments != 1 || result.Coverage.Globals != 1 {

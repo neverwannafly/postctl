@@ -41,12 +41,12 @@ func main() {
 
 func printCoverage(coverage postmanlocal.Coverage) {
 	fmt.Printf(
-		"collections=%d folders=%d requests=%d prerequest=%d tests=%d examples=%d missing_bodies=%d unresolved=%d environments=%d globals=%d\n",
+		"collections=%d folders=%d requests=%d requests_with_prerequest=%d requests_with_tests=%d examples=%d missing_bodies=%d unresolved=%d environments=%d globals=%d\n",
 		coverage.Collections,
 		coverage.Folders,
 		coverage.Requests,
-		coverage.PreRequestScripts,
-		coverage.TestScripts,
+		coverage.RequestsWithPreRequestScripts,
+		coverage.RequestsWithTestScripts,
 		coverage.Examples,
 		coverage.MissingBodies,
 		coverage.Unresolved,
@@ -55,12 +55,12 @@ func printCoverage(coverage postmanlocal.Coverage) {
 	)
 	for _, collection := range coverage.PerCollection {
 		fmt.Printf(
-			"%s: folders=%d requests=%d prerequest=%d tests=%d examples=%d missing_bodies=%d unresolved=%d\n",
+			"%s: folders=%d requests=%d requests_with_prerequest=%d requests_with_tests=%d examples=%d missing_bodies=%d unresolved=%d\n",
 			collection.Name,
 			collection.Folders,
 			collection.Requests,
-			collection.PreRequestScripts,
-			collection.TestScripts,
+			collection.RequestsWithPreRequestScripts,
+			collection.RequestsWithTestScripts,
 			collection.Examples,
 			collection.MissingBodies,
 			collection.Unresolved,
