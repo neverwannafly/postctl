@@ -73,6 +73,7 @@ func ConvertObject(raw map[string]any, options Options) (*Document, Report, erro
 			moveCollectionSecrets(collection, &report)
 		}
 		report.Counts.Collections = 1
+		report.Counts.OAuthTokens = countOAuthTokens(collection)
 		report.sort()
 		return &Document{Kind: KindCollection, Collection: collection}, report, nil
 	}

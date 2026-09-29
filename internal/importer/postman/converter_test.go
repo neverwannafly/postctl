@@ -406,6 +406,9 @@ func copyTree(source, destination string) error {
 		if entry.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
+		if entry.Name() == "store.lock" {
+			return nil // advisory lock file, not workspace content
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -422,7 +425,7 @@ func assertTreesEqual(t *testing.T, expected, actual string) {
 			if walkErr != nil {
 				return walkErr
 			}
-			if entry.IsDir() || entry.Name() == ".gitignore" {
+			if entry.IsDir() || entry.Name() == ".gitignore" || entry.Name() == "store.lock" {
 				return nil
 			}
 			relative, err := filepath.Rel(root, path)

@@ -19,7 +19,14 @@ type Counts struct {
 	Examples     int `json:"examples"`
 	Environments int `json:"environments"`
 	Globals      int `json:"globals"`
+	// SecretsMoved counts literal credentials rewritten to generated secret
+	// collection variables (their values go to the Keychain on save). A dry
+	// run reports what would move.
 	SecretsMoved int `json:"secretsMovedToKeychain"`
+	// OAuthTokens counts literal OAuth 2.0 access, refresh and ID tokens that
+	// the store keeps in the Keychain on save. They are not variables and are
+	// not part of SecretsMoved.
+	OAuthTokens int `json:"oauthTokensInKeychain"`
 }
 
 // Warning describes a non-fatal compatibility or coverage issue.
@@ -75,6 +82,7 @@ func (r *Report) Merge(other Report) {
 	r.Counts.Environments += other.Counts.Environments
 	r.Counts.Globals += other.Counts.Globals
 	r.Counts.SecretsMoved += other.Counts.SecretsMoved
+	r.Counts.OAuthTokens += other.Counts.OAuthTokens
 	r.Changes.Added = append(r.Changes.Added, other.Changes.Added...)
 	r.Changes.Changed = append(r.Changes.Changed, other.Changes.Changed...)
 	r.Changes.Removed = append(r.Changes.Removed, other.Changes.Removed...)
@@ -100,8 +108,14 @@ func (r Report) WriteText(w io.Writer) {
 	fmt.Fprintln(w, "──────────────────────────────────────────────────────────────────────────")
 	fmt.Fprintf(w, "Imported %d collections · %d folders · %d requests · %d environments\n",
 		r.Counts.Collections, r.Counts.Folders, r.Counts.Requests, r.Counts.Environments)
-	fmt.Fprintf(w, "Scripts %d pre-request · %d test · %d examples · %d secrets moved to Keychain\n",
-		r.Counts.PreScripts, r.Counts.TestScripts, r.Counts.Examples, r.Counts.SecretsMoved)
+	moved, kept := "moved to Keychain variables", "kept in Keychain"
+	if r.DryRun {
+		moved, kept = "would move to Keychain variables", "would be kept in Keychain"
+	}
+	fmt.Fprintf(w, "Scripts %d pre-request · %d test · %d examples\n",
+		r.Counts.PreScripts, r.Counts.TestScripts, r.Counts.Examples)
+	fmt.Fprintf(w, "Secrets %d %s · %d OAuth tokens %s\n",
+		r.Counts.SecretsMoved, moved, r.Counts.OAuthTokens, kept)
 	fmt.Fprintf(w, "● %d added · %d changed · %d kept (not in source)\n",
 		len(r.Changes.Added), len(r.Changes.Changed), len(r.Changes.Kept))
 	if len(r.Changes.Removed) > 0 {
