@@ -30,7 +30,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Running | ws/6a-request-editor | 2026-09-30 00:20 IST |
-| WS6b response viewer | Composer 2.5 (fast) | Done | ws/6b-response-viewer | 2026-09-30 01:05 IST |
+| WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
@@ -302,3 +302,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Verified `ws/5-tui-shell` (in scope; golden renders reviewed by hand, e.g. the delete dialog at 200×60 defaults to Cancel and names the folder and request count). Merged into `main`, resolving `go.mod`/`go.sum`/ledger conflicts and a duplicate global `--workspace` flag between WS1 and WS5 in `cmd/postctl/main.go`. Build, race tests and lint are green.
 - Decisions: D5 (send keys) and D6 (persist fold state) answer WS5's questions. WS5's `deepCopy`/`LoadLenient`-probe stand-ins still work (the probe now finds the real method); their cleanup is assigned to WS6a. Added C2: `internal/tui/send.go` send contract.
 - Next: Launch WS6a (Sonnet 5.5) and WS6b (Composer 2.5) in parallel. WS4 (engine) starts when WS3 merges and will implement `tui.Sender`.
+
+### 2026-09-30 01:30 IST · Orchestrator · PROGRESS
+- Did: Found WS3 and WS6a had stopped mid-run. WS3 had committed up to a17f1ca with no DONE entry; WS6a had only its STARTED entry and no implementation. Resumed both agents with their context and asked them to commit after each milestone. Verified WS6b: in scope, race tests and lint green, 10 MB JSON first render 4.8 ms (target < 50 ms), golden renders reviewed by hand (NO_COLOR JSON body, ASCII timeline with Authorization masked). Merged WS6b into `main`.
+- Decisions: Accepted WS6b's additive contract `RetrySendMsg` in `internal/tui/send.go`. WS6a's shell send wiring must handle it; check this when merging WS6a.
+- Next: Wait for WS3 and WS6a. WS4 (engine, implements `tui.Sender`) starts when WS3 merges.
