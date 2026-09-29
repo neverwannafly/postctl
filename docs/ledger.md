@@ -245,3 +245,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed (0 issues). Implementation commit `bf7eb52`.
 - Blockers / questions: None.
 - Next: none
+
+### 2026-09-29 23:59 IST · WS2b · Orchestrator · PROGRESS
+- Did: Verified `ws/2b-oauth2`. It touched only `internal/oauth2/` and the ledger; standard library only; no logging of tokens. Merged into `main` and added a compile-time assertion that `oauth2.Source` implements `httpx.TokenSource`. Build, race tests and lint are green.
+- Decisions: Accepted deviations. The loopback note comes through `FetchOptions.OnNote`. `Save` takes an owner ID (the ref is `oauth2/<owner>`). Non-loopback or https redirect URIs bind an ephemeral `127.0.0.1` listener, as Postman does. The TUI sequence for auth code is documented in WS2b's DONE entry; WS6 will implement "Get new token" against it.
+- Next: WS4 engine wires `oauth2.Source` into `httpx.Options.OAuth2`.
