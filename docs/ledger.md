@@ -222,3 +222,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...` passed; `go test -race ./...` passed; `golangci-lint run` passed with 0 issues.
 - Blockers / questions: No blockers. Allowed deviation: NTLM returns a clear `ErrUnsupportedAuth`. `net/http` preserves duplicate response header values but not original wire order/casing, so `Response.Headers` is deterministic rather than wire-ordered and header wire size is reconstructed.
 - Next: none
+
+### 2026-09-29 23:58 IST · WS2 · Orchestrator · PROGRESS
+- Did: Verified `ws/2-vars-httpx`. It stayed in scope (plus a `docs/tui-stack.md` note for the brotli and publicsuffix dependencies). Contract changes only add things: `vars.RandomSource`, `httpx.TokenSource`, `Options.OAuth2`, `Options.CookieJar`. Race tests and lint are green. Merged into `main`, then replaced WS2's local request/auth copy helpers with `model.Request.Clone` / `Auth.Clone` from WS0.1; tests are still green.
+- Decisions: Accepted two deviations. NTLM returns `ErrUnsupportedAuth`. Response header order and casing are normalized by `net/http`, not kept as sent on the wire.
+- Next: WS2b implements `httpx.TokenSource`; WS3 is coding against these contracts. The WS4 engine brief can now be written against real APIs.
