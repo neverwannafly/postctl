@@ -40,7 +40,7 @@ func TestAuthInheritWithNothingAbove(t *testing.T) {
 func TestAuthSwitchTypeAndFillBearer(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabAuth)
-	h.key("down")            // Type row
+	h.key("down")           // Type row
 	h.key("right", "right") // Inherit -> None -> Bearer
 	if h.req.Auth == nil || h.req.Auth.Type != model.AuthBearer || h.req.Auth.Bearer == nil {
 		t.Fatalf("auth = %+v", h.req.Auth)
@@ -378,7 +378,7 @@ func TestPasteCurlOffersImport(t *testing.T) {
 	if h.req.Name != "Create charge" {
 		t.Fatal("import must keep the request name")
 	}
-	if h.p.url.text() != h.req.URL.Raw {
+	if h.p.url.Text() != h.req.URL.Raw {
 		t.Fatal("URL field not refreshed")
 	}
 	h.key("ctrl+z")

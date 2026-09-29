@@ -1,6 +1,7 @@
 package request
 
 import (
+	"github.com/shubham/postctl/internal/tui/textin"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -117,7 +118,7 @@ type kvView struct {
 
 	edit  bool
 	col   int // 0 key, 1 value, 2 description
-	in    *lineInput
+	in    *textin.Input
 	draft bool // the current row was just added and is still empty
 
 	bulk bool
@@ -164,7 +165,7 @@ func (k *kvView) paste(p *Pane, m tea.PasteMsg) bool {
 		k.area.update(m)
 		return k.bulkApply(p)
 	case k.edit:
-		k.in.update(m)
+		k.in.Update(m)
 		return k.applyText(p)
 	}
 	return false
@@ -211,17 +212,17 @@ func (k *kvView) beginEdit(p *Pane, items []kvItem, col int) {
 	}
 	k.edit = true
 	k.col = col
-	k.in = newLineInput(k.field(items[k.cur], col))
+	k.in = textin.New(k.field(items[k.cur], col))
 	switch col {
 	case 0:
-		k.in.placeholder = "name"
+		k.in.Placeholder = "name"
 	case 1:
-		k.in.placeholder = "value"
+		k.in.Placeholder = "value"
 	default:
-		k.in.placeholder = "description"
+		k.in.Placeholder = "description"
 	}
 	if col < 2 {
-		k.in.hl = func(s string) []span { return p.sc.highlight(s) }
+		k.in.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
 	}
 }
 
@@ -232,7 +233,7 @@ func (k *kvView) applyText(p *Pane) bool {
 		return false
 	}
 	it := &items[k.cur]
-	setField(it, k.col, k.in.text())
+	setField(it, k.col, k.in.Text())
 	if k.draft {
 		// A new row stays disabled (and so out of the URL and the sent
 		// request) until it has content.
@@ -453,7 +454,7 @@ func (k *kvView) editKey(p *Pane, m tea.KeyPressMsg, items []kvItem) (bool, bool
 	case "ctrl+r":
 		return true, false, nil
 	}
-	if k.in.update(m) {
+	if k.in.Update(m) {
 		return true, k.applyText(p), nil
 	}
 	return true, false, nil
@@ -645,7 +646,7 @@ func (k *kvView) statusLine(p *Pane, items []kvItem, w int) string {
 		if k.cur < len(items) && items[k.cur].file && k.col == 1 {
 			label = "File path"
 		}
-		return "\n" + th.Render(ui.TextSecondary, th.Fit(label, 12)) + k.in.view(th, w-12, true)
+		return "\n" + th.Render(ui.TextSecondary, th.Fit(label, 12)) + k.in.View(th, w-12, true)
 	}
 	off, n := 0, 0
 	for _, it := range items {

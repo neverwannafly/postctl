@@ -196,10 +196,10 @@ func (p *Pane) confirmKey(m tea.KeyPressMsg) tea.Cmd {
 			return p.importCurl(o.pc)
 		}
 		if o.inBar {
-			before := p.url.text()
+			before := p.url.Text()
 			pre := p.req.Clone()
-			p.url.insert(o.text)
-			if p.url.text() != before {
+			p.url.Insert(o.text)
+			if p.url.Text() != before {
 				return p.urlEdited(pre)
 			}
 		}

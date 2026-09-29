@@ -90,10 +90,10 @@ func (p *Pane) stopAll() {
 // reloadAll refreshes every widget from the request.
 func (p *Pane) reloadAll() {
 	if p.req == nil {
-		p.url.set("")
+		p.url.Set("")
 		return
 	}
-	p.url.set(p.req.URL.Raw)
+	p.url.Set(p.req.URL.Raw)
 	for _, v := range p.views {
 		v.reload(p)
 	}
@@ -102,6 +102,6 @@ func (p *Pane) reloadAll() {
 // syncURL refreshes the URL field after a Params edit changed the URL.
 func (p *Pane) syncURL() {
 	if p.req != nil && !p.urlE {
-		p.url.set(p.req.URL.Raw)
+		p.url.Set(p.req.URL.Raw)
 	}
 }

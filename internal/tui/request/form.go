@@ -1,6 +1,7 @@
 package request
 
 import (
+	"github.com/shubham/postctl/internal/tui/textin"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -43,7 +44,7 @@ type form struct {
 	cur    int
 	top    int
 	edit   bool
-	in     *lineInput
+	in     *textin.Input
 	reveal bool
 }
 
@@ -114,11 +115,11 @@ func (f *form) maskFor(r formRow, text string) bool {
 
 func (f *form) beginEdit(p *Pane, r formRow) {
 	f.edit = true
-	f.in = newLineInput(r.textValue())
-	f.in.placeholder = r.placeholder
-	f.in.mask = f.maskFor(r, f.in.text())
+	f.in = textin.New(r.textValue())
+	f.in.Placeholder = r.placeholder
+	f.in.Mask = f.maskFor(r, f.in.Text())
 	if !r.secret {
-		f.in.hl = func(s string) []span { return p.sc.highlight(s) }
+		f.in.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
 	}
 }
 
@@ -153,15 +154,15 @@ func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, 
 		case "ctrl+r":
 			if r.secret {
 				f.reveal = !f.reveal
-				f.in.mask = f.maskFor(r, f.in.text())
+				f.in.Mask = f.maskFor(r, f.in.Text())
 			}
 			return true, false, nil
 		}
-		if f.in.update(m) {
+		if f.in.Update(m) {
 			if r.set != nil {
-				changed = r.set(f.in.text())
+				changed = r.set(f.in.Text())
 			}
-			f.in.mask = f.maskFor(r, f.in.text())
+			f.in.Mask = f.maskFor(r, f.in.Text())
 			return true, changed, nil
 		}
 		return true, false, nil
@@ -218,12 +219,12 @@ func (f *form) paste(p *Pane, rows func() []formRow, m tea.PasteMsg) bool {
 	rs := rows()
 	f.clamp(rs)
 	r := rs[f.cur]
-	f.in.update(m)
+	f.in.Update(m)
 	changed := false
 	if r.set != nil {
-		changed = r.set(f.in.text())
+		changed = r.set(f.in.Text())
 	}
-	f.in.mask = f.maskFor(r, f.in.text())
+	f.in.Mask = f.maskFor(r, f.in.Text())
 	return changed
 }
 
@@ -282,7 +283,7 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	case rowText:
 		switch {
 		case focused && f.edit && f.in != nil:
-			val = f.in.view(th, valW, true)
+			val = f.in.View(th, valW, true)
 		case r.value == "":
 			val = th.Render(ui.TextQuiet, th.Truncate(r.placeholder, valW))
 		case r.secret && !f.reveal && !strings.Contains(r.value, "{{"):
@@ -319,16 +320,16 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 }
 
 // renderSpans draws s with highlight spans, truncated to width.
-func renderSpans(th ui.Theme, s string, spans []span, width int) string {
+func renderSpans(th ui.Theme, s string, spans []textin.Span, width int) string {
 	rs := []rune(s)
 	var b strings.Builder
 	pos := 0
 	for _, sp := range spans {
-		if sp.from > pos {
-			b.WriteString(th.Render(ui.TextPrimary, string(rs[pos:sp.from])))
+		if sp.From > pos {
+			b.WriteString(th.Render(ui.TextPrimary, string(rs[pos:sp.From])))
 		}
-		b.WriteString(th.Render(sp.tok, string(rs[sp.from:min(sp.to, len(rs))])))
-		pos = sp.to
+		b.WriteString(th.Render(sp.Tok, string(rs[sp.From:min(sp.To, len(rs))])))
+		pos = sp.To
 	}
 	if pos < len(rs) {
 		b.WriteString(th.Render(ui.TextPrimary, string(rs[pos:])))

@@ -1,6 +1,7 @@
 package request
 
 import (
+	"github.com/shubham/postctl/internal/tui/textin"
 	"regexp"
 	"strings"
 
@@ -138,11 +139,11 @@ func (s *scope) resolve(raw string) (string, []string) {
 
 // highlight returns spans for every {{variable}} in s: info for resolved
 // names, warning for unresolved ones. Indices are runes.
-func (s *scope) highlight(str string) []span {
+func (s *scope) highlight(str string) []textin.Span {
 	if !strings.Contains(str, "{{") {
 		return nil
 	}
-	var spans []span
+	var spans []textin.Span
 	for _, loc := range varRE.FindAllStringSubmatchIndex(str, -1) {
 		name := str[loc[2]:loc[3]]
 		tok := ui.SyntaxKey
@@ -154,7 +155,7 @@ func (s *scope) highlight(str string) []span {
 			tok = ui.TextPrimary
 		}
 		from := len([]rune(str[:loc[0]]))
-		spans = append(spans, span{from: from, to: from + len([]rune(str[loc[0]:loc[1]])), tok: tok})
+		spans = append(spans, textin.Span{From: from, To: from + len([]rune(str[loc[0]:loc[1]])), Tok: tok})
 	}
 	return spans
 }

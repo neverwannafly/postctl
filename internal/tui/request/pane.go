@@ -1,6 +1,7 @@
 package request
 
 import (
+	"github.com/shubham/postctl/internal/tui/textin"
 	"os"
 	"os/exec"
 	"strings"
@@ -178,7 +179,7 @@ type Pane struct {
 
 	zone zone
 	tab  tabID
-	url  *lineInput
+	url  *textin.Input
 	urlE bool // the URL field has input focus
 	msel *methodSel
 
@@ -209,8 +210,8 @@ func New(env tui.PaneEnv, d Deps) *Pane {
 		hist:  map[model.ID]*history{},
 		saves: map[model.ID]*saveState{},
 	}
-	p.url = newLineInput("")
-	p.url.placeholder = "Enter request URL"
+	p.url = textin.New("")
+	p.url.Placeholder = "Enter request URL"
 	p.views = [numTabs]tabView{
 		tabParams:   newKVView(kindParams),
 		tabAuth:     newAuthView(),
@@ -225,7 +226,7 @@ func New(env tui.PaneEnv, d Deps) *Pane {
 }
 
 func (p *Pane) applyTheme() {
-	p.url.hl = func(s string) []span { return p.sc.highlight(s) }
+	p.url.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
 	for _, v := range p.views {
 		if t, ok := v.(interface{ setTheme(ui.Theme) }); ok {
 			t.setTheme(p.th)

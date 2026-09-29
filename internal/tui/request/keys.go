@@ -112,9 +112,9 @@ func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
 		p.msel = newMethodSel(p.req.Method)
 		return nil
 	}
-	before := p.url.text()
+	before := p.url.Text()
 	pre := p.req.Clone()
-	if !p.url.update(m) || p.url.text() == before {
+	if !p.url.Update(m) || p.url.Text() == before {
 		return nil
 	}
 	return p.urlEdited(pre)
@@ -123,7 +123,7 @@ func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
 // urlEdited copies the field into the request, keeping disabled parameters
 // and path variable values that the raw text cannot carry.
 func (p *Pane) urlEdited(pre *model.Request) tea.Cmd {
-	applyRawURL(&p.req.URL, p.url.text())
+	applyRawURL(&p.req.URL, p.url.Text())
 	p.views[tabParams].reload(p)
 	return p.record(pre, false)
 }
@@ -288,10 +288,10 @@ func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
 		}
 	}
 	if inBar && p.msel == nil {
-		before := p.url.text()
+		before := p.url.Text()
 		pre := p.req.Clone()
-		p.url.update(m)
-		if p.url.text() != before {
+		p.url.Update(m)
+		if p.url.Text() != before {
 			return p.urlEdited(pre)
 		}
 		return nil

@@ -130,8 +130,8 @@ func TestUndoCoalescesTyping(t *testing.T) {
 	if h.req.URL.Raw != "{{baseUrl}}/v1/charges/:id?limit=10&debug=1" {
 		t.Fatalf("one undo should remove the whole burst, raw = %q", h.req.URL.Raw)
 	}
-	if h.p.url.text() != h.req.URL.Raw {
-		t.Fatalf("URL field %q out of sync", h.p.url.text())
+	if h.p.url.Text() != h.req.URL.Raw {
+		t.Fatalf("URL field %q out of sync", h.p.url.Text())
 	}
 	h.advance(2 * time.Second)
 	h.typ("x")

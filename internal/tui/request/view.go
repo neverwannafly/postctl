@@ -87,7 +87,7 @@ func (p *Pane) barView() string {
 	right := p.sendLabel()
 	urlW := max(4, p.w-2-methodW-2-ui.Width(right)-1)
 	focused := p.urlE && p.focused
-	field := p.url.view(th, urlW, focused)
+	field := p.url.View(th, urlW, focused)
 	return marker + badge + "  " + field + " " + right
 }
 

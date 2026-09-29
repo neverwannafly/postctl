@@ -1,9 +1,9 @@
-// Package request is the Request pane: the URL bar, the Params, Auth,
-// Headers, Body, Pre-request, Tests and Settings tabs, autosave, undo,
-// $EDITOR round trips, copy as curl, curl import and the OAuth 2.0 "Get new
-// token" flow. It implements tui.Pane and plugs in through
-// tui.Options.NewRequestPane (see [Factory]).
-package request
+// Package textin is the single-line text field shared by the request pane and
+// the environment editor. It exists instead of bubbles/textinput because the
+// URL bar highlights {{variables}} while you type, secrets are masked, and
+// every field must share one look. The cursor is drawn as a reverse-video cell
+// (no terminal cursor is positioned).
+package textin
 
 import (
 	"strings"
@@ -14,46 +14,45 @@ import (
 	"github.com/shubham/postctl/internal/ui"
 )
 
-// span is a highlighted run of a line: [from, to) in runes.
-type span struct {
-	from, to int
-	tok      ui.Token
+// Span is a highlighted run of a line: [From, To) in runes.
+type Span struct {
+	From, To int
+	Tok      ui.Token
 }
 
-// lineInput is a small single-line editor. It exists instead of
-// bubbles/textinput because the URL bar highlights {{variables}} while you
-// type, secrets are masked, and every field must share one look. The cursor
-// is drawn as a reverse-video cell (no terminal cursor is positioned).
-type lineInput struct {
+// Input is a small single-line editor.
+type Input struct {
 	value  []rune
 	cursor int
-	// mask hides the value (secret fields).
-	mask bool
-	// placeholder is shown, quietly, while the value is empty.
-	placeholder string
-	// hl returns highlight spans for the value; nil for none.
-	hl func(s string) []span
+	// Mask hides the value (secret fields).
+	Mask bool
+	// Placeholder is shown, quietly, while the value is empty.
+	Placeholder string
+	// Highlight returns highlight spans for the value; nil for none.
+	Highlight func(s string) []Span
 	// offset is the first visible rune, kept so the cursor stays in view.
 	offset int
 }
 
-func newLineInput(s string) *lineInput {
-	l := &lineInput{}
-	l.set(s)
+// New returns an input holding s with the cursor at the end.
+func New(s string) *Input {
+	l := &Input{}
+	l.Set(s)
 	return l
 }
 
-// set replaces the value and puts the cursor at the end.
-func (l *lineInput) set(s string) {
+// Set replaces the value and puts the cursor at the end.
+func (l *Input) Set(s string) {
 	l.value = []rune(s)
 	l.cursor = len(l.value)
 	l.offset = 0
 }
 
-// text is the current value.
-func (l *lineInput) text() string { return string(l.value) }
+// Text is the current value.
+func (l *Input) Text() string { return string(l.value) }
 
-func (l *lineInput) insert(s string) {
+// Insert puts s at the cursor; newlines become spaces.
+func (l *Input) Insert(s string) {
 	// Single-line: newlines in pasted text become spaces.
 	s = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ", "\t", " ").Replace(s)
 	rs := []rune(s)
@@ -65,7 +64,7 @@ func (l *lineInput) insert(s string) {
 	l.cursor += len(rs)
 }
 
-func (l *lineInput) deleteRange(from, to int) {
+func (l *Input) deleteRange(from, to int) {
 	if from < 0 || to > len(l.value) || from >= to {
 		return
 	}
@@ -75,7 +74,7 @@ func (l *lineInput) deleteRange(from, to int) {
 
 func isWord(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' }
 
-func (l *lineInput) wordLeft() int {
+func (l *Input) wordLeft() int {
 	i := l.cursor
 	for i > 0 && !isWord(l.value[i-1]) {
 		i--
@@ -86,7 +85,7 @@ func (l *lineInput) wordLeft() int {
 	return i
 }
 
-func (l *lineInput) wordRight() int {
+func (l *Input) wordRight() int {
 	i := l.cursor
 	for i < len(l.value) && !isWord(l.value[i]) {
 		i++
@@ -97,11 +96,11 @@ func (l *lineInput) wordRight() int {
 	return i
 }
 
-// update applies a key or paste. It reports whether it handled the message.
-func (l *lineInput) update(msg tea.Msg) bool {
+// Update applies a key or paste. It reports whether it handled the message.
+func (l *Input) Update(msg tea.Msg) bool {
 	switch m := msg.(type) {
 	case tea.PasteMsg:
-		l.insert(m.Content)
+		l.Insert(m.Content)
 		return true
 	case tea.KeyPressMsg:
 		switch m.String() {
@@ -131,7 +130,7 @@ func (l *lineInput) update(msg tea.Msg) bool {
 			l.deleteRange(0, l.cursor)
 		default:
 			if m.Text != "" && m.Mod&(tea.ModCtrl|tea.ModAlt) == 0 {
-				l.insert(m.Text)
+				l.Insert(m.Text)
 				return true
 			}
 			return false
@@ -141,17 +140,17 @@ func (l *lineInput) update(msg tea.Msg) bool {
 	return false
 }
 
-// view renders the value in width cells. focused draws the cursor.
-func (l *lineInput) view(th ui.Theme, width int, focused bool) string {
+// View renders the value in width cells. focused draws the cursor.
+func (l *Input) View(th ui.Theme, width int, focused bool) string {
 	width = max(1, width)
 	if len(l.value) == 0 {
 		if focused {
-			return cursorCell(th, " ") + th.Render(ui.TextQuiet, th.Truncate(l.placeholder, max(0, width-1)))
+			return cursorCell(th, " ") + th.Render(ui.TextQuiet, th.Truncate(l.Placeholder, max(0, width-1)))
 		}
-		return th.Render(ui.TextQuiet, th.Truncate(l.placeholder, width))
+		return th.Render(ui.TextQuiet, th.Truncate(l.Placeholder, width))
 	}
 	shown := l.value
-	if l.mask {
+	if l.Mask {
 		shown = []rune(strings.Repeat(string([]rune(th.Glyphs.Mask)[:1]), len(l.value)))
 	}
 	// Keep the cursor inside the window (one cell reserved for the cursor at
@@ -170,14 +169,14 @@ func (l *lineInput) view(th ui.Theme, width int, focused bool) string {
 		l.offset = 0
 	}
 	end := min(len(shown), l.offset+room)
-	var spans []span
-	if l.hl != nil && !l.mask {
-		spans = l.hl(string(shown))
+	var spans []Span
+	if l.Highlight != nil && !l.Mask {
+		spans = l.Highlight(string(shown))
 	}
 	tokAt := func(i int) ui.Token {
 		for _, s := range spans {
-			if i >= s.from && i < s.to {
-				return s.tok
+			if i >= s.From && i < s.To {
+				return s.Tok
 			}
 		}
 		return ui.TextPrimary
