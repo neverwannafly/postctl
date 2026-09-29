@@ -289,6 +289,7 @@ func (s *session) execute(
 			SendOptions: opts,
 			Cookies:     e.cookies,
 			Timeout:     e.cfg.ScriptTimeout,
+			MemoryLimit: e.cfg.ScriptMemoryLimit,
 		})
 		if err != nil {
 			out.Err = err
@@ -349,6 +350,7 @@ func (s *session) execute(
 			SendOptions: opts,
 			Cookies:     e.cookies,
 			Timeout:     e.cfg.ScriptTimeout,
+			MemoryLimit: e.cfg.ScriptMemoryLimit,
 		})
 		if err != nil {
 			out.Err = err

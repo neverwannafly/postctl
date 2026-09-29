@@ -33,6 +33,7 @@ type Input struct {
     SendOptions httpx.Options
     Cookies     CookieAccess     // backs pm.cookies and pm.cookies.jar(); may be nil
     Timeout     time.Duration    // whole run; zero means DefaultTimeout (5s)
+    MemoryLimit int64            // heap growth cap in bytes; zero means DefaultMemoryLimit (256 MiB); <0 disables
 }
 
 type Result struct {
@@ -223,10 +224,49 @@ Syntax errors are reported the same way, before anything runs.
 
 The whole run — including pending timers, promises and in-flight
 `pm.sendRequest` calls — is bounded by `Input.Timeout`, 5 seconds by default,
-which is also Postman's default. An infinite loop is interrupted rather than
-wedging the process: the VM is interrupted from a watchdog goroutine, so a
-script with no yield point still stops. Cancelling the context has the same
-effect. Either way `Result.TimedOut` is set.
+which is also Postman's default. The VM is interrupted from a watchdog
+goroutine, so a script with no yield point still stops: an infinite loop at
+the top level, inside a timer, a promise job, an async test, a getter, a
+`sort` comparator or a `replace` callback, or one that catches and ignores
+the interrupt. Cancelling the context has the same effect. Either way
+`Result.TimedOut` is set and `Result.Err` says the script timed out.
+
+What the timeout can and cannot guarantee:
+
+- **The wrap-up is bounded too.** After the script chain, postctl reads
+  `pm.request` back, and that can run script-defined code (an overridden
+  `pm.request.toJSON`, say). It gets its own 500 ms budget; if it overruns,
+  the result is a timeout error and the request is not updated.
+- **`Run` always returns.** goja checks for an interrupt between bytecode
+  instructions, so a long *native* call (`new Array(4294967295).join('')`, or
+  a host call that blocks) is out of the interrupt's reach. If the VM has not
+  unwound 1.5 s after the deadline, `Run` abandons it and returns what the
+  script had recorded by then, with `TimedOut` set. The abandoned goroutine
+  cannot change anything afterwards — the bridge refuses every write to the
+  variable store, the cookie jar and the result — but it keeps running until
+  the native call ends, so a script can waste CPU that long. A blocking call
+  already in flight at the deadline (a cookie-jar write) is not undone.
+- **Regular expressions are capped per match.** Patterns Go's `regexp`
+  cannot express (backreferences, lookahead) run on a backtracking engine
+  inside a single native call. Every match is limited to one second, after
+  which the match fails and the script carries on, so catastrophic
+  backtracking costs at most a second per match instead of hanging the run.
+- **Recursion is capped at 10 000 frames.** Deeper nesting stops the script
+  with `RangeError: Maximum call stack size exceeded`; a script cannot catch
+  it.
+- **Memory is capped by heap growth.** goja has no per-VM allocation
+  accounting, so `Input.MemoryLimit` (256 MiB by default; the engine's
+  `Config.ScriptMemoryLimit`) is compared with the *process* heap growth since
+  the run began, sampled every 10 ms. A run that exceeds it is interrupted
+  with `script exceeded the memory limit of N MiB`. Two consequences: the
+  check is exact for a lone script but a runaway script can also stop
+  another one running at the same moment, and a single native allocation
+  larger than the headroom (one huge `'x'.repeat(n)`) happens before the next
+  sample and is only caught afterwards. `TimedOut` is not set for a memory
+  stop.
+- **`pm.sendRequest` is bounded.** At most 8 requests are on the wire at
+  once and one run may make at most 256 in total; further calls fail through
+  their callback (or rejected promise) with an error that says so.
 
 A script reaches nothing outside the APIs above. There is no file system, no
 process environment, no `child_process`, and the only network access is

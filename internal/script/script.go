@@ -97,6 +97,14 @@ type Input struct {
 	Cookies CookieAccess
 	// Timeout bounds the whole run. Zero means [DefaultTimeout].
 	Timeout time.Duration
+	// MemoryLimit stops the run with a script error once the process heap
+	// has grown by more than this many bytes since the run began. Zero
+	// means [DefaultMemoryLimit]; a negative value disables the check.
+	//
+	// goja cannot account for allocation per runtime, so the figure is the
+	// whole process's heap growth: exact for a lone script, and a runaway
+	// script may also stop another that runs at the same moment.
+	MemoryLimit int64
 }
 
 // TestResult is one pm.test (or one legacy tests["name"] entry).
