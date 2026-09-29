@@ -28,7 +28,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
 | WS4 engine/runner | — | Not started | — | — |
-| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
+| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-29 23:41 IST |
 | WS6 editor + response viewer | — | Not started | — | — |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
@@ -131,3 +131,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-29 23:41 IST · WS5 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/5-tui-shell
+- Did: Read brief, design language, tui-stack, AGENTS, plan §0/§3/§8, `internal/ui/theme.go`, model/store API and the prod-console-tui reference (app.go, keys.go, components.go).
+- Files: `docs/ledger.md`
+- Decisions: Charm versions pinned to prod-console-tui (bubbletea v2.0.9, bubbles v2.2.1, lipgloss v2.0.5, x/ansi v0.11.7). `store.LoadLenient` not yet available on this branch: the TUI codes against a small `Loader` interface with a `Load`-based fallback adapter.
+- Tests: n/a
+- Blockers / questions: none
+- Next: components in `internal/ui`, then `internal/tui` (root, layout, tree, env switcher, palette, help, first run, watcher), then `cmd/postctl` launch.
