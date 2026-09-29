@@ -23,7 +23,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
 | WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-30 00:10 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
-| WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 01:20 IST |
+| WS2 vars + httpx | GPT-5.6 Sol (medium) | Done | ws/2-vars-httpx | 2026-09-30 01:30 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
@@ -158,3 +158,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Package race tests and focused lint pass; tests cover every body mode, static/OAuth2/Digest/SigV4/Hawk/unsupported NTLM auth behavior, redirects, compression, truncation, timeout errors, TLS HTTP/2, cookie persistence and management, defaults, disabled headers, and curl escaping.
 - Blockers / questions: None.
 - Next: Run the full repository build/race/lint acceptance suite, fix integration findings, and record DONE.
+
+### 2026-09-30 01:30 IST · WS2 · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/2-vars-httpx
+- Did: Completed `internal/vars` and `internal/httpx` end to end, including tests and dependency documentation. Exported variable stores/resolution/application and an HTTP client, persistent cookie jar, auth/token integration, and curl generation.
+- Files: `internal/vars/*`, `internal/httpx/*`, `go.mod`, `go.sum`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Additive contract changes only: `internal/vars/scope.go` adds `RandomSource`; `internal/httpx/types.go` adds `TokenSource`, `Options.OAuth2`, and `Options.CookieJar`. Dependencies added: `github.com/andybalholm/brotli` for Brotli decoding and `golang.org/x/net/publicsuffix` for cookie policy.
+- Tests: `go build ./...` passed; `go test -race ./...` passed; `golangci-lint run` passed with 0 issues.
+- Blockers / questions: No blockers. Allowed deviation: NTLM returns a clear `ErrUnsupportedAuth`. `net/http` preserves duplicate response header values but not original wire order/casing, so `Response.Headers` is deterministic rather than wire-ordered and header wire size is reconstructed.
+- Next: none
