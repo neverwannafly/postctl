@@ -35,6 +35,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
+| QA-fixes | GPT-5.6 Sol (medium) | In progress | qa/fixes | 2026-09-30 03:15 IST |
 
 ## Entries
 
@@ -535,3 +536,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green.
 - Blockers / questions: `git merge-tree` against current `main` (a9761cc) reports one conflict, `docs/ledger.md` (append-only entries and the status row); code merges cleanly.
 - Next: merge; WS7 may want `postctl ws` (connect, send, tail) on top of `wsx`.
+
+### 2026-09-30 03:15 IST · QA-fixes · GPT-5.6 Sol (medium) · STARTED
+- Branch/worktree: qa/fixes (`/Users/shubham/work/postctl-wt/qa-fixes`)
+- Did: Merged WS9 into main after committing the WS8 and INT3 briefs, resolved the append-only ledger conflict, passed the full build/race/lint gate, removed the WS9 worktree, and created this branch from the merged main.
+- Files: `docs/ledger.md`
+- Decisions: Implement the five orchestrator QA decisions as separate commits; do not merge this branch into main.
+- Tests: Part A `go build ./... && go test -race ./... && golangci-lint run` passed.
+- Blockers / questions: none.
+- Next: WebSocket layout.

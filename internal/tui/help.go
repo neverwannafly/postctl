@@ -43,7 +43,7 @@ func (o *helpOverlay) update(_ *app, msg tea.Msg) (overlay, tea.Cmd) {
 
 func (o *helpOverlay) view(a *app, w, h int) string {
 	t := a.theme
-	groups := a.keys.helpGroups(a.focusTitle(), a.focusHints())
+	groups := a.keys.helpGroups(a.focusTitle(), a.focusHints(), a.responseHidden())
 
 	keyW := 0
 	for _, g := range groups {
