@@ -58,12 +58,127 @@ var dynamicVariables = map[string]dynamicFunc{
 	"$randomBankAccount":    func(s *MemStore) string { return randomFrom(s, digits, 12) },
 	"$randomStreetAddress": func(s *MemStore) string {
 		return strconv.Itoa(1+s.random.Intn(9999)) + " " + capitalize(randomWord(s)) + " Street"
-	}, //nolint:staticcheck // Fixed ASCII words.
+	},
 	"$randomLatitude":  func(s *MemStore) string { return fmt.Sprintf("%.6f", float64(s.random.Intn(180000001))/1e6-90) },
 	"$randomLongitude": func(s *MemStore) string { return fmt.Sprintf("%.6f", float64(s.random.Intn(360000001))/1e6-180) },
 	"$randomSemver": func(s *MemStore) string {
 		return fmt.Sprintf("%d.%d.%d", s.random.Intn(10), s.random.Intn(20), s.random.Intn(50))
 	},
+}
+
+func init() {
+	addDynamicChoices()
+	addDynamicGenerators()
+}
+
+func addDynamicChoices() {
+	choices := map[string][]string{
+		"$randomNamePrefix":            {"Dr.", "Mr.", "Ms.", "Prof."},
+		"$randomNameSuffix":            {"Jr.", "Sr.", "II", "III"},
+		"$randomJobArea":               {"Engineering", "Finance", "Marketing", "Operations"},
+		"$randomJobDescriptor":         {"Lead", "Principal", "Senior", "Dynamic"},
+		"$randomJobTitle":              {"Engineer", "Analyst", "Manager", "Architect"},
+		"$randomJobType":               {"Designer", "Developer", "Director", "Strategist"},
+		"$randomStreetName":            {"Main Street", "Market Street", "Oak Avenue", "Sunset Road"},
+		"$randomCompanySuffix":         {"Inc", "LLC", "Group", "PLC"},
+		"$randomCurrencyCode":          {"AUD", "CAD", "EUR", "INR", "JPY", "USD"},
+		"$randomCurrencyName":          {"Dollar", "Euro", "Rupee", "Yen"},
+		"$randomCurrencySymbol":        {"$", "€", "₹", "¥"},
+		"$randomTransactionType":       {"deposit", "invoice", "payment", "withdrawal"},
+		"$randomBankAccountName":       {"Checking", "Investment", "Savings"},
+		"$randomBankAccountBic":        {"AAAABBCC", "BOFAUS3N", "DEUTDEFF"},
+		"$randomProductAdjective":      {"Ergonomic", "Fantastic", "Practical", "Sleek"},
+		"$randomProductMaterial":       {"Cotton", "Granite", "Metal", "Wooden"},
+		"$randomProduct":               {"Chair", "Keyboard", "Shirt", "Table"},
+		"$randomDepartment":            {"Books", "Electronics", "Garden", "Sports"},
+		"$randomDatabaseColumn":        {"created_at", "id", "name", "status"},
+		"$randomDatabaseTable":         {"accounts", "orders", "products", "users"},
+		"$randomDatabaseType":          {"bigint", "boolean", "text", "varchar"},
+		"$randomDatabaseCollation":     {"en_US.UTF-8", "utf8_general_ci", "utf8mb4_unicode_ci"},
+		"$randomDatabaseEngine":        {"InnoDB", "MyISAM", "PostgreSQL"},
+		"$randomFileType":              {"application", "image", "text", "video"},
+		"$randomFileExt":               {"json", "png", "txt", "xml"},
+		"$randomCommonFileType":        {"application/json", "image/png", "text/plain"},
+		"$randomCommonFileExt":         {"json", "png", "txt"},
+		"$randomMimeType":              {"application/json", "image/png", "text/plain"},
+		"$randomDomainSuffix":          {"com", "example", "net", "org"},
+		"$randomLocale":                {"de", "en", "es", "fr", "ja"},
+		"$randomAbbreviation":          {"CSS", "HTTP", "JSON", "SQL"},
+		"$randomNoun":                  {"application", "protocol", "request", "system"},
+		"$randomVerb":                  {"build", "parse", "send", "write"},
+		"$randomIngverb":               {"building", "parsing", "sending", "writing"},
+		"$randomAdjective":             {"fast", "portable", "reliable", "secure"},
+		"$randomCatchPhraseAdjective":  {"Adaptive", "Distributed", "Robust", "Virtual"},
+		"$randomCatchPhraseDescriptor": {"foreground", "local", "open-source", "real-time"},
+		"$randomCatchPhraseNoun":       {"architecture", "interface", "protocol", "system"},
+		"$randomBsAdjective":           {"cross-platform", "distributed", "frictionless"},
+		"$randomBsBuzz":                {"aggregate", "enable", "optimize"},
+		"$randomBsNoun":                {"architectures", "interfaces", "platforms"},
+	}
+	for name, values := range choices {
+		dynamicVariables[name] = choiceDynamic(values...)
+	}
+}
+
+func addDynamicGenerators() {
+	dynamicVariables["$randomNumber"] = func(s *MemStore) string { return strconv.Itoa(s.random.Intn(100000)) }
+	dynamicVariables["$randomFloat"] = func(s *MemStore) string {
+		return fmt.Sprintf("%.6f", float64(s.random.Intn(1000000))/1000000)
+	}
+	dynamicVariables["$randomInternetColor"] = dynamicVariables["$randomColor"]
+	dynamicVariables["$randomMACAddress"] = func(s *MemStore) string {
+		parts := make([]string, 6)
+		for i := range parts {
+			parts[i] = fmt.Sprintf("%02x", s.random.Intn(256))
+		}
+		return strings.Join(parts, ":")
+	}
+	dynamicVariables["$randomDomainWord"] = randomWord
+	dynamicVariables["$randomDomainName"] = func(s *MemStore) string { return randomWord(s) + ".example" }
+	dynamicVariables["$randomExampleEmail"] = func(s *MemStore) string {
+		return randomWord(s) + strconv.Itoa(s.random.Intn(1000)) + "@example.com"
+	}
+	dynamicVariables["$randomFileName"] = func(s *MemStore) string { return randomWord(s) + ".txt" }
+	dynamicVariables["$randomCommonFileName"] = dynamicVariables["$randomFileName"]
+	dynamicVariables["$randomFilePath"] = func(s *MemStore) string { return "/tmp/" + randomWord(s) + ".txt" }
+	dynamicVariables["$randomDirectoryPath"] = func(s *MemStore) string { return "/tmp/" + randomWord(s) }
+	dynamicVariables["$randomPhoneNumberExt"] = func(s *MemStore) string { return randomFrom(s, digits, 4) }
+	dynamicVariables["$randomBankAccountIban"] = func(s *MemStore) string {
+		return "GB" + randomFrom(s, digits, 2) + randomFrom(s, alphaNumeric, 18)
+	}
+	dynamicVariables["$randomBitcoin"] = func(s *MemStore) string { return "1" + randomFrom(s, alphaNumeric, 33) }
+	dynamicVariables["$randomProductName"] = func(s *MemStore) string {
+		return capitalize(randomWord(s)) + " " + capitalize(randomWord(s))
+	}
+	dynamicVariables["$randomCatchPhrase"] = func(s *MemStore) string { return capitalize(randomWords(s, 3)) }
+	dynamicVariables["$randomBs"] = func(s *MemStore) string { return randomWords(s, 3) }
+	dynamicVariables["$randomPhrase"] = func(s *MemStore) string { return capitalize(randomWords(s, 6)) + "." }
+	dynamicVariables["$randomLoremSentences"] = func(s *MemStore) string {
+		return capitalize(randomWords(s, 8)) + ". " + capitalize(randomWords(s, 8)) + "."
+	}
+	dynamicVariables["$randomLoremParagraphs"] = func(s *MemStore) string {
+		return capitalize(randomWords(s, 24)) + ".\n\n" + capitalize(randomWords(s, 24)) + "."
+	}
+	dynamicVariables["$randomLoremText"] = func(s *MemStore) string { return randomWords(s, 40) }
+	dynamicVariables["$randomLoremSlug"] = func(s *MemStore) string {
+		return strings.ReplaceAll(randomWords(s, 4), " ", "-")
+	}
+	dynamicVariables["$randomLoremLines"] = func(s *MemStore) string {
+		return capitalize(randomWords(s, 8)) + ".\n" + capitalize(randomWords(s, 8)) + "."
+	}
+	for _, name := range []string{
+		"$randomAvatarImage", "$randomImageUrl", "$randomAbstractImage", "$randomAnimalsImage",
+		"$randomBusinessImage", "$randomCatsImage", "$randomCityImage", "$randomFoodImage",
+		"$randomNightlifeImage", "$randomFashionImage", "$randomPeopleImage", "$randomNatureImage",
+		"$randomSportsImage", "$randomTechnicsImage", "$randomTransportImage",
+	} {
+		dynamicVariables[name] = func(s *MemStore) string {
+			return "https://images.example/" + randomWord(s) + ".png"
+		}
+	}
+	dynamicVariables["$randomImageDataUri"] = func(s *MemStore) string {
+		return "data:image/svg+xml;base64,PHN2Zy8+"
+	}
 }
 
 const (

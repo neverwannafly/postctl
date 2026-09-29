@@ -23,7 +23,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
 | WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-30 00:10 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
-| WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:35 IST |
+| WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 01:20 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
@@ -149,3 +149,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go test -race ./internal/vars` passed; `golangci-lint run ./internal/vars/...` passed with 0 issues.
 - Blockers / questions: None.
 - Next: Implement HTTP request building, transport, auth, cookies, curl generation, and protocol tests.
+
+### 2026-09-30 01:20 IST · WS2 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/2-vars-httpx
+- Did: Implemented the HTTP sender with all body modes, streaming binary files, defaults and disabled-header handling, redirects, TLS/HTTP2/timeouts, trace timings, compression, body caps, wire-size accounting, persistent public-suffix-aware cookies, copy-as-curl, and bearer/basic/API-key/Digest/OAuth2/SigV4/Hawk auth. NTLM returns an explicit unsupported error.
+- Files: `internal/httpx/*`, `internal/vars/dynamic.go`, `internal/httpx/types.go`, `go.mod`, `go.sum`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Added pure-Go Brotli and public-suffix dependencies as required by the brief. Binary request files stream from disk; the final sent-body snapshot is captured while the transport reads it. Digest supports MD5/MD5-sess/SHA-256/SHA-256-sess with `auth` and `auth-int`.
+- Tests: Package race tests and focused lint pass; tests cover every body mode, static/OAuth2/Digest/SigV4/Hawk/unsupported NTLM auth behavior, redirects, compression, truncation, timeout errors, TLS HTTP/2, cookie persistence and management, defaults, disabled headers, and curl escaping.
+- Blockers / questions: None.
+- Next: Run the full repository build/race/lint acceptance suite, fix integration findings, and record DONE.
