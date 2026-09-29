@@ -10,6 +10,7 @@ require (
 	github.com/andybalholm/brotli v1.2.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/x/ansi v0.11.7
+	github.com/coder/websocket v1.8.14
 	github.com/dop251/goja v0.0.0-20260926152631-39ec2650adc9
 	github.com/dop251/goja_nodejs v0.0.0-20260918173711-b481721df8a2
 	github.com/fsnotify/fsnotify v1.9.0
