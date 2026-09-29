@@ -605,7 +605,8 @@ func (tv *treeState) renderRow(r treeRow, sel, focused bool) string {
 		s.add(on(ui.StatusWarning), g.Warn+" "+r.label)
 	case rowProblem:
 		s.add(on(ui.StatusDanger), g.Fail+" ")
-		s.add(on(ui.TextPrimary), t.Truncate(r.label, max(4, w-s.w)))
+		// The file name matters most, so a long path loses its start.
+		s.add(on(ui.TextPrimary), truncateLeft(t, r.label, max(4, w-s.w)))
 		if reason := firstLine(r.problem.Err.Error()); reason != "" && w-s.w > 12 {
 			s.add(on(ui.TextQuiet), "  "+t.Truncate(reason, w-s.w-2))
 		}
@@ -710,4 +711,18 @@ func firstLine(s string) string {
 		s = s[:i]
 	}
 	return strings.TrimSpace(s)
+}
+
+// truncateLeft shortens s to w cells by cutting from the start, keeping the
+// end (for paths, the file name).
+func truncateLeft(t ui.Theme, s string, w int) string {
+	if ui.Width(s) <= w {
+		return s
+	}
+	r := []rune(s)
+	tail := []rune(t.Glyphs.Ellipsis)
+	for len(r) > 0 && ui.Width(string(tail))+ui.Width(string(r)) > w {
+		r = r[1:]
+	}
+	return string(tail) + string(r)
 }

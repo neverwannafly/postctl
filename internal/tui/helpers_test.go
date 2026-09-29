@@ -172,7 +172,7 @@ func (h *harness) run(cmd tea.Cmd) {
 		var msg tea.Msg
 		select {
 		case msg = <-done:
-		case <-time.After(150 * time.Millisecond):
+		case <-time.After(40 * time.Millisecond):
 			continue
 		}
 		switch m := msg.(type) {
@@ -341,3 +341,8 @@ func golden(t *testing.T, name, got string) {
 func demo() *model.Workspace { return tuitest.Demo() }
 
 var errBoom = errors.New("disk on fire")
+
+// brokenFile builds a load problem for a file under root.
+func brokenFile(root, rel, reason string) *store.FileError {
+	return &store.FileError{Path: filepath.Join(root, rel), Err: errors.New(reason)}
+}

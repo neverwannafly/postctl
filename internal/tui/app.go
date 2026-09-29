@@ -155,6 +155,7 @@ func newApp(opts Options) *app {
 	}
 	a.request, a.response = newReq(env), newResp(env)
 	a.registry.AddFunc(a.builtinActions)
+	a.registry.AddFunc(a.paneActions)
 	a.layoutPanes()
 	return a
 }

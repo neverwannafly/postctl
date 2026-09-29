@@ -282,6 +282,11 @@ func (a *app) hints() []ui.Hint {
 	global := []ui.Hint{
 		hint("?", "Help", 0), hint("Ctrl-P", "Palette", 1), hint("E", "Environments", 3), hint("q", "Quit", 6),
 	}
+	if a.editing() {
+		// Plain keys go to the text field, so only the shortcuts that still
+		// work are offered.
+		global = []ui.Hint{hint("Ctrl-P", "Palette", 1)}
+	}
 	var own []ui.Hint
 	switch a.focus {
 	case SlotSidebar:

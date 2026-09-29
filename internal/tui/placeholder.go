@@ -64,7 +64,7 @@ func (p *placeholderPane) requestView() string {
 	case ref.Problem != nil:
 		name := filepath.Base(ref.Problem.Path)
 		return t.ErrorState("Could not read "+name+".",
-			"The rest of your workspace is intact. "+firstLine(ref.Problem.Err.Error()),
+			"Reason: "+firstLine(ref.Problem.Err.Error())+"\nThe rest of your workspace is intact.",
 			"Fix the file in your editor. postctl reloads it as soon as you save.", w) +
 			"\n\n" + t.Render(ui.TextQuiet, ui.Wrap(ref.Problem.Path, w))
 	case ref.Request == nil && len(ref.Path) > 0:
