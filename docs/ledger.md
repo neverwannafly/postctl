@@ -24,7 +24,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS1 Postman importer | GPT-5.6 Sol (medium) | Done, merged to main | ws/1-importer | 2026-09-29 23:55 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Done, merged to main | ws/2-vars-httpx | 2026-09-29 23:55 IST |
-| WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-29 23:35 IST |
+| WS2b OAuth2 | Grok 4.7 (high, fast) | Done, merged to main | ws/2b-oauth2 | 2026-09-29 23:58 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-29 23:35 IST |
 | WS4 engine/runner | — | Not started | — | — |
@@ -227,3 +227,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Verified `ws/2-vars-httpx`. It stayed in scope (plus a `docs/tui-stack.md` note for the brotli and publicsuffix dependencies). Contract changes only add things: `vars.RandomSource`, `httpx.TokenSource`, `Options.OAuth2`, `Options.CookieJar`. Race tests and lint are green. Merged into `main`, then replaced WS2's local request/auth copy helpers with `model.Request.Clone` / `Auth.Clone` from WS0.1; tests are still green.
 - Decisions: Accepted two deviations. NTLM returns `ErrUnsupportedAuth`. Response header order and casing are normalized by `net/http`, not kept as sent on the wire.
 - Next: WS2b implements `httpx.TokenSource`; WS3 is coding against these contracts. The WS4 engine brief can now be written against real APIs.
+
+### 2026-09-29 23:41 IST · WS2b · Grok 4.7 · STARTED
+- Branch/worktree: ws/2b-oauth2
+- Did: Read the WS2b brief, plan §0 (R2, D2), model rule 6, `OAuth2Config` / `OAuth2Token`, `SecretStore` / `HydrateAuth`, the httpx contract, and the prod-console-tui loopback login. Starting `internal/oauth2` only.
+- Files: `docs/ledger.md`
+- Decisions: Standard library only (`golang.org/x/oauth2` would hide PKCE, loopback, implicit fragment delivery, and the no-auto-refresh rule, and a new dependency cannot be recorded in `docs/tui-stack.md` from this workstream). Token secrets use the store's JSON shape (`access`, `refresh`, `id`) so `HydrateAuth` can read them. `Source.Token` matches the forthcoming `httpx.TokenSource` signature without importing httpx.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Implement grant fetches, loopback, and the cached token source.
+
+### 2026-09-29 23:55 IST · WS2b · Grok 4.7 · DONE
+- Branch/worktree: ws/2b-oauth2
+- Did: Shipped `internal/oauth2`. `Fetch` runs client credentials, authorization code, authorization code with PKCE (S256 or plain), password, and implicit, plus an on-demand refresh. Browser grants listen on 127.0.0.1, honor a localhost redirect's port and path, and otherwise use an ephemeral loopback URI reported through `FetchOptions.OnNote`. The authorization URL is passed to `OnAuthURL` before the browser opens. `Source.Token` returns a cached unexpired token or `ErrNoToken` and does not fetch. `Source.Save` writes access, refresh, and ID token strings as the store's JSON secret (`access`, `refresh`, `id`).
+- Files: `internal/oauth2/`, `docs/ledger.md`
+- Decisions: Standard library only. `Source.Token` matches the forthcoming `httpx.TokenSource` signature and does not import httpx. The loopback note is `FetchOptions.OnNote` because `model.OAuth2Token` has no note field. `Save` takes an owner id so an empty `Token.Ref` becomes `oauth2/<owner>`. Flat `OAuth2Config.Extra` entries are sent on authorize and token requests; `authRequestParams`, `tokenRequestParams`, and `refreshRequestParams` stay on that step. Sensitive extra keys are dropped. Scope is not repeated on the authorization-code token exchange. `client_id` is always in the token body; the secret is Basic or the body per `ClientAuth`.
+- Tests: `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed (0 issues). Implementation commit `bf7eb52`.
+- Blockers / questions: None.
+- Next: none
