@@ -131,3 +131,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-30 00:10 IST · WS2 · GPT-5.6 Sol · STARTED
+- Branch/worktree: ws/2-vars-httpx
+- Did: Read the WS2 brief, binding plan decisions, ledger process, repository instructions, model contract, shared vars/httpx contracts, and relevant model/store APIs.
+- Files: `docs/ledger.md`
+- Decisions: Contract files will be extended additively only. Folder variables are excluded from the collection variable layer per the Postman v2.1 contract.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Implement and test `internal/vars`, then implement and test `internal/httpx`.
