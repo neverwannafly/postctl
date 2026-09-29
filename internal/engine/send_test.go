@@ -688,3 +688,23 @@ func TestIterationDataAndLocals(t *testing.T) {
 		t.Fatalf("server saw %v", hits)
 	}
 }
+
+func TestGlobalsFileIsCreatedWhenMissing(t *testing.T) {
+	srv := newServer(t, jsonHandler(`{}`))
+	f := newFixture(t, srv)
+	req := model.NewRequest("R", "GET", "{{baseUrl}}/x")
+	req.Scripts.Test = js(`pm.globals.set("created", "yes");`)
+	f.col.Items = append(f.col.Items, req)
+	f.save()
+	out := f.send(f.findRequest("R"), nil)
+	if !reflect.DeepEqual(out.Persisted, []string{"globals"}) || len(out.Warnings) != 0 {
+		t.Fatalf("persisted=%v warnings=%v", out.Persisted, out.Warnings)
+	}
+	ws, err := f.store.Load()
+	if err != nil || ws.Globals == nil {
+		t.Fatalf("globals not written: %v", err)
+	}
+	if v, _ := varValue(ws.Globals.Variables, "created"); v != "yes" {
+		t.Fatalf("created = %q", v)
+	}
+}
