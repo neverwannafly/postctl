@@ -37,7 +37,7 @@ func (a *app) geo() geometry {
 	g.bodyH = max(3, a.height-headerRows-footerRows)
 	switch g.layout {
 	case ui.LayoutThreePane:
-		g.sidebarW = min(max(28, g.width/5), 40)
+		g.sidebarW = min(max(30, g.width*22/100), 44)
 		rest := g.width - g.sidebarW - 2*gapWidth
 		g.requestW = rest * 55 / 100
 		g.responseW = rest - g.requestW
@@ -291,7 +291,7 @@ func (a *app) hints() []ui.Hint {
 	default:
 		own = a.response.KeyHints()
 	}
-	if a.layoutKind() != ui.LayoutThreePane && a.focus != SlotSidebar {
+	if a.focus != SlotSidebar {
 		own = append(own, hint("Tab", "Next pane", 4))
 	}
 	if a.layoutKind() == ui.LayoutSingle && a.focus != SlotSidebar {

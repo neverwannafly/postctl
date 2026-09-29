@@ -98,6 +98,7 @@ func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint) []helpGroup {
 			{"Enter", "Choose"}, {"Esc", "Close or cancel"}, {k.Up.Help().Key + " " + k.Down.Help().Key, "Move"},
 		}},
 	}
+	groups[1].Rows = replaceRow(groups[1].Rows, k.MoveUp.Help().Key, helpRow{k.MoveUp.Help().Key + " " + k.MoveDown.Help().Key, "Move up or down in its folder"})
 	// The overview rows for the pane numbers read better as one line.
 	groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
 	groups[1].Rows = replaceRow(groups[1].Rows, k.PageUp.Help().Key, helpRow{"PgUp PgDn", "Page up or down"})
