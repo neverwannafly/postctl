@@ -48,6 +48,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("postctl", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "print the version and exit")
+	workspace := fs.String("workspace", "", "use this workspace directory")
 	fs.Bool("help", false, "show help")
 	fs.Bool("h", false, "show help")
 	if err := fs.Parse(args); err != nil {
@@ -83,7 +84,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return exitOK
 	}
 	if rest[0] == "import" {
-		return runImport(rest[1:], stdout, stderr)
+		importArgs := rest[1:]
+		if *workspace != "" && len(importArgs) > 0 {
+			importArgs = append([]string{importArgs[0], "--workspace", *workspace}, importArgs[1:]...)
+		}
+		return runImport(importArgs, stdout, stderr)
 	}
 	for _, c := range commands {
 		if c.name == rest[0] {
@@ -127,6 +132,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Flags:")
 	fmt.Fprintln(w, "  --version   Print the version and exit")
+	fmt.Fprintln(w, "  --workspace Use this workspace directory")
 	fmt.Fprintln(w, "  --help      Show this help")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Exit codes: 0 ok, 1 test failures, 2 request errors, 3 usage or configuration errors.")

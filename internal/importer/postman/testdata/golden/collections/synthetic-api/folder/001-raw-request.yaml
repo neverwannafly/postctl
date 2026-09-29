@@ -71,7 +71,26 @@ extra:
       script:
         exec:
           - tests['legacy'] = true;
+  prerequestEvents:
+    - listen: prerequest
+      script:
+        exec:
+          - pm.visualizer.set('<b>x</b>');
+    - listen: prerequest
+      script:
+        exec:
+          - require('left-pad');
   proxy:
     match: synthetic
+  testEvents:
+    - disabled: true
+      listen: test
+      script:
+        exec:
+          - tests['legacy'] = true;
+    - listen: test
+      script:
+        exec:
+          - pm.test('ok', function () {});
   url:
     vendorUrl: true

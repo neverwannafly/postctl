@@ -33,6 +33,17 @@ func TestImportPostmanDryRun(t *testing.T) {
 	}
 }
 
+func TestImportGlobalWorkspaceFlag(t *testing.T) {
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	code, output, errorOutput := runCLI(
+		"--workspace", workspace,
+		"import", "postman", importerFixture(t, "minimal-v2.0.json"), "--dry-run",
+	)
+	if code != 0 || errorOutput != "" || !strings.Contains(output, "Imported 1 collections") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, output, errorOutput)
+	}
+}
+
 func TestImportPostmanWritesWorkspace(t *testing.T) {
 	workspace := filepath.Join(t.TempDir(), "workspace")
 	code, output, errorOutput := runCLI(

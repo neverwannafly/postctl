@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -49,7 +51,7 @@ func Convert(data []byte, options Options) (*Document, Report, error) {
 		return nil, Report{}, errors.New("invalid JSON document")
 	}
 	var trailing any
-	if err := dec.Decode(&trailing); err == nil {
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return nil, Report{}, errors.New("JSON document contains trailing data")
 	}
 	return ConvertObject(raw, options)
@@ -413,12 +415,21 @@ func convertAuth(value any, path string, report *Report) *model.Auth {
 		auth.Type = model.AuthUnsupported
 		auth.OriginalType = authType
 		auth.Raw = map[string]any{"parameters": cloneMapAny(rawParams)}
+		for key, entry := range extras(raw, "type", authType) {
+			auth.Raw["_auth_"+key] = entry
+		}
 		report.AddWarning(path, "unsupported-auth",
 			fmt.Sprintf("Auth type %s was preserved but cannot be sent", authType))
 		return auth
 	}
 	if len(rawParams) > 0 {
 		auth.Raw = cloneMapAny(rawParams)
+	}
+	for key, entry := range extras(raw, "type", authType) {
+		if auth.Raw == nil {
+			auth.Raw = map[string]any{}
+		}
+		auth.Raw["_auth_"+key] = entry
 	}
 	return auth
 }
@@ -539,6 +550,9 @@ func convertEvents(value any, path string, extra *map[string]any, report *Report
 		grouped[listen] = append(grouped[listen], event)
 	}
 	for listen, events := range grouped {
+		if len(events) > 1 || eventsHaveExtra(events) {
+			putExtra(extra, listen+"Events", mapsToAny(events))
+		}
 		var enabled, disabled []map[string]any
 		for _, event := range events {
 			if boolValue(event["disabled"]) {
@@ -566,6 +580,19 @@ func convertEvents(value any, path string, extra *map[string]any, report *Report
 	}
 	lintRequestScripts(path, scripts, report)
 	return scripts
+}
+
+func eventsHaveExtra(events []map[string]any) bool {
+	for _, event := range events {
+		if len(extras(event, "listen", "disabled", "script")) > 0 {
+			return true
+		}
+		script := object(event["script"])
+		if len(extras(script, "id", "name", "src", "exec", "type")) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func combineScripts(events []map[string]any) *model.Script {
@@ -636,7 +663,19 @@ func convertKV(value any) []model.KV {
 }
 
 func object(value any) map[string]any {
-	result, _ := value.(map[string]any)
+	if result, ok := value.(map[string]any); ok {
+		return result
+	}
+	reflected := reflect.ValueOf(value)
+	if !reflected.IsValid() || reflected.Kind() != reflect.Map ||
+		reflected.Type().Key().Kind() != reflect.String {
+		return nil
+	}
+	result := make(map[string]any, reflected.Len())
+	iterator := reflected.MapRange()
+	for iterator.Next() {
+		result[iterator.Key().String()] = iterator.Value().Interface()
+	}
 	return result
 }
 

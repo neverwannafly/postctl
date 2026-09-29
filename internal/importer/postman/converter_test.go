@@ -160,10 +160,37 @@ func TestFormatsAndVariables(t *testing.T) {
 		`{"info":{"name":"future","schema":"https://schema.getpostman.com/json/collection/v3/collection.json"}}`,
 		`{"name":"unknown"}`,
 		`not json`,
+		`{"name":"unknown"} trailing`,
 	} {
 		if _, _, err := Convert([]byte(input), Options{}); err == nil {
 			t.Fatalf("expected format error")
 		}
+	}
+}
+
+func TestConvertObjectAcceptsNamedNestedMaps(t *testing.T) {
+	type namedMap map[string]any
+	raw := map[string]any{
+		"info": namedMap{
+			"_postman_id": "named",
+			"name":        "Named maps",
+			"schema":      schemaV21,
+		},
+		"item": []any{namedMap{
+			"id":   "request",
+			"name": "Request",
+			"request": namedMap{
+				"method": "GET",
+				"url":    "https://example.invalid",
+			},
+		}},
+	}
+	document, report, err := ConvertObject(raw, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if report.Counts.Requests != 1 || len(document.Collection.Requests()) != 1 {
+		t.Fatal("named map documents were not converted")
 	}
 }
 
@@ -234,6 +261,29 @@ func TestMergeKeepsItemsAbsentFromSource(t *testing.T) {
 	if !contains(converted.Changes.Kept, "Version 2 › Local only") ||
 		!contains(converted.Changes.Added, "Version 2 › Ping") {
 		t.Fatalf("changes = %+v", converted.Changes)
+	}
+}
+
+func TestMergeDoesNotDuplicateMovedItem(t *testing.T) {
+	request := model.NewRequest("Moved", "GET", "https://example.invalid")
+	request.ID = "request"
+	oldFolder := &model.Folder{ID: "old-folder", Name: "Old", Items: []model.Item{request}}
+	existing := &model.Collection{ID: "collection", Name: "Collection", Items: []model.Item{oldFolder}}
+	workspace := &model.Workspace{ID: "workspace", Name: "Workspace", Collections: []*model.Collection{existing}}
+
+	importedRequest := model.NewRequest("Moved", "GET", "https://example.invalid")
+	importedRequest.ID = "request"
+	imported := &model.Collection{
+		ID: "collection", Name: "Collection",
+		Items: []model.Item{
+			&model.Folder{ID: "old-folder", Name: "Old"},
+			&model.Folder{ID: "new-folder", Name: "New", Items: []model.Item{importedRequest}},
+		},
+	}
+	report := Report{}
+	MergeDocuments(workspace, []*Document{{Kind: KindCollection, Collection: imported}}, &report)
+	if len(workspace.Collections[0].Requests()) != 1 {
+		t.Fatal("moved request was duplicated")
 	}
 }
 

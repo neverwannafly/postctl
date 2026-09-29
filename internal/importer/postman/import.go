@@ -48,7 +48,9 @@ func mergeCollection(workspace *model.Workspace, imported *model.Collection, rep
 		if existing.ID != imported.ID {
 			continue
 		}
-		mergeItems(existing.Items, &imported.Items, imported.Name, report)
+		importedIDs := map[model.ID]bool{}
+		collectItemIDs(imported.Items, importedIDs)
+		mergeItems(existing.Items, &imported.Items, importedIDs, imported.Name, report)
 		if !reflect.DeepEqual(existing, imported) {
 			report.Changes.Changed = append(report.Changes.Changed, imported.Name)
 		}
@@ -59,13 +61,17 @@ func mergeCollection(workspace *model.Workspace, imported *model.Collection, rep
 	report.Changes.Added = append(report.Changes.Added, imported.Name)
 }
 
-func mergeItems(existing []model.Item, imported *[]model.Item, parentPath string, report *Report) {
+func mergeItems(
+	existing []model.Item,
+	imported *[]model.Item,
+	importedIDs map[model.ID]bool,
+	parentPath string,
+	report *Report,
+) {
 	oldByID := make(map[model.ID]model.Item, len(existing))
 	for _, item := range existing {
 		oldByID[item.ItemID()] = item
 	}
-	importedIDs := map[model.ID]bool{}
-	collectItemIDs(*imported, importedIDs)
 	for _, item := range *imported {
 		path := joinPath(parentPath, item.ItemName())
 		old := oldByID[item.ItemID()]
@@ -76,7 +82,7 @@ func mergeItems(existing []model.Item, imported *[]model.Item, parentPath string
 		newFolder, newIsFolder := item.(*model.Folder)
 		oldFolder, oldIsFolder := old.(*model.Folder)
 		if newIsFolder && oldIsFolder {
-			mergeItems(oldFolder.Items, &newFolder.Items, path, report)
+			mergeItems(oldFolder.Items, &newFolder.Items, importedIDs, path, report)
 		}
 		if !reflect.DeepEqual(old, item) {
 			report.Changes.Changed = append(report.Changes.Changed, path)
