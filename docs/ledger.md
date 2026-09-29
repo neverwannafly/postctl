@@ -34,7 +34,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS7 CLI | Grok 4.7 (high, fast) | Done, merged to main | ws/7-cli | 2026-09-30 03:15 IST |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
-| WS6c runner + history TUI | Composer 2.5 (fast) | Done (branch) | ws/6c-runner-history | 2026-09-30 03:10 IST |
+| WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
 
 ## Entries
 
