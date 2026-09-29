@@ -20,7 +20,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS | Owner (model) | Status | Branch | Last update |
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | Draft v0, awaiting user answers | — | 2026-09-29 |
-| WS0 scaffold/model/store | — | Not started | — | — |
+| WS0 scaffold/model/store | Sonnet 5.5 (high) | In progress | ws/0-scaffold | 2026-09-29 |
 | WS1 Postman importer | — | Not started | — | — |
 | WS2 vars + httpx | — | Not started | — | — |
 | WS3 script runtime | — | Not started | — | — |
@@ -45,3 +45,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: WS1b outputs standard v2.1 JSON so the importer (WS1) stays format-stable. Private extracted data goes to gitignored `testdata/private/`.
 - Blockers / questions: Round-2 questions (gRPC/OAuth2 depth, launch approval).
 - Next: Write briefs for WS0 and WS1b, then launch Wave 1.
+
+### 2026-09-29 23:15 IST · WS0 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/0-scaffold
+- Did: Read brief, plan §0, ledger, and reference repo docs/code (design-language, tui-stack, AGENTS, theme, cli, keychain). Confirmed toolchain (Go 1.26.1, task, golangci-lint 2.11.4) and module cache.
+- Files: `docs/ledger.md`
+- Decisions: none yet.
+- Tests: n/a
+- Blockers / questions: none
+- Next: model types, then store, then scaffold/CLI, theme skeleton, docs.
