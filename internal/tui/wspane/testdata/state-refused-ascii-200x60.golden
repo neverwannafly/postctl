@@ -1,0 +1,60 @@
+  WS      {{baseUrl}}/stream?channel=btc Connect                                                                                                                                                        
+  x Refused: 401 Unauthorized. Details are in the log                                                                                                                                                   
+Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
+===========---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  Message                                              Text  0 B |   Log  2                                                                                                                             
+Type a message. Ctrl-S sends it.                                 |   03:04:05.000 * info  Connecting                                                                                                    
+                                                                 | > 03:04:05.000 * error The server refused the connection: 401 Unauthorized                                                           
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+  Saved  3                                                       |                                                                                                                                      
+> subscribe              {"type":"subscribe","channel":"... JSON |                                                                                                                                      
+  heartbeat              ping                               text |                                                                                                                                      
+  auth                   {"type":"auth","token":"{{token... JSON |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      
+                                                                 |                                                                                                                                      

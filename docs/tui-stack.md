@@ -22,7 +22,7 @@ This document records the implementation stack for the macOS-first Go TUI descri
 | Storage | YAML files via `go.yaml.in/yaml/v3` | One YAML file per request, scripts as real `.js` files, deterministic output, strict decoding. See [model.md](model.md). | v1 |
 | Secret store | macOS Keychain behind the `store.SecretStore` interface | `/usr/bin/security` invoked through `os/exec` without a shell; secrets go over stdin (`security -i`), base64-encoded, never argv. `store.MemorySecrets` is the test fake. | v1 |
 | Logging | Go `log/slog` to a file outside the TUI renderer | Structured diagnostics with redaction. Never log secret values, tokens, header values, request/response bodies, or query strings. | v1 |
-| WebSocket | `github.com/coder/websocket` | Context-aware client with a small API surface for WebSocket requests. | WebSocket workstream |
+| WebSocket | `github.com/coder/websocket` (v1.8.14) | Pure-Go, context-aware client with a small API: `Dial` with headers, an `http.Client` (cookie jar, TLS settings, proxy), subprotocols, ping/pong hooks, close codes, and a read limit. `internal/wsx` wraps it; nothing else imports it. The standard library has no WebSocket client, and `golang.org/x/net/websocket` is deprecated and lacks context support, close codes and ping hooks. | v1 (WS9) |
 | Test support | Go `testing`, `net/http/httptest`, fakes behind narrow interfaces | Verify pipeline ordering, auth application, script semantics, and storage round trips without the network or Keychain. | v1 |
 
 ### Why this stack

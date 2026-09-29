@@ -1,0 +1,60 @@
+  WS      {{baseUrl}}/stream?channel=btc Connect                                                                                                                                                        
+  ○ Not connected                                                                                                                                                                                Unsaved
+Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
+━━━━━━━━━━━─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+› Message                                          JSON  ✓ valid │   Log                                                                                                                                
+{"op":"sub","ids":[1,2]}                                         │   No messages yet                                                                                                                    
+                                                                 │   Connect with Ctrl-S, then send a message. Everything sent and received is listed here.                                             
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+  Saved  3                                                       │                                                                                                                                      
+› subscribe              {"type":"subscribe","channel":"bt… JSON │                                                                                                                                      
+  heartbeat              ping                               text │                                                                                                                                      
+  auth                   {"type":"auth","token":"{{token}}… JSON │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      
+                                                                 │                                                                                                                                      

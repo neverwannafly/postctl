@@ -25,6 +25,15 @@ const (
 	rowHeading
 )
 
+// methodBadge is the text of a request's badge in the tree and palette: the
+// HTTP method, or WS for a WebSocket request.
+func methodBadge(r *model.Request) string {
+	if r.Kind == model.KindWebSocket {
+		return "WS"
+	}
+	return r.Method
+}
+
 // methodWidth is the fixed width of the method column in the tree; DELETE is
 // shown as DEL.
 const methodWidth = 5
@@ -254,7 +263,7 @@ func (tv *treeState) appendContainer(c *model.Collection, parent model.Container
 				tv.appendContainer(c, v, depth+1)
 			}
 		case *model.Request:
-			tv.rows = append(tv.rows, treeRow{kind: rowRequest, id: v.ID, node: n, depth: depth, label: v.Name, method: v.Method})
+			tv.rows = append(tv.rows, treeRow{kind: rowRequest, id: v.ID, node: n, depth: depth, label: v.Name, method: methodBadge(v)})
 		}
 	}
 }
@@ -280,7 +289,7 @@ func (tv *treeState) appendMatches() {
 		req := n.item.(*model.Request)
 		last := []rune(req.Name)
 		lbl := []rune(labels[r.index])
-		tv.rows = append(tv.rows, treeRow{kind: rowRequest, id: n.id, node: n, label: labels[r.index], method: req.Method,
+		tv.rows = append(tv.rows, treeRow{kind: rowRequest, id: n.id, node: n, label: labels[r.index], method: methodBadge(req),
 			match: r.pos, ctxLen: len(lbl) - len(last)})
 	}
 }

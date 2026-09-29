@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"github.com/shubham/postctl/internal/tui/request"
 	"github.com/shubham/postctl/internal/tui/runner"
 	"github.com/shubham/postctl/internal/tui/tuiengine"
+	"github.com/shubham/postctl/internal/tui/wspane"
 )
 
 type storeProvider interface {
@@ -147,6 +149,20 @@ func wireEditors(o *tui.Options) {
 	if o.NewRequestPane == nil {
 		o.NewRequestPane = request.Factory(request.Deps{
 			Tokens: oauth2.NewSource(lazySecrets{engine: engines}, nil),
+		})
+	}
+	if _, ok := o.NewPaneForKind[model.KindWebSocket]; !ok && o.Backend != nil {
+		if o.NewPaneForKind == nil {
+			o.NewPaneForKind = map[model.Kind]tui.PaneFactory{}
+		}
+		o.NewPaneForKind[model.KindWebSocket] = wspane.Factory(wspane.Deps{
+			Tokens: oauth2.NewSource(lazySecrets{engine: engines}, nil),
+			Jar: func() http.CookieJar {
+				if eng, err := engines.get(); err == nil {
+					return eng.Cookies()
+				}
+				return nil
+			},
 		})
 	}
 	if o.NewEnvEditor == nil {

@@ -1,0 +1,358 @@
+package wspane
+
+import (
+	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/ui"
+)
+
+// setZone moves the cursor between the URL bar, the tab bar and the content.
+func (p *Pane) setZone(z zone) {
+	p.zone = z
+	p.urlE = z == zBar
+	p.syncFocus()
+}
+
+// enterBody moves the cursor from the tab bar into the tab's content.
+func (p *Pane) enterBody() {
+	p.setZone(zBody)
+	switch p.tab {
+	case tabAuth:
+		p.auth.enter()
+	case tabSettings:
+		p.settings.enter()
+	}
+}
+
+func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
+	if !p.editable() {
+		return nil
+	}
+	if p.confirm != nil {
+		return p.confirmKey(m)
+	}
+	p.notice = "" // a message lasts until the next key
+	cmd := p.dispatch(m)
+	p.syncFocus()
+	return cmd
+}
+
+func (p *Pane) dispatch(m tea.KeyPressMsg) tea.Cmd {
+	switch m.String() {
+	case "ctrl+s", "ctrl+enter":
+		return p.primary()
+	case "ctrl+l":
+		p.stopEditing()
+		p.setZone(zBar)
+		return nil
+	case "esc":
+		if l := p.peek(); l != nil && l.state == stConnecting && !p.searching && p.rename == nil {
+			return p.cancelConnect()
+		}
+	}
+	switch p.zone {
+	case zBar:
+		return p.barKey(m)
+	case zTabs:
+		return p.tabsKey(m)
+	}
+	return p.bodyKey(m)
+}
+
+// primary is the send key: connect when there is no connection, otherwise
+// send the composer's message.
+func (p *Pane) primary() tea.Cmd {
+	l := p.cur()
+	switch l.state {
+	case stIdle:
+		return p.connect()
+	case stOpen:
+		return p.sendComposer()
+	}
+	return nil
+}
+
+// ---- URL bar ---------------------------------------------------------------------
+
+func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
+	switch m.String() {
+	case "enter":
+		return p.toggleConnect()
+	case "esc", "tab", "down":
+		p.setZone(zTabs)
+		return nil
+	}
+	before := p.url.Text()
+	if !p.url.Update(m) || p.url.Text() == before {
+		return nil
+	}
+	return p.urlEdited()
+}
+
+// urlEdited copies the field into the request, keeping disabled parameters
+// and path variable values that the raw text cannot carry.
+func (p *Pane) urlEdited() tea.Cmd {
+	applyRawURL(&p.req.URL, p.url.Text())
+	p.params.reload(p)
+	return p.touched()
+}
+
+// applyRawURL sets u from raw text. Disabled query rows stay where they are;
+// enabled rows take their values from the text in order; path variables keep
+// the values already entered.
+func applyRawURL(u *model.URL, raw string) {
+	parsed := model.ParseURL(raw)
+	var query []model.KV
+	j := 0
+	for _, q := range u.Query {
+		if q.Disabled {
+			query = append(query, q)
+			continue
+		}
+		if j < len(parsed.Query) {
+			nq := parsed.Query[j]
+			nq.Description = q.Description
+			query = append(query, nq)
+			j++
+		}
+	}
+	query = append(query, parsed.Query[j:]...)
+	old := map[string]model.Variable{}
+	for _, v := range u.PathVars {
+		old[v.Key] = v
+	}
+	for i, v := range parsed.PathVars {
+		if o, ok := old[v.Key]; ok {
+			parsed.PathVars[i] = o
+		}
+	}
+	u.Raw = raw
+	u.Query = query
+	u.PathVars = parsed.PathVars
+}
+
+// ---- tab bar ---------------------------------------------------------------------
+
+func (p *Pane) tabsKey(m tea.KeyPressMsg) tea.Cmd {
+	switch m.String() {
+	case "left":
+		p.tab = (p.tab + numTabs - 1) % numTabs
+	case "right":
+		p.tab = (p.tab + 1) % numTabs
+	case "home":
+		p.tab = 0
+	case "end":
+		p.tab = numTabs - 1
+	case "up":
+		p.setZone(zBar)
+	case "down", "enter":
+		p.enterBody()
+	case "c":
+		return p.toggleConnect()
+	}
+	return nil
+}
+
+// ---- tab content -----------------------------------------------------------------
+
+func (p *Pane) bodyKey(m tea.KeyPressMsg) tea.Cmd {
+	var handled, changed, editing bool
+	switch p.tab {
+	case tabMessages:
+		return p.messagesKey(m)
+	case tabParams:
+		handled, changed = p.params.key(p, m)
+		editing = p.params.editing()
+	case tabHeaders:
+		handled, changed = p.headers.key(p, m)
+		editing = p.headers.editing()
+	case tabAuth:
+		handled, changed = p.auth.key(p, m)
+		editing = p.auth.editing()
+	default:
+		handled, changed = p.settings.key(p, m)
+		editing = p.settings.editing()
+	}
+	var cmd tea.Cmd
+	if changed {
+		cmd = p.touched()
+		p.syncURL()
+	}
+	if handled || editing {
+		return cmd
+	}
+	switch m.String() {
+	case "up", "esc":
+		p.setZone(zTabs)
+	case "left":
+		p.tab = (p.tab + numTabs - 1) % numTabs
+		p.enterBody()
+	case "right":
+		p.tab = (p.tab + 1) % numTabs
+		p.enterBody()
+	}
+	return cmd
+}
+
+func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
+	if !p.editable() || p.confirm != nil {
+		return nil
+	}
+	switch {
+	case p.zone == zBar:
+		before := p.url.Text()
+		p.url.Update(m)
+		if p.url.Text() != before {
+			return p.urlEdited()
+		}
+		return nil
+	case p.searching:
+		p.search.Update(m)
+		if l := p.cur(); p.search.Text() != l.log.query {
+			l.log.query = p.search.Text()
+			l.log.refilter()
+		}
+		return nil
+	case p.rename != nil:
+		p.rename.Update(m)
+		return nil
+	case p.zone != zBody:
+		return nil
+	}
+	var changed bool
+	switch p.tab {
+	case tabMessages:
+		if p.sect == sComposer && p.comp.update(m) {
+			return p.composerEdited()
+		}
+		return nil
+	case tabParams:
+		changed = p.params.paste(p, m)
+	case tabHeaders:
+		changed = p.headers.paste(p, m)
+	case tabAuth:
+		changed = p.auth.f.paste(p, func() []formRow { return p.auth.rows(p) }, m)
+	default:
+		changed = p.settings.f.paste(p, func() []formRow { return p.settings.rows(p) }, m)
+	}
+	if changed {
+		p.syncURL()
+		return p.touched()
+	}
+	return nil
+}
+
+// ---- hints -------------------------------------------------------------------------
+
+// KeyHints implements tui.Pane.
+func (p *Pane) KeyHints() []ui.Hint {
+	if !p.editable() {
+		return nil
+	}
+	if p.confirm != nil {
+		return []ui.Hint{{Key: "Enter", Label: "Confirm", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
+	}
+	l := p.peek()
+	state := stIdle
+	if l != nil {
+		state = l.state
+	}
+	primary := ui.Hint{Key: "Ctrl-S", Label: "Connect", Priority: 1}
+	if p.enhanced {
+		primary.Key = "Ctrl-Enter"
+	}
+	switch state {
+	case stConnecting:
+		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}}
+	case stOpen:
+		primary.Label = "Send"
+	case stClosing:
+		return nil
+	}
+	var hs []ui.Hint
+	switch p.zone {
+	case zBar:
+		label := "Connect"
+		if state == stOpen {
+			label = "Disconnect"
+		}
+		hs = []ui.Hint{{Key: "Enter", Label: label, Priority: 1}, {Key: "Esc", Label: "Tabs", Priority: 2}, primary}
+	case zTabs:
+		label := "Connect"
+		if state == stOpen {
+			label = "Disconnect"
+		}
+		hs = []ui.Hint{
+			{Key: "←→", Label: "Tab", Priority: 2},
+			{Key: "↓", Label: "Edit", Priority: 2},
+			{Key: "c", Label: label, Priority: 3},
+			primary,
+		}
+	default:
+		hs = append(p.bodyHints(state), primary)
+	}
+	return hs
+}
+
+func (p *Pane) bodyHints(state connState) []ui.Hint {
+	switch p.tab {
+	case tabParams:
+		return p.params.hints()
+	case tabHeaders:
+		return p.headers.hints()
+	case tabAuth:
+		return p.auth.hints()
+	case tabSettings:
+		return p.settings.hints()
+	}
+	switch p.sect {
+	case sComposer:
+		next := "Log"
+		if len(p.messages()) > 0 {
+			next = "Saved"
+		}
+		return []ui.Hint{
+			{Key: "Esc", Label: "Tabs", Priority: 2},
+			{Key: "Tab", Label: next, Priority: 3},
+			{Key: "Ctrl-T", Label: "Format", Priority: 4},
+			{Key: "Ctrl-R", Label: "Format JSON", Priority: 5},
+			{Key: "Ctrl-X", Label: "Save message", Priority: 4},
+		}
+	case sSaved:
+		if p.rename != nil {
+			return []ui.Hint{{Key: "Enter", Label: "Save name", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
+		}
+		send := "Send"
+		if state != stOpen {
+			send = "Send (not connected)"
+		}
+		return []ui.Hint{
+			{Key: "Enter", Label: send, Priority: 1},
+			{Key: "e", Label: "Edit in composer", Priority: 3},
+			{Key: "r", Label: "Rename", Priority: 4},
+			{Key: "d", Label: "Delete", Priority: 4},
+			{Key: "Esc", Label: "Composer", Priority: 2},
+		}
+	}
+	switch {
+	case p.searching:
+		return []ui.Hint{{Key: "Enter", Label: "Keep results", Priority: 1}, {Key: "Esc", Label: "Clear", Priority: 1}}
+	case p.detail != nil:
+		return []ui.Hint{
+			{Key: "Esc", Label: "Back", Priority: 1},
+			{Key: "↑↓", Label: "Scroll", Priority: 2},
+			{Key: "←→", Label: "Message", Priority: 2},
+			{Key: "c", Label: "Copy", Priority: 3},
+		}
+	}
+	return []ui.Hint{
+		{Key: "Enter", Label: "Open", Priority: 2},
+		{Key: "↑↓", Label: "Select", Priority: 3},
+		{Key: "f", Label: "Filter", Priority: 3},
+		{Key: "/", Label: "Search", Priority: 3},
+		{Key: "c", Label: "Copy", Priority: 4},
+		{Key: "p", Label: "Ping", Priority: 5},
+		{Key: "x", Label: "Clear", Priority: 6},
+		{Key: "Esc", Label: "Composer", Priority: 2},
+	}
+}

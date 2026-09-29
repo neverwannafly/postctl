@@ -129,6 +129,34 @@ func (r *Request) validate(v *validator, path string) {
 		}
 	}
 	validateAuth(v, path, r.Auth)
+	r.WebSocket.validate(v, path)
+}
+
+func (w *WebSocketSettings) validate(v *validator, path string) {
+	if w == nil {
+		return
+	}
+	seen := map[ID]bool{}
+	for i, m := range w.Messages {
+		mp := fmt.Sprintf("%s > websocket message %d", path, i+1)
+		if !m.Format.Valid() {
+			v.addf(mp, "unknown format %q", m.Format)
+		}
+		// A hand-written message may have no id yet; the editor assigns one.
+		if m.ID != "" && seen[m.ID] {
+			v.addf(mp, "duplicate id %q", m.ID)
+		}
+		seen[m.ID] = true
+	}
+	if w.Draft != nil && !w.Draft.Format.Valid() {
+		v.addf(path+" > websocket draft", "unknown format %q", w.Draft.Format)
+	}
+	if w.PingInterval != nil && *w.PingInterval < 0 {
+		v.addf(path, "websocket pingInterval must not be negative")
+	}
+	if w.MaxMessageBytes != nil && *w.MaxMessageBytes < 0 {
+		v.addf(path, "websocket maxMessageBytes must not be negative")
+	}
 }
 
 func validateAuth(v *validator, path string, a *Auth) {
@@ -268,6 +296,7 @@ func (c *Collection) EnsureIDs() {
 			if n.ID == "" {
 				n.ID = NewID()
 			}
+			n.WebSocket.EnsureIDs()
 		}
 		return nil
 	})

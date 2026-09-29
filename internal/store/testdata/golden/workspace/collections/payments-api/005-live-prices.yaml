@@ -1,0 +1,47 @@
+id: req-ws
+name: Live prices
+description: Streams price ticks.
+kind: websocket
+url:
+  raw: wss://{{wsHost}}/prices?feed=eur
+  query:
+    - key: feed
+      value: eur
+headers:
+  - key: Origin
+    value: https://app.test
+auth:
+  type: bearer
+  bearer:
+    token: '{{token}}'
+settings:
+  verifyTLS: false
+  timeout: 10s
+websocket:
+  messages:
+    - id: msg-sub
+      name: Subscribe
+      body: |-
+        {
+          "op": "subscribe",
+          "symbol": "{{symbol}}"
+        }
+      format: json
+    - id: msg-ping
+      name: Hello
+      body: hello
+      format: text
+    - id: msg-bin
+      name: Binary blob
+      body: AQID
+      format: binary-base64
+  draft:
+    body: '{"op": "unsubscribe"}'
+    format: json
+  subprotocols:
+    - v1.prices
+    - v2.prices
+  pingInterval: 30s
+  maxMessageBytes: 1048576
+  extra:
+    note: kept

@@ -37,6 +37,10 @@ type Options struct {
 	// NewRequestPane and NewResponsePane supply the panes for the Request and
 	// Response slots. Nil selects the built-in placeholders.
 	NewRequestPane, NewResponsePane PaneFactory
+	// NewPaneForKind supplies alternative Request-slot panes for requests of
+	// other kinds (WebSocket). The pane from NewRequestPane stays the default
+	// for every kind not listed. Nil keeps a single pane for all requests.
+	NewPaneForKind map[model.Kind]PaneFactory
 	// Sender runs the send pipeline for the Request pane's send key. Nil
 	// disables sending (the pane says so). cmd/postctl supplies the engine
 	// adapter, or a fake until the engine lands.
@@ -166,6 +170,9 @@ func newApp(opts Options) *app {
 		newResp = newResponsePlaceholder
 	}
 	a.request, a.response = newReq(env), newResp(env)
+	if len(opts.NewPaneForKind) > 0 {
+		a.request = newKindRouter(env, a.request, opts.NewPaneForKind)
+	}
 	a.registry.AddFunc(a.builtinActions)
 	a.registry.AddFunc(a.paneActions)
 	a.registry.AddFunc(a.screenActions)

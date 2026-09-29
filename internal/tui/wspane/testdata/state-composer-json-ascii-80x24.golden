@@ -1,0 +1,24 @@
+  WS      {{baseUrl}}/stream?channel=btc Connect                                
+  o Not connected                                                        Unsaved
+Messages(3)  Params(1)  Headers(1)  Auth  Settings                              
+===========---------------------------------------------------------------------
+> Message                                                          JSON  + valid
+{"op":"sub","ids":[1,2]}                                                        
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+  Saved  3                                                                      
+> subscribe                   {"type":"subscribe","channel":"btc"}          JSON
+  heartbeat                   ping                                          text
+  auth                        {"type":"auth","token":"{{token}}"}           JSON
+  Log                                                                           
+  No messages yet                                                               
+  Connect with Ctrl-S, then send a message. Everything sent and received is     
+  listed here.                                                                  
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                

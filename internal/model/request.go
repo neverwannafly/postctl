@@ -42,6 +42,9 @@ type Request struct {
 	Scripts Scripts `yaml:"scripts,omitempty"`
 	// Settings are per-request transport overrides.
 	Settings RequestSettings `yaml:"settings,omitempty"`
+	// WebSocket holds the WebSocket-only settings and saved messages of a
+	// [KindWebSocket] request; nil for other kinds.
+	WebSocket *WebSocketSettings `yaml:"websocket,omitempty"`
 	// Examples are saved responses (Postman: response[]).
 	Examples []Example `yaml:"examples,omitempty"`
 	// Extra preserves unknown request-level fields (for example Postman's
