@@ -132,7 +132,7 @@ func (f *fakeBackend) savedState() store.State {
 
 // harness drives an app like the Bubble Tea runtime would, but synchronously.
 type harness struct {
-	t    *testing.T
+	t    testing.TB
 	a    *app
 	be   *fakeBackend
 	quit bool
@@ -142,7 +142,7 @@ type harnessOpt func(*Options)
 
 // newHarness builds an app over a fake backend, sizes it, loads the workspace
 // and settles all commands.
-func newHarness(t *testing.T, ws *model.Workspace, w, h int, opts ...harnessOpt) *harness {
+func newHarness(t testing.TB, ws *model.Workspace, w, h int, opts ...harnessOpt) *harness {
 	t.Helper()
 	be := newFake(ws)
 	o := Options{Backend: be, NoWatch: true}
@@ -345,4 +345,21 @@ var errBoom = errors.New("disk on fire")
 // brokenFile builds a load problem for a file under root.
 func brokenFile(root, rel, reason string) *store.FileError {
 	return &store.FileError{Path: filepath.Join(root, rel), Err: errors.New(reason)}
+}
+
+func largeWorkspace() *model.Workspace { return tuitest.Large(1000) }
+
+func sizeMsg(w, h int) tea.WindowSizeMsg { return tea.WindowSizeMsg{Width: w, Height: h} }
+
+// newHarnessWith is newHarness over a prepared fake backend.
+func newHarnessWith(t testing.TB, be *fakeBackend, w, h int, opts ...harnessOpt) *harness {
+	t.Helper()
+	o := Options{Backend: be, NoWatch: true}
+	for _, f := range opts {
+		f(&o)
+	}
+	hs := &harness{t: t, a: newApp(o), be: be}
+	hs.msg(tea.WindowSizeMsg{Width: w, Height: h})
+	hs.run(hs.a.Init())
+	return hs
 }
