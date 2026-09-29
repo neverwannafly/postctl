@@ -497,3 +497,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Both post-merge build/race/lint gates passed. Local-server CLI smoke passed (`ls` 2 lines, `send` exit 0, `run` exit 0, one JUnit suite). Private checks passed using temporary workspaces and `--keep-literal-secrets`: local dry-run found 2 collections, 11 folders, 23 requests, 17 pre-request scripts and 3 environments; staging import produced 36 flat items. At 140x40, help lists `R`, `H` and `Ctrl-E`; each opens its documented screen, and a collection run reached the summary.
 - Blockers / questions: QA follow-ups are TUI runner JUnit export and the pre-existing task to move envedit, cookies and textarea scroll-offset adjustment out of `View`.
 - Next: Remove finished worktrees, run the final full gate, and record DONE.
+
+### 2026-09-30 03:30 IST · INT2 · GPT-5.6 Sol · DONE
+- Branch/worktree: `main` in `/Users/shubham/work/postctl`
+- Did: Committed the Wave 4 briefs; scope-checked and merged WS7 then WS6c; marked both status rows “Done, merged to main”; fixed the TUI help integration; and removed the finished `ws7-cli` and `ws6c-runner-history` worktrees. WS9 was not merged or modified.
+- Files: `docs/briefs/{WS6c-runner-history-tui,WS7-cli,WS9-websocket,INT2-integration}.md`, merged WS7/WS6c files, `internal/tui/keys.go`, `internal/tui/testdata/golden/help-*.golden`, `docs/ledger.md`
+- Decisions: The TUI runner remains JSON-only because the CLI JUnit implementation is private and CLI-coupled; extracting a shared reporter is deferred to QA.
+- Tests: Final `go build ./... && go test -race ./... && golangci-lint run` passed. CLI local-server smoke passed (`ls` 2 lines, `send` and `run` exit 0, valid JUnit with one suite). Privacy-safe local dry-run and private staging import passed with the counts recorded above, using temporary workspaces and no Keychain writes. At 140x40 the help lists and opens `R` runner, `H` history and `Ctrl-E` environment editor; a demo collection run reached its rendered summary.
+- Blockers / questions: QA follow-ups: extract a reusable JUnit reporter for TUI runner export; move envedit, cookies and textarea scroll-offset adjustment out of `View`.
+- Next: none
