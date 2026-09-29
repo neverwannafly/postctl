@@ -131,3 +131,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-29 23:38 IST · WS0.1 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/0-scaffold
+- Did: Read plan §0 D1–D4. Scope: `store.LoadLenient`, deep `Clone`/`CloneFresh` on model types, `--workspace`/`POSTCTL_WORKSPACE` in `store.Discover`, docs/model.md.
+- Files: `docs/ledger.md`
+- Decisions: none yet.
+- Tests: n/a
+- Blockers / questions: none
+- Next: Clone, LoadLenient, Discover options, docs.
