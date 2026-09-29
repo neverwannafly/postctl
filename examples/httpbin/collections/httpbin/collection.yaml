@@ -1,0 +1,8 @@
+schemaVersion: 1
+id: coll-httpbin
+name: HTTPBin
+description: Sample collection demonstrating HTTP methods, bodies, authentication, scripts, and runner flow.
+order:
+  - methods
+  - auth
+  - runner-flow

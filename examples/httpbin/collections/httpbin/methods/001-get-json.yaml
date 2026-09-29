@@ -1,0 +1,12 @@
+id: req-get-json
+name: GET with query
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/get?filter=active'
+  query:
+    - key: filter
+      value: active
+scripts:
+  test:
+    file: 001-get-json.test.js

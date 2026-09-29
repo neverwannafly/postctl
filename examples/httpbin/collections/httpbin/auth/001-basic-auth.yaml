@@ -1,0 +1,14 @@
+id: req-basic-auth
+name: Basic auth
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/basic-auth/{{username}}/{{password}}'
+auth:
+  type: basic
+  basic:
+    username: '{{username}}'
+    password: '{{password}}'
+scripts:
+  test:
+    file: 001-basic-auth.test.js

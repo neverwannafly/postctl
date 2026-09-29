@@ -1,0 +1,16 @@
+schemaVersion: 1
+id: env-httpbin
+name: httpbin
+variables:
+  - key: baseUrl
+    value: https://httpbin.org
+  - key: token
+    type: secret
+    secretRef: env/env-httpbin/token
+  - key: username
+    value: postctl
+  - key: password
+    value: secretpassword
+  - key: hmacSecret
+    type: secret
+    secretRef: env/env-httpbin/hmacSecret

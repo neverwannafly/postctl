@@ -1,0 +1,9 @@
+id: req-step-skip
+name: Step skip
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/get?step=skip'
+scripts:
+  test:
+    file: 002-step-skip.test.js

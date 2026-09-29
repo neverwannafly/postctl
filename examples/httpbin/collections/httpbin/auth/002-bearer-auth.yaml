@@ -1,0 +1,13 @@
+id: req-bearer-auth
+name: Bearer auth
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/bearer'
+auth:
+  type: bearer
+  bearer:
+    token: '{{token}}'
+scripts:
+  test:
+    file: 002-bearer-auth.test.js

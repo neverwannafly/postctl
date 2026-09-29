@@ -1,0 +1,7 @@
+id: fold-runner-flow
+name: Runner flow
+description: Demonstrates setNextRequest flow control for the collection runner.
+order:
+  - 001-step-start
+  - 002-step-skip
+  - 003-step-finish

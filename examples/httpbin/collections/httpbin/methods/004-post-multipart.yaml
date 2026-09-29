@@ -1,0 +1,19 @@
+id: req-post-multipart
+name: POST multipart form
+kind: http
+method: POST
+url:
+  raw: '{{baseUrl}}/post'
+body:
+  mode: formdata
+  formData:
+    - key: description
+      type: text
+      value: sample multipart upload
+    - key: file
+      type: file
+      src: fixtures/sample.txt
+      contentType: text/plain
+scripts:
+  test:
+    file: 004-post-multipart.test.js

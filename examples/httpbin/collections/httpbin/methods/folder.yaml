@@ -1,0 +1,8 @@
+id: fold-methods
+name: Methods
+description: GET and POST requests with various body formats.
+order:
+  - 001-get-json
+  - 002-post-json
+  - 003-post-form
+  - 004-post-multipart

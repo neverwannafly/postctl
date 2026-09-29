@@ -1,0 +1,7 @@
+id: fold-auth
+name: Authentication
+description: Bearer, Basic, and HMAC signing examples using variables.
+order:
+  - 001-basic-auth
+  - 002-bearer-auth
+  - 003-hmac-auth

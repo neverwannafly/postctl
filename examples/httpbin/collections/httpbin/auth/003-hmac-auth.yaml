@@ -1,0 +1,11 @@
+id: req-hmac-auth
+name: HMAC signature
+kind: http
+method: GET
+url:
+  raw: '{{baseUrl}}/headers'
+scripts:
+  preRequest:
+    file: 003-hmac-auth.pre.js
+  test:
+    file: 003-hmac-auth.test.js
