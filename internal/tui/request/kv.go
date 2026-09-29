@@ -434,7 +434,7 @@ func (k *kvView) editKey(p *Pane, m tea.KeyPressMsg, items []kvItem) (bool, bool
 		k.addRow(p, items)
 		return true, true, nil
 	case "shift+tab":
-		if k.col > 0 && !(items[k.cur].path && k.col == 1) {
+		if k.col > 0 && (!items[k.cur].path || k.col != 1) {
 			k.beginEdit(p, items, k.col-1)
 		}
 		return true, false, nil

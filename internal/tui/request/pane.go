@@ -175,7 +175,6 @@ type Pane struct {
 	coll  *model.Collection
 	chain []model.Container
 	sc    *scope
-	scRaw *scope // secrets revealed; only built inside commands
 
 	zone zone
 	tab  tabID
@@ -270,7 +269,6 @@ func (p *Pane) Blur() {
 }
 
 // hasRequest reports whether a request is open for editing.
-func (p *Pane) hasRequest() bool { return p.req != nil }
 
 // Update implements tui.Pane.
 func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {

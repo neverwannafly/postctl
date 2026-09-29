@@ -1,3 +1,5 @@
+// Package request is the Request pane: the URL bar, the seven tabs, autosave,
+// undo, the OAuth 2.0 flow, curl copy and import, and the send wiring.
 package request
 
 import (
@@ -253,14 +255,13 @@ func (p *Pane) Actions() []tui.Action {
 			}},
 	}
 	for i := range numTabs {
-		t := tabID(i)
 		acts = append(acts, tui.Action{
 			ID: "request.tab." + strings.ToLower(tabNames[i]), Title: "Go to " + tabNames[i] + " tab", Group: "Request", Enabled: ok,
 			Run: func() tea.Cmd {
 				p.stopViews()
-				p.tab = t
+				p.tab = i
 				p.setZone(zBody)
-				p.views[t].enter(p)
+				p.views[i].enter(p)
 				return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
 			},
 		})

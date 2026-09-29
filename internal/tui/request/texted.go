@@ -85,8 +85,6 @@ func (e *textEditor) focus() {
 
 func (e *textEditor) blur() { e.ta.Blur() }
 
-func (e *textEditor) focused() bool { return e.ta.Focused() }
-
 // update applies a message and reports whether the text changed.
 func (e *textEditor) update(msg tea.Msg) bool {
 	before := e.ta.Value()
@@ -105,9 +103,6 @@ func (e *textEditor) pos() (line, col int) { return e.ta.Line() + 1, e.ta.Column
 func (e *textEditor) insertText(s string) {
 	e.ta.InsertString(s)
 }
-
-// atTop reports whether the cursor is on the first line.
-func (e *textEditor) atTop() bool { return e.ta.Line() == 0 }
 
 // lineCount is the number of lines.
 func (e *textEditor) lineCount() int { return strings.Count(e.ta.Value(), "\n") + 1 }

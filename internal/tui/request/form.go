@@ -53,8 +53,6 @@ func (f *form) reset() {
 	f.reveal = false
 }
 
-func (f *form) editing() bool { return f.edit }
-
 // selectable reports whether the cursor may rest on the row.
 func selectable(r formRow) bool { return r.kind != rowInfo }
 
@@ -81,18 +79,6 @@ func (f *form) clamp(rows []formRow) {
 	}
 }
 
-func (f *form) atTop(rows []formRow) bool {
-	if f.edit {
-		return false
-	}
-	for i := 0; i < f.cur && i < len(rows); i++ {
-		if selectable(rows[i]) {
-			return false
-		}
-	}
-	return true
-}
-
 // step moves the cursor to the next selectable row in dir.
 func (f *form) step(rows []formRow, dir int) bool {
 	for i := f.cur + dir; i >= 0 && i < len(rows); i += dir {
@@ -102,11 +88,6 @@ func (f *form) step(rows []formRow, dir int) bool {
 		}
 	}
 	return false
-}
-
-func isRef(s string) bool {
-	m := varRE.FindString(s)
-	return m != "" && strings.TrimSpace(s) == m
 }
 
 func (f *form) maskFor(r formRow, text string) bool {
@@ -269,17 +250,15 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	}
 	switch r.kind {
 	case rowChoice:
-		v := r.value
 		if focused && p.zone == zBody {
 			l, rt := "‹", "›"
 			if th.ASCII {
 				l, rt = "<", ">"
 			}
-			v = th.Render(ui.TextQuiet, l) + " " + th.Render(ui.TextPrimary, r.value) + " " + th.Render(ui.TextQuiet, rt)
+			val = th.Render(ui.TextQuiet, l) + " " + th.Render(ui.TextPrimary, r.value) + " " + th.Render(ui.TextQuiet, rt)
 		} else {
-			v = th.Render(ui.TextPrimary, r.value)
+			val = th.Render(ui.TextPrimary, r.value)
 		}
-		val = v
 	case rowText:
 		switch {
 		case focused && f.edit && f.in != nil:
@@ -305,7 +284,7 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	if editNote != "" {
 		line += th.Render(ui.StatusWarning, editNote)
 	}
-	if r.note != "" && !(focused && f.edit) {
+	if r.note != "" && (!focused || !f.edit) {
 		room := valW - ui.Width(val)
 		note := " " + r.note
 		if room >= ui.Width(note)+1 {

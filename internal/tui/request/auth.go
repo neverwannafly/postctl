@@ -1,8 +1,6 @@
 package request
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/ui"
@@ -156,20 +154,19 @@ func (a *authView) rows(p *Pane) []formRow {
 	switch t {
 	case model.AuthInherit:
 		eff, src := p.inheritedAuth()
-		switch {
-		case eff == nil:
+		if eff == nil {
 			rows = append(rows,
 				formRow{label: "Effective", kind: rowInfo, value: "No Auth"},
 				formRow{label: "", kind: rowInfo, value: "Nothing above sets authentication, so none is sent."})
-		default:
-			label := authLabel(eff.Type)
-			if eff.Type == model.AuthUnsupported {
-				label = "Unsupported (" + eff.OriginalType + ")"
-			}
-			rows = append(rows,
-				formRow{label: "Effective", kind: rowInfo, value: label},
-				formRow{label: "From", kind: rowInfo, value: src})
+			break
 		}
+		label := authLabel(eff.Type)
+		if eff.Type == model.AuthUnsupported {
+			label = "Unsupported (" + eff.OriginalType + ")"
+		}
+		rows = append(rows,
+			formRow{label: "Effective", kind: rowInfo, value: label},
+			formRow{label: "From", kind: rowInfo, value: src})
 	case model.AuthNone:
 		rows = append(rows, formRow{label: "", kind: rowInfo, value: "No authentication is sent, and nothing is inherited."})
 	case model.AuthBearer:
@@ -270,10 +267,4 @@ func (a *authView) hints(p *Pane) []ui.Hint {
 		hs = append(hs, ui.Hint{Key: "g", Label: "Get token", Priority: 2})
 	}
 	return hs
-}
-
-// hasSecrets is used by tests: whether a literal secret value would be
-// displayed with the current reveal state.
-func (a *authView) shown(p *Pane, s string) bool {
-	return a.f.reveal || strings.Contains(s, "{{")
 }
