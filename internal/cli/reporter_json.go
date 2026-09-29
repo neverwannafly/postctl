@@ -72,6 +72,9 @@ func (r *jsonReporter) finished(e engine.RequestFinished) map[string]any {
 	doc["path"] = o.Path
 	doc["durationMs"] = durationMS(o.Duration)
 	doc["skipped"] = o.Skipped
+	if o.SkipReason != "" {
+		doc["skipReason"] = o.SkipReason
+	}
 	if o.Response != nil {
 		doc["status"] = o.Response.StatusCode
 		doc["statusText"] = o.Response.Status

@@ -785,7 +785,13 @@ func (m *Model) renderRow(r row, sel bool) string {
 		spin := t.Render(ui.StatusInfo, "… "+t.Truncate(r.step, 30))
 		line += "  " + spin
 	case stDone:
-		if r.errText != "" {
+		if r.outcome != nil && r.outcome.Skipped {
+			label := "Skipped"
+			if r.outcome.SkipReason != "" {
+				label += ": " + r.outcome.SkipReason
+			}
+			line += "  " + t.Render(ui.StatusWarning, t.Truncate(label, 42))
+		} else if r.errText != "" {
 			line += "  " + t.Render(ui.StatusDanger, "× Failed")
 		} else if r.status > 0 {
 			line += "  " + t.Render(ui.StatusSuccess, fmt.Sprintf("%d", r.status))
@@ -812,6 +818,7 @@ func (m *Model) viewSummary() string {
 	lines := []string{
 		fmt.Sprintf("Iterations  %d", s.Iterations),
 		fmt.Sprintf("Requests    %d", s.Requests),
+		fmt.Sprintf("Skipped     %d", s.Skipped),
 		fmt.Sprintf("Tests       %d passed, %d failed", s.Tests.Passed, s.Tests.Failed),
 		fmt.Sprintf("Duration    %s", s.TotalTime.Truncate(time.Millisecond)),
 	}

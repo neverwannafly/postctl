@@ -177,6 +177,9 @@ reverted on disk. Environment and globals writes are not affected.
 - **Delay** is the pause between requests (not before the first).
 - **Cancellation.** The context ends the run (`StopCancelled`); the in-flight
   request is cancelled and is not counted as a transport error.
+- **WebSocket requests.** Runs list them as skipped with the reason
+  "WebSocket requests are not run". They do not execute scripts or count as
+  requests, failures or transport errors.
 
 ### Events
 

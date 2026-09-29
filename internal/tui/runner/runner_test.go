@@ -101,6 +101,25 @@ func TestTransportErrorEvent(t *testing.T) {
 	}
 }
 
+func TestWebSocketSkipAppearsInLiveAndSummaryViews(t *testing.T) {
+	m := New(testEnv(80, 24), Deps{Runner: &fakerun.Runner{}})
+	m.SetSize(80, 24)
+	m.phase = phLive
+	m.ensureRow("ws-1", "WS", "Events")
+	m.finishRow(&engine.Outcome{
+		RequestID: "ws-1", RequestName: "Events", Skipped: true,
+		SkipReason: engine.WebSocketSkipReason,
+	})
+	if got := ansi.Strip(m.View()); !strings.Contains(got, engine.WebSocketSkipReason) {
+		t.Fatalf("live view did not show skip reason:\n%s", got)
+	}
+	m.phase = phSummary
+	m.summary = &engine.RunSummary{Iterations: 1, Skipped: 1}
+	if got := ansi.Strip(m.View()); !strings.Contains(got, "Skipped     1") {
+		t.Fatalf("summary did not show skipped count:\n%s", got)
+	}
+}
+
 func TestCancelRun(t *testing.T) {
 	fr := &fakerun.Runner{
 		Scripts: []fakerun.Script{{Name: "Slow", Method: "GET", Steps: []string{"Waiting for response"}, Delay: 50 * time.Millisecond}},

@@ -111,6 +111,7 @@ func (r *cliReporter) writeSummary(sum *engine.RunSummary) {
 	rows := [][3]string{
 		{"iterations", fmt.Sprintf("%d", sum.Iterations), fmt.Sprintf("%d", failedIterationCount(sum))},
 		{"requests", fmt.Sprintf("%d", sum.Requests), fmt.Sprintf("%d", failedRequestCount(sum))},
+		{"skipped", fmt.Sprintf("%d", sum.Skipped), "0"},
 		{"test-scripts", fmt.Sprintf("%d", r.testN), fmt.Sprintf("%d", r.testFail)},
 		{"prerequest-scripts", fmt.Sprintf("%d", r.preN), fmt.Sprintf("%d", r.preFail)},
 		{"assertions", fmt.Sprintf("%d", sum.Tests.Total()), fmt.Sprintf("%d", sum.Tests.Failed)},

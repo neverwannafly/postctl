@@ -60,11 +60,24 @@ func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
 		seconds = o.Response.Timings.Total.Seconds()
 	}
 	timeAttr := fmt.Sprintf("%.3f", seconds)
+	if o.Skipped {
+		msg := o.SkipReason
+		if msg == "" {
+			msg = "skipped"
+		}
+		s.Cases = append(s.Cases, junitCase{
+			Name: "request", ClassName: name, Time: timeAttr,
+			Skipped: &junitSkipped{Message: msg},
+		})
+		s.Tests++
+		s.Skipped++
+	}
 	for _, t := range o.Tests {
 		tc := junitCase{Name: t.Name, ClassName: name, Time: timeAttr}
 		switch {
 		case t.Skipped:
 			tc.Skipped = &junitSkipped{Message: "skipped"}
+			s.Skipped++
 		case !t.Passed:
 			msg := r.a.mask(t.Message)
 			tc.Failure = &junitFailure{Message: msg, Type: "assertion", Text: msg}
@@ -100,6 +113,7 @@ func (r *junitReporter) write(sum *engine.RunSummary) error {
 	for _, s := range r.suites {
 		doc.Tests += s.Tests
 		doc.Failures += s.Failures
+		doc.Skipped += s.Skipped
 		doc.Suites = append(doc.Suites, s)
 	}
 	if sum != nil {
@@ -122,6 +136,7 @@ type junitSuites struct {
 	Name     string       `xml:"name,attr"`
 	Tests    int          `xml:"tests,attr"`
 	Failures int          `xml:"failures,attr"`
+	Skipped  int          `xml:"skipped,attr"`
 	Time     string       `xml:"time,attr"`
 	Suites   []junitSuite `xml:"testsuite"`
 }
@@ -131,6 +146,7 @@ type junitSuite struct {
 	Name     string      `xml:"name,attr"`
 	Tests    int         `xml:"tests,attr"`
 	Failures int         `xml:"failures,attr"`
+	Skipped  int         `xml:"skipped,attr"`
 	Time     string      `xml:"time,attr,omitempty"`
 	Cases    []junitCase `xml:"testcase"`
 }

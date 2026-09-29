@@ -1,6 +1,7 @@
 postctl  demo — Run summary                                            env  none
 ────────────────────────────────────────────────────────────────────────────────Iterations  1
 Requests    2
+Skipped     0
 Tests       3 passed, 1 failed
 Duration    1.2s
 

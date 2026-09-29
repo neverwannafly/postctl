@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 )
@@ -306,6 +307,62 @@ func TestRunReportersBailAndCancel(t *testing.T) {
 	code, _, errOut = exec(st, "run", "Payments/List charges")
 	if code != ExitUsage || !strings.Contains(errOut, "takes a collection or folder") {
 		t.Fatalf("run request: %d %q", code, errOut)
+	}
+}
+
+func TestWebSocketSendIsRejectedAndRunReportersSkip(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	t.Cleanup(srv.Close)
+	st := demoWorkspace(t, srv)
+	ws, err := st.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := model.NewWebSocketRequest("Events", "wss://socket.example.test/events")
+	stream.ID = "req-events"
+	ws.Collections[0].Items = append(ws.Collections[0].Items, stream)
+	if err := st.SaveCollection(context.Background(), ws.Collections[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	code, _, errOut := exec(st, "send", "Payments/Events")
+	const sendMessage = "Open WebSocket requests in the TUI; `postctl send` supports HTTP requests."
+	if code != ExitUsage || !strings.Contains(errOut, sendMessage) {
+		t.Fatalf("send: code=%d stderr=%q", code, errOut)
+	}
+
+	dir := t.TempDir()
+	jsonPath := filepath.Join(dir, "run.json")
+	xmlPath := filepath.Join(dir, "run.xml")
+	code, out, errOut := exec(st, "run", "Payments", "--reporter", "cli,json,junit",
+		"--reporter-json-export", jsonPath, "--reporter-junit-export", xmlPath)
+	if code != ExitOK || errOut != "" {
+		t.Fatalf("run: code=%d stderr=%q\n%s", code, errOut, out)
+	}
+	if !strings.Contains(out, engine.WebSocketSkipReason) || !strings.Contains(out, "skipped") {
+		t.Fatalf("CLI reporter did not list the skip:\n%s", out)
+	}
+	rawJSON, err := os.ReadFile(jsonPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rawJSON), `"skipped":true`) ||
+		!strings.Contains(string(rawJSON), `"skipReason":"`+engine.WebSocketSkipReason+`"`) {
+		t.Fatalf("JSON reporter did not mark the request skipped:\n%s", rawJSON)
+	}
+	rawXML, err := os.ReadFile(xmlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var suites junitSuites
+	if err := xml.Unmarshal(rawXML, &suites); err != nil {
+		t.Fatal(err)
+	}
+	if suites.Skipped != 1 || !strings.Contains(string(rawXML), engine.WebSocketSkipReason) {
+		t.Fatalf("JUnit reporter did not mark the request skipped:\n%s", rawXML)
 	}
 }
 
