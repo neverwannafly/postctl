@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,7 +54,7 @@ func (s *Store) lock() (unlock func(), err error) {
 	}
 	for {
 		err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX)
-		if err != syscall.EINTR {
+		if !errors.Is(err, syscall.EINTR) {
 			break
 		}
 	}
