@@ -16,6 +16,7 @@ import (
 
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/response"
 )
 
 // version is set at build time: go build -ldflags "-X main.version=1.2.3".
@@ -138,9 +139,10 @@ func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
 		return exitUsage
 	}
 	err = launchUI(tui.Options{
-		Backend:    tui.NewStoreBackend(root, store.WithSecretStore(store.NewKeychain(""))),
-		Accessible: accessible,
-		ASCII:      ascii,
+		Backend:         tui.NewStoreBackend(root, store.WithSecretStore(store.NewKeychain(""))),
+		Accessible:      accessible,
+		ASCII:           ascii,
+		NewResponsePane: response.New,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "Could not run the interactive UI: %v. It needs a terminal; for scripts use the subcommands (postctl --help).\n", err)
