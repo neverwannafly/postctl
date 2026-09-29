@@ -17,8 +17,7 @@ import (
 // from the jar's public API: Get, Set, List and Delete.
 //
 // The adapter is safe for concurrent use because the jar is. A nil jar yields
-// an adapter whose reads are empty and whose writes fail the same way a nil
-// [script.CookieAccess] would.
+// a nil interface, which scripts treat as "no cookie store".
 func NewCookieAccess(jar *httpx.CookieJar) script.CookieAccess {
 	if jar == nil {
 		return nil
