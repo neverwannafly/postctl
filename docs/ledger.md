@@ -24,7 +24,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-30 00:10 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
-| WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
+| WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-29 23:41 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
 | WS4 engine/runner | — | Not started | — | — |
@@ -131,3 +131,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-29 23:41 IST · WS2b · Grok 4.7 · STARTED
+- Branch/worktree: ws/2b-oauth2
+- Did: Read the WS2b brief, plan §0 (R2, D2), model rule 6, `OAuth2Config` / `OAuth2Token`, `SecretStore` / `HydrateAuth`, the httpx contract, and the prod-console-tui loopback login. Starting `internal/oauth2` only.
+- Files: `docs/ledger.md`
+- Decisions: Standard library only (`golang.org/x/oauth2` would hide PKCE, loopback, implicit fragment delivery, and the no-auto-refresh rule, and a new dependency cannot be recorded in `docs/tui-stack.md` from this workstream). Token secrets use the store's JSON shape (`access`, `refresh`, `id`) so `HydrateAuth` can read them. `Source.Token` matches the forthcoming `httpx.TokenSource` signature without importing httpx.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Implement grant fetches, loopback, and the cached token source.
