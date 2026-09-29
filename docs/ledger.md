@@ -22,7 +22,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | Plan | Orchestrator | Draft v0, awaiting user answers | — | 2026-09-29 |
 | WS0 scaffold/model/store | — | Not started | — | — |
 | WS1 Postman importer | — | Not started | — | — |
-| WS1b Postman local extractor | GPT-5.6 Sol | Started | ws/1b-postman-local | 2026-09-29 23:09 IST |
+| WS1b Postman local extractor | GPT-5.6 Sol | Done | ws/1b-postman-local | 2026-09-29 23:49 IST |
 | WS2 vars + httpx | — | Not started | — | — |
 | WS3 script runtime | — | Not started | — | — |
 | WS4 engine/runner | — | Not started | — | — |
@@ -64,3 +64,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: A privacy-safe spike decoded current records without exposing values. Current live-cache probe found 2 root collections, 11 folders, 29 requests, 17 pre-request scripts, 0 test scripts, 3 environments, and no live globals record.
 - Blockers / questions: The cache is partial. External blob values are identifiable but were not needed by current live collection/environment records.
 - Next: Implement and test the package, staging writer, coverage report, and development CLI.
+
+### 2026-09-29 23:46 IST · WS1b · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/1b-postman-local
+- Did: Implemented active-partition discovery, mandatory private copying, LevelDB metadata scanning, IndexedDB/Blink/V8/Snappy/blob decoding, v3 collection-tree conversion, environment/globals conversion, structural v2.1 validation, staging output, coverage reporting, and the development CLI.
+- Files: `internal/importer/postmanlocal/`, `cmd/postman-extract/`, `docs/postman-local-format.md`
+- Decisions: Coverage counts requests containing each script kind, not raw script blocks. Partial request records lacking required method/name fields are omitted and counted as unresolved.
+- Tests: Synthetic decoder, key-prefix, blob metadata, tree/script, locate, validation, and staging tests pass; private-data test skips unless its fixture directory exists.
+- Blockers / questions: None.
+- Next: Run the real private staging acceptance check and full build/race/lint suite.
+
+### 2026-09-29 23:49 IST · WS1b · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/1b-postman-local
+- Did: Ran the extractor on the active Postman partition and wrote validated JSON to the gitignored private staging directory. Final live-cache coverage is 2 collections, 11 folders, 23 emitted requests, 17 requests with pre-request scripts, 0 with test scripts, 3 environments, and 0 live globals records; 6 partial request references were reported unresolved.
+- Files: `docs/ledger.md`; real output only under gitignored `testdata/private/staging/`
+- Decisions: The six partial requests are not emitted as malformed v2.1 items. The absence of test scripts and globals is reported as cache coverage, not inferred data.
+- Tests: `go build ./...` passed; `go test -race ./...` passed; `golangci-lint run ./internal/importer/postmanlocal/... ./cmd/postman-extract/...` passed with 0 issues.
+- Blockers / questions: Known cache gaps are documented; use Postman File → Export when uncached resources are required.
+- Next: none
