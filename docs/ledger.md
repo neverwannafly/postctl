@@ -31,7 +31,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Done, merged to main | ws/6a-request-editor | 2026-09-30 02:15 IST |
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
-| WS7 CLI | — | Not started | — | — |
+| WS7 CLI | Grok 4.7 (high, fast) | Done | ws/7-cli | 2026-09-30 02:49 IST |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
 
@@ -434,3 +434,30 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Final `go build ./... && go test -race ./... && golangci-lint run` passed.
 - Blockers / questions: none. Existing QA follow-up remains: move envedit, cookies and textarea scroll-offset adjustment out of `View` and into `Update`.
 - Next: WS7 can build CLI send/run against the merged engine.
+
+### 2026-09-30 02:24 IST · WS7 · Grok 4.7 · STARTED
+- Branch/worktree: ws/7-cli
+- Did: Read the WS7 brief, plan §0 and §9, engine, model, design language, AGENTS and the ledger. Created the worktree from main and started the linear CLI (`ls`, `send`, `run`, `env`, `curl`).
+- Files: `docs/ledger.md`
+- Decisions: CLI stays a thin client of `engine.Send` / `engine.Run` with the same engine construction as `cmd/postctl/wire.go`. Strict `store.Load`. No edits to WS6c or WS9 files.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Implement each command and reporters.
+
+### 2026-09-30 02:40 IST · WS7 · Grok 4.7 · PROGRESS
+- Branch/worktree: ws/7-cli
+- Did: Landed `internal/cli` and the `ls`/`send`/`run`/`env`/`curl` dispatch in `cmd/postctl/main.go`. Path resolution, masking, cli/json/junit reporters, and tests against httptest plus a temp workspace are in place.
+- Files: `internal/cli/**`, `cmd/postctl/main.go`, `cmd/postctl/main_test.go`
+- Decisions: (1) `--json` on `run` selects the NDJSON reporter and does not also run the cli reporter. (2) Combining reporters requires an export path so only one writer owns stdout. (3) `--no-scripts` and `--timeout-request` clone the model and clear scripts or set `Settings.Timeout`; the engine has no separate flags for those. (4) A canceled run whose summary exit code is 0 exits 2. (5) `env get` is an alias of `env show`. (6) `env show --reveal` confirms only when stdin is a terminal.
+- Tests: `go test ./internal/cli ./cmd/postctl` green. Package lint green after unexporting reporter methods and dropping an unused helper.
+- Blockers / questions: None.
+- Next: `docs/cli.md`, full `go build`, race tests and `golangci-lint run`.
+
+### 2026-09-30 02:49 IST · WS7 · Grok 4.7 · DONE
+- Branch/worktree: ws/7-cli (not merged, not pushed)
+- Did: Shipped the linear CLI: `ls`, `send`, `run` (cli, NDJSON and JUnit reporters), `env` and `curl`, plus `docs/cli.md`. Dispatch lives in `cmd/postctl/main.go`. `import` and `wire.go` are unchanged.
+- Files: `internal/cli/**`, `cmd/postctl/main.go`, `cmd/postctl/main_test.go`, `docs/cli.md`, `docs/ledger.md`
+- Decisions: see the PROGRESS entry. Also: `send` always masks secrets (no `--reveal` on send). Pretty-printed JSON bodies only when stdout is a terminal. Hawk auth is not rendered as curl flags. A single path segment that matches no collection is a tree-wide unique-name search; a collection of that name wins.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). CLI tests cover path ambiguity and case, exit codes 0/1/2/3, reporter text, NDJSON and JUnit structure, bail, cancel during `--delay`, CSV iterations, secret masking (`--reveal` and `curl --with-secrets` only), `--no-history`, and a read-only `ls` of `testdata/private/staging` when that directory is present (names and counts only).
+- Blockers / questions: None.
+- Next: none.

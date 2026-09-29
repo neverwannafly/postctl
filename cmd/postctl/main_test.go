@@ -32,7 +32,7 @@ func TestHelp(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("%v: code %d", args, code)
 		}
-		for _, want := range []string{"postctl import", "postctl ls", "postctl send", "postctl run", "postctl env", "--version"} {
+		for _, want := range []string{"postctl import", "postctl ls", "postctl send", "postctl run", "postctl env", "postctl curl", "--version"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("%v: help lacks %q", args, want)
 			}
@@ -40,13 +40,9 @@ func TestHelp(t *testing.T) {
 	}
 }
 
-func TestStubsExitThree(t *testing.T) {
-	for _, c := range []string{"ls", "send", "run", "env"} {
-		code, out, errOut := runCLI(c, "x")
-		if code != 3 || out != "" || !strings.Contains(errOut, "not implemented yet") {
-			t.Errorf("%s: code=%d out=%q err=%q", c, code, out, errOut)
-		}
-		code, out, _ = runCLI(c, "--help")
+func TestCommandHelp(t *testing.T) {
+	for _, c := range []string{"ls", "send", "run", "env", "curl"} {
+		code, out, _ := runCLI(c, "--help")
 		if code != 0 || !strings.Contains(out, "Usage: postctl "+c) {
 			t.Errorf("%s --help: code=%d out=%q", c, code, out)
 		}
