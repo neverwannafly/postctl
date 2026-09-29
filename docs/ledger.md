@@ -25,7 +25,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
-| WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, awaiting merge | ws/0-scaffold | 2026-09-29 23:43 IST |
+| WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
@@ -149,3 +149,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green.
 - Blockers / questions: none.
 - Next: merge `ws/0-scaffold`. WS5 can call `store.LoadLenient`; the CLI/WS1/WS5 wire `--workspace` via `store.WithWorkspace`.
+
+### 2026-09-29 23:45 IST · WS0.1 · Orchestrator · PROGRESS
+- Did: Verified that `ws/0-scaffold` (WS0.1) touched only model/store/docs, then merged it into `main` (5c590dd). Build, race tests and lint are green.
+- Decisions: Accepted WS0.1's unrequested safeguard: saves never delete files that failed a lenient load. WS2 and WS5 branched before this merge. When they merge, swap WS2's local copy helper for `Request.Clone` and WS5's `Load` adapter for `LoadLenient`, and wire `store.WithWorkspace` into `--workspace`.
+- Next: Keep waiting on WS1, WS2, WS2b, WS3 and WS5.
