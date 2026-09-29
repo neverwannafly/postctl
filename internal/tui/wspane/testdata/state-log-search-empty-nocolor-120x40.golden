@@ -1,0 +1,40 @@
+  WS      {{baseUrl}}/stream?channel=btc Disconnect                                                                     
+  ● Connected · ↑ 1 sent · ↓ 4 received                                                                                 
+Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                      
+━━━━━━━━━━━─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Message                                Text  0 B │ › Log  0 of 7                                                      
+Type a message. Ctrl-S sends it.                   │ / zzz                                                              
+                                                   │   Nothing matches                                                  
+                                                   │   The filter or search hides all 7 entries.                        
+                                                   │                                                                    
+                                                   │   f changes the filter. Esc clears the search.                     
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+  Saved  3                                         │                                                                    
+› subscribe         {"type":"subscribe","cha… JSON │                                                                    
+  heartbeat         ping                      text │                                                                    
+  auth              {"type":"auth","token":"… JSON │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    
+                                                   │                                                                    

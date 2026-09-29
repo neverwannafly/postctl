@@ -612,3 +612,39 @@ func serveWithCookie(t *testing.T) *httptest.Server {
 	t.Cleanup(srv.Close)
 	return srv
 }
+
+func TestDrainTakesQueuedEventsWithoutBlocking(t *testing.T) {
+	ctx := testCtx(t)
+	srv := serve(t, nil, echo)
+	c := dial(t, ctx, wsURL(srv), Options{})
+	if got := next(t, ctx, c); got.Type != EventOpen {
+		t.Fatalf("first event: %+v", got)
+	}
+	if got := c.Drain(10); len(got) != 0 {
+		t.Fatalf("nothing is queued yet, got %+v", got)
+	}
+	for _, s := range []string{"a", "b", "c"} {
+		if err := c.Send(ctx, Text, []byte(s)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Each send queues an outgoing event at once; the echoes follow.
+	first := c.Drain(2)
+	if len(first) != 2 || first[0].Dir != DirOut || string(first[0].Data) != "a" || string(first[1].Data) != "b" {
+		t.Fatalf("first drain: %+v", first)
+	}
+	var seen []string
+	deadline := time.Now().Add(3 * time.Second)
+	for len(seen) < 4 && time.Now().Before(deadline) {
+		for _, e := range c.Drain(100) {
+			seen = append(seen, e.Dir.String()+":"+string(e.Data))
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if len(seen) < 4 || seen[0] != "out:c" {
+		t.Fatalf("remaining events: %v", seen)
+	}
+	if c.Drain(0) != nil || c.Drain(-1) != nil {
+		t.Fatal("a non-positive count returns nothing")
+	}
+}

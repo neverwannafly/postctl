@@ -68,6 +68,13 @@ func NewWebSocketRequest(name, rawURL string) *Request {
 	}
 }
 
+// Empty reports whether no WebSocket setting is set, so the request can be
+// written without a websocket section.
+func (w *WebSocketSettings) Empty() bool {
+	return w == nil || (len(w.Messages) == 0 && w.Draft == nil && len(w.Subprotocols) == 0 &&
+		w.PingInterval == nil && w.MaxMessageBytes == nil && len(w.Extra) == 0)
+}
+
 // FindMessage returns the saved message with the given ID.
 func (w *WebSocketSettings) FindMessage(id ID) (*WSMessage, bool) {
 	if w == nil {

@@ -268,6 +268,24 @@ func (c *Conn) Next(ctx context.Context) (Event, error) {
 	}
 }
 
+// Drain returns up to n events that are already queued, without blocking. It
+// serves the same consumer as [Conn.Next]: only one goroutine may call either.
+func (c *Conn) Drain(n int) []Event {
+	c.qmu.Lock()
+	defer c.qmu.Unlock()
+	k := min(n, len(c.queue))
+	if k <= 0 {
+		return nil
+	}
+	out := make([]Event, k)
+	copy(out, c.queue[:k])
+	for i := range k {
+		c.queue[i] = Event{}
+	}
+	c.queue = c.queue[k:]
+	return out
+}
+
 // emit records ev with the next sequence number and the current time.
 func (c *Conn) emit(ev Event) uint64 {
 	ev.Seq = c.seq.Add(1)

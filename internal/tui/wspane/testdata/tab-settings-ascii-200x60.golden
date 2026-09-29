@@ -1,0 +1,60 @@
+  WS      {{baseUrl}}/stream?channel=btc Connect                                                                                                                                                        
+  o Not connected                                                                                                                                                                                       
+Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
+------------------------------------------========------------------------------------------------------------------------------------------------------------------------------------------------------
+> Subprotocols         none, e.g. graphql-transport-ws                                                                                                                                                  
+  Keep-alive ping      off                                                                                                                                                                              
+  Max message size     16.0 MB (default)                                                                                                                                                                
+  Connect timeout      30s (default)                                                                                                                                                                    
+  Verify TLS           On                                                                                                                                                                               
+  Send cookies         On                                                                                                                                                                               
+                                                                                                                                                                                                        
+  Variables in the URL, headers and messages resolve when you connect.                                                                                                                                  
+  Pre-request and test scripts do not run for WebSocket requests.                                                                                                                                       
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
+                                                                                                                                                                                                        
