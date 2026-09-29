@@ -37,6 +37,13 @@ type Options struct {
 	// NewRequestPane and NewResponsePane supply the panes for the Request and
 	// Response slots. Nil selects the built-in placeholders.
 	NewRequestPane, NewResponsePane PaneFactory
+	// Sender runs the send pipeline for the Request pane's send key. Nil
+	// disables sending (the pane says so). cmd/postctl supplies the engine
+	// adapter, or a fake until the engine lands.
+	Sender Sender
+	// NewEnvEditor and NewCookieManager supply the environment editor
+	// (Ctrl-E) and the cookie manager screens. Nil hides their actions.
+	NewEnvEditor, NewCookieManager ScreenFactory
 	// Registry receives palette actions; a fresh one is used when nil.
 	Registry *Registry
 	// NoWatch disables file watching (tests).
@@ -111,6 +118,7 @@ type app struct {
 	toastSeq int
 
 	foldSeq        int
+	sends          map[model.ID]*flight
 	saver          saveQueue
 	quitting       bool
 	selfWriteUntil time.Time
@@ -157,6 +165,7 @@ func newApp(opts Options) *app {
 	a.request, a.response = newReq(env), newResp(env)
 	a.registry.AddFunc(a.builtinActions)
 	a.registry.AddFunc(a.paneActions)
+	a.registry.AddFunc(a.screenActions)
 	a.layoutPanes()
 	return a
 }
@@ -258,6 +267,19 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.loadCmd(nil)
 	case quitNowMsg:
 		return a, a.quit(true)
+	case SendRequestMsg:
+		return a, a.startSend(msg.Request)
+	case RetrySendMsg:
+		return a, a.retrySend(msg.RequestID)
+	case CancelSendMsg:
+		a.cancelSend(msg.RequestID)
+		return a, nil
+	case sendEventsMsg:
+		return a, a.onSendEvents(msg)
+	case SaveMsg:
+		return a, a.onSaveMsg(msg)
+	case OpenScreenMsg:
+		return a, a.openScreen(msg.Screen)
 	case foldPersistMsg:
 		return a, a.onFoldPersist(msg)
 	}
@@ -270,7 +292,11 @@ func (a *app) forward(msg tea.Msg) tea.Cmd {
 	var c1, c2 tea.Cmd
 	a.request, c1 = a.request.Update(msg)
 	a.response, c2 = a.response.Update(msg)
-	return tea.Batch(c1, c2)
+	var c3 tea.Cmd
+	if _, ok := a.ov.(*screenOverlay); ok {
+		c3 = a.updateOverlay(msg)
+	}
+	return tea.Batch(c1, c2, c3)
 }
 
 // broadcast is forward for shell-originated messages.
@@ -385,6 +411,14 @@ type quitNowMsg struct{}
 // quit leaves the program. Pending saves finish first so no edit is lost;
 // force skips that wait.
 func (a *app) quit(force bool) tea.Cmd {
+	a.cancelAllSends()
+	if !force {
+		if flush, n := a.flushDirty(); n > 0 && !a.quitting {
+			// Edits whose autosave timer has not fired yet are written now.
+			a.quitting = true
+			return tea.Batch(flush, a.toastInfo("Saving before quit…"))
+		}
+	}
 	if !force && a.saver.busy() {
 		a.quitting = true
 		return a.toastInfo("Saving before quit…")
@@ -545,6 +579,8 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, a.keys.Env):
 		a.ov = newEnvOverlay(a)
 		return nil, true
+	case key.Matches(msg, a.keys.EnvEdit) && a.opts.NewEnvEditor != nil:
+		return a.openEnvEditor(""), true
 	case key.Matches(msg, a.keys.Quit):
 		return a.quit(false), true
 	case key.Matches(msg, a.keys.Next):

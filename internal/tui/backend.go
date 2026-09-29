@@ -147,3 +147,51 @@ func (b *storeBackend) SaveState(st store.State) error {
 	}
 	return s.SaveState(st)
 }
+
+// DeleteEnvironment implements [EnvironmentDeleter].
+func (b *storeBackend) DeleteEnvironment(ctx context.Context, id model.ID) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	return s.DeleteEnvironment(ctx, id)
+}
+
+// SaveGlobals implements [GlobalsSaver].
+func (b *storeBackend) SaveGlobals(ctx context.Context, g *model.Globals) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	return s.SaveGlobals(ctx, g)
+}
+
+// HydrateVariables implements [Hydrator]: it reads secret values from the
+// secret store into vars. Refs with no stored value stay empty.
+func (b *storeBackend) HydrateVariables(ctx context.Context, vars []model.Variable) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	_, err = s.HydrateVariables(ctx, vars)
+	return err
+}
+
+// HydrateAuth implements [Hydrator] for OAuth 2.0 token secrets.
+func (b *storeBackend) HydrateAuth(ctx context.Context, a *model.Auth) error {
+	s, err := b.open()
+	if err != nil {
+		return err
+	}
+	_, err = s.HydrateAuth(ctx, a)
+	return err
+}
+
+// PathOf implements [PathResolver].
+func (b *storeBackend) PathOf(c *model.Collection, id model.ID) (string, error) {
+	s, err := b.open()
+	if err != nil {
+		return "", err
+	}
+	return s.PathOf(c, id)
+}

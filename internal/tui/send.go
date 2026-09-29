@@ -113,3 +113,10 @@ type SendResultMsg struct {
 	// Result is the outcome.
 	Result SendResult
 }
+
+// RetrySendMsg asks the shell to resend the request for RequestID (for example
+// from the response pane after a transport error).
+type RetrySendMsg struct {
+	// RequestID is the request to send again.
+	RequestID model.ID
+}

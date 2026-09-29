@@ -36,6 +36,10 @@ func (o *envOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	switch k.String() {
 	case "esc", "E":
 		return nil, nil
+	case "e":
+		if a.opts.NewEnvEditor != nil && o.cursor > 0 {
+			return nil, a.openEnvEditor(a.envs()[o.cursor-1].ID)
+		}
 	case "up":
 		o.cursor = max(0, o.cursor-1)
 	case "down":
@@ -155,7 +159,11 @@ func (o *envOverlay) hints(a *app) []ui.Hint {
 	if a.ascii {
 		arrows = "Up/Down"
 	}
-	return []ui.Hint{hint("Enter", "Use", 0), hint(arrows, "Move", 1), hint("Esc", "Close", 0)}
+	hs := []ui.Hint{hint("Enter", "Use", 0), hint(arrows, "Move", 1), hint("Esc", "Close", 0)}
+	if a.opts.NewEnvEditor != nil && o.cursor > 0 {
+		hs = append(hs, hint("e", "Edit", 1))
+	}
+	return hs
 }
 
 // envs returns the workspace's environments.
