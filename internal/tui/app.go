@@ -641,9 +641,14 @@ func (a *app) setFocus(s Slot) tea.Cmd {
 	if s == a.focus {
 		return nil
 	}
+	var blur tea.Cmd
 	switch a.focus {
 	case SlotRequest:
 		a.request.Blur()
+		// A pane that saves on blur returns the command that does it.
+		if b, ok := a.request.(interface{ BlurCmd() tea.Cmd }); ok {
+			blur = b.BlurCmd()
+		}
 	case SlotResponse:
 		a.response.Blur()
 	}
@@ -660,7 +665,7 @@ func (a *app) setFocus(s Slot) tea.Cmd {
 		a.rightShow = SlotResponse
 		cmd = a.response.Focus()
 	}
-	return cmd
+	return tea.Batch(blur, cmd)
 }
 
 // layoutKind is the layout in effect: accessible mode is always linear.
