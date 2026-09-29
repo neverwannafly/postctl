@@ -76,12 +76,12 @@ func TestTreeWalkFindRequests(t *testing.T) {
 	if _, _, _, ok := c.Find("nope"); ok {
 		t.Fatal("found missing")
 	}
-	// SkipChildren
+	// ErrSkipChildren
 	var n int
 	_ = c.Walk(func(it Item, _ Container, _ int) error {
 		n++
 		if it.ItemID() == "f1" {
-			return SkipChildren
+			return ErrSkipChildren
 		}
 		return nil
 	})

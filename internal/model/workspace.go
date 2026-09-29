@@ -134,12 +134,12 @@ func (*Request) isItem() {}
 func (c *Collection) ContainerID() ID { return c.ID }
 
 // Children implements [Container].
-func (c *Collection) Children() []Item { return c.Items }
+func (c *Collection) Children() []Item      { return c.Items }
 func (c *Collection) setChildren(it []Item) { c.Items = it }
 
 // ContainerID implements [Container].
 func (f *Folder) ContainerID() ID { return f.ID }
 
 // Children implements [Container].
-func (f *Folder) Children() []Item { return f.Items }
+func (f *Folder) Children() []Item      { return f.Items }
 func (f *Folder) setChildren(it []Item) { f.Items = it }

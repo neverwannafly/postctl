@@ -25,7 +25,6 @@ linters:
         - fmt.Fprintln
     gocritic:
       disabled-checks:
-        - hugeParam
         - ifElseChain
     revive:
       rules:
@@ -41,7 +40,6 @@ linters:
       checks: ["all", "-ST1000"]
   exclusions:
     presets:
-      - comments
       - std-error-handling
     rules:
       - path: _test\.go

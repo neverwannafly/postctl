@@ -20,19 +20,19 @@ var (
 // Walk visits every item below c in display order, depth first. depth is 0
 // for direct children of the collection. parent is the containing collection
 // or folder. Returning a non-nil error stops the walk and is returned; return
-// [SkipChildren] to skip a folder's children.
+// [ErrSkipChildren] to skip a folder's children.
 func (c *Collection) Walk(fn func(it Item, parent Container, depth int) error) error {
 	return walk(c, 0, fn)
 }
 
-// SkipChildren can be returned from a Walk callback to skip the children of
+// ErrSkipChildren can be returned from a Walk callback to skip the children of
 // the folder just visited.
-var SkipChildren = errors.New("model: skip children")
+var ErrSkipChildren = errors.New("model: skip children")
 
 func walk(parent Container, depth int, fn func(Item, Container, int) error) error {
 	for _, it := range parent.Children() {
 		err := fn(it, parent, depth)
-		if errors.Is(err, SkipChildren) {
+		if errors.Is(err, ErrSkipChildren) {
 			continue
 		}
 		if err != nil {

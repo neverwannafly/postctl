@@ -253,7 +253,7 @@ func (s *Store) envIndex() (map[string]model.ID, error) {
 
 func (s *Store) writeWorkspaceFile(ws *model.Workspace, order []string) error {
 	wf := workspaceFile{SchemaVersion: model.SchemaVersion, Workspace: *ws, CollectionOrder: order}
-	wf.Workspace.Collections, wf.Workspace.Environments, wf.Workspace.Globals = nil, nil, nil
+	wf.Collections, wf.Environments, wf.Globals = nil, nil, nil
 	data, err := marshalYAML(&wf)
 	if err != nil {
 		return err
@@ -452,7 +452,7 @@ func (s *Store) writeContainerFile(w *writer, sw *secretWriter, ct model.Contain
 	switch n := ct.(type) {
 	case *model.Collection:
 		cf := collectionFile{SchemaVersion: model.SchemaVersion, Collection: *n, Order: lay.order[n.ID]}
-		cf.Collection.Items = nil
+		cf.Items = nil
 		var err error
 		if cf.Variables, err = sw.vars(ScopeCollection, n.ID, n.Variables); err != nil {
 			return err
@@ -467,7 +467,7 @@ func (s *Store) writeContainerFile(w *writer, sw *secretWriter, ct model.Contain
 	case *model.Folder:
 		loc := lay.nodes[n.ID]
 		ff := folderFile{Folder: *n, Order: lay.order[n.ID]}
-		ff.Folder.Items = nil
+		ff.Items = nil
 		var err error
 		if ff.Variables, err = sw.vars(ScopeFolder, n.ID, n.Variables); err != nil {
 			return err
