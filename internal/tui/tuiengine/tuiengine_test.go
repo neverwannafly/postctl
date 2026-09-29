@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/shubham/postctl/internal/engine"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
@@ -141,5 +142,25 @@ func TestSendMapsErrors(t *testing.T) {
 	res = s.sender.Send(context.Background(), tui.SendRequest{Collection: s.col, Request: dead, Environment: s.env}, nil)
 	if res.Err == nil || res.Response != nil || res.RequestID != dead.ID {
 		t.Fatalf("transport error: %+v", res)
+	}
+}
+
+func TestOutcomeMasksConsoleTestsAndScriptErrors(t *testing.T) {
+	const secret = "synthetic-tui-output-secret"
+	res := OutcomeToResult(&engine.Outcome{
+		Redactor: history.NewRedactor([]string{secret}),
+		Console:  []engine.ConsoleLine{{Level: "log", Text: "console " + secret}},
+		Tests:    []engine.TestResult{{Name: "test " + secret, Message: "message " + secret}},
+		ScriptError: &engine.ScriptFailure{
+			Event: "test",
+			Text:  "script " + secret,
+		},
+	})
+	joined := res.Console[0].Text + res.Tests[0].Name + res.Tests[0].Message + res.ScriptError
+	if strings.Contains(joined, secret) {
+		t.Fatalf("TUI result exposed a known secret")
+	}
+	if !strings.Contains(joined, history.Mask) {
+		t.Fatalf("TUI result did not use the shared history mask: %q", joined)
 	}
 }

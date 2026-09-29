@@ -50,24 +50,33 @@ func (s *Sender) Send(ctx context.Context, req tui.SendRequest, progress func(tu
 }
 
 func result(out *engine.Outcome) tui.SendResult {
+	mask := func(s string) string {
+		if out.Redactor == nil {
+			return s
+		}
+		return out.Redactor.Text(s)
+	}
 	res := tui.SendResult{
 		RequestID: out.RequestID,
 		Started:   out.Started,
 		Response:  out.Response,
 		Skipped:   out.Skipped,
-		Warnings:  append([]string(nil), out.Warnings...),
+		Redactor:  out.Redactor,
 		Err:       out.Err,
+	}
+	for _, warning := range out.Warnings {
+		res.Warnings = append(res.Warnings, mask(warning))
 	}
 	for _, t := range out.Tests {
 		res.Tests = append(res.Tests, tui.TestOutcome{
-			Name: t.Name, Passed: t.Passed, Skipped: t.Skipped, Message: t.Message,
+			Name: mask(t.Name), Passed: t.Passed, Skipped: t.Skipped, Message: mask(t.Message),
 		})
 	}
 	for _, c := range out.Console {
-		res.Console = append(res.Console, tui.ConsoleLine{Level: c.Level, Text: c.Text, Event: c.Event})
+		res.Console = append(res.Console, tui.ConsoleLine{Level: c.Level, Text: mask(c.Text), Event: c.Event})
 	}
 	if f := out.ScriptError; f != nil {
-		res.ScriptError = scriptErrorText(f)
+		res.ScriptError = mask(scriptErrorText(f))
 	}
 	return res
 }

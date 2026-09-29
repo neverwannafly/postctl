@@ -128,6 +128,18 @@ func (s *session) refreshSecrets() {
 	}
 }
 
+func (s *session) addAuthSecrets(auth *model.Auth) {
+	if auth == nil || auth.OAuth2 == nil || auth.OAuth2.Token == nil {
+		return
+	}
+	tok := auth.OAuth2.Token
+	for _, value := range []string{tok.AccessToken, tok.RefreshToken, tok.IDToken} {
+		if value != "" {
+			s.secrets[value] = struct{}{}
+		}
+	}
+}
+
 func (s *session) redactor(extraNames ...string) *history.Redactor {
 	values := make([]string, 0, len(s.secrets))
 	for v := range s.secrets {
@@ -310,10 +322,12 @@ func (s *session) execute(
 	}
 	out.Resolved = resolved
 	out.Warnings = append(out.Warnings, unresolvedWarnings(resolved.URL.Raw)...)
+	s.addAuthSecrets(resolved.Auth)
 
 	emit(StepSend, stepSend)
-	redactor := s.redactor(authNames(resolved.Auth)...)
 	resp, err := e.cfg.HTTP.Send(ctx, resolved, opts)
+	s.addAuthSecrets(resolved.Auth)
+	redactor := s.redactor(authNames(resolved.Auth)...)
 	if err != nil {
 		out.Err = sendError(ctx, err, redactor)
 		s.finish(ctx, out, progress)
@@ -361,6 +375,13 @@ func (s *session) finish(ctx context.Context, out *Outcome, progress func(Step))
 	saved, warnings := s.persist(ctx, progress)
 	out.Persisted = saved
 	out.Warnings = append(out.Warnings, warnings...)
+	s.refreshSecrets()
+	if out.Resolved != nil {
+		s.addAuthSecrets(out.Resolved.Auth)
+		out.Redactor = s.redactor(authNames(out.Resolved.Auth)...)
+	} else {
+		out.Redactor = s.redactor()
+	}
 	s.record(ctx, out)
 }
 

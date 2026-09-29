@@ -1,10 +1,12 @@
 package response
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
@@ -355,7 +358,8 @@ func (p *Pane) render() string {
 	b.WriteString(p.tabContent(st.result, w))
 	if st.result.ScriptError != "" {
 		b.WriteByte('\n')
-		b.WriteString(t.Render(ui.StatusDanger, t.Glyphs.Warn+" Script: "+t.Truncate(st.result.ScriptError, w)))
+		text := maskResultText(p, st.result, st.result.ScriptError)
+		b.WriteString(t.Render(ui.StatusDanger, t.Glyphs.Warn+" Script: "+t.Truncate(text, w)))
 	}
 	return b.String()
 }
@@ -376,7 +380,7 @@ func (p *Pane) viewSending(w int) string {
 
 func (p *Pane) viewTransportErr(t ui.Theme, r tui.SendResult, w int) string {
 	p.lastTransportRequest = r.RequestID
-	msg := r.Err.Error()
+	msg := maskResultText(p, r, r.Err.Error())
 	return t.ErrorState(msg,
 		"Your request is unchanged.",
 		"Send again with Ctrl-Enter, or press Ctrl-S to retry from here.", w)
@@ -502,9 +506,9 @@ func (p *Pane) tabContent(r tui.SendResult, w int) string {
 		return p.viewConsole(r, w, h)
 	default:
 		if r.Response != nil {
-			return RenderTimeline(p.th, r.Response, w, p.revealSecrets)
+			return RenderTimeline(p.th, r.Response, w, p.revealSecrets, r.Redactor)
 		}
-		return p.th.EmptyState("No timeline", "Timing appears after a completed request.", "", w)
+		return p.th.EmptyState("No timeline", "Timing appears after a completed request.", "Send with Ctrl-S.", w)
 	}
 }
 
@@ -664,14 +668,15 @@ func (p *Pane) renderHex(body []byte, w, h int) string {
 func (p *Pane) viewHeaders(r tui.SendResult, w, h int) string {
 	t := p.th
 	if r.Response == nil {
-		return t.EmptyState("No headers", "", "", w)
+		return t.EmptyState("No headers", "Response headers appear after a completed request.", "Send with Ctrl-S.", w)
+	}
+	headers := r.Response.Headers
+	if !p.revealSecrets {
+		headers = resultRedactor(r).Headers(headers)
 	}
 	var rows []ui.KVRow
-	for _, kv := range r.Response.Headers {
-		val := kv.Value
-		if SecretHeader(kv.Key) && !p.revealSecrets {
-			val = t.Glyphs.Mask
-		}
+	for _, kv := range headers {
+		val := strings.ReplaceAll(kv.Value, history.Mask, t.Glyphs.Mask)
 		rows = append(rows, ui.KVRow{Key: kv.Key, Value: val, Secret: SecretHeader(kv.Key)})
 	}
 	table := t.KVTable(rows, ui.KVTableOptions{Width: w, Focus: -1, Header: true, Reveal: p.revealSecrets})
@@ -731,9 +736,11 @@ func (p *Pane) viewTests(r tui.SendResult, w, h int) string {
 		default:
 			mark, tok = t.Glyphs.Fail, ui.StatusDanger
 		}
-		line := t.Render(tok, mark) + " " + t.Render(ui.TextPrimary, tc.Name)
+		name := maskResultText(p, r, tc.Name)
+		line := t.Render(tok, mark) + " " + t.Render(ui.TextPrimary, name)
 		if !tc.Passed && !tc.Skipped && tc.Message != "" {
-			line += " — " + t.Render(ui.TextSecondary, t.Truncate(tc.Message, w-ui.Width(line)-3))
+			message := maskResultText(p, r, tc.Message)
+			line += " — " + t.Render(ui.TextSecondary, t.Truncate(message, w-ui.Width(line)-3))
 		}
 		lines = append(lines, line)
 	}
@@ -763,7 +770,8 @@ func (p *Pane) viewConsole(r tui.SendResult, w, h int) string {
 		case "error":
 			tok = ui.StatusDanger
 		}
-		lines = append(lines, t.Render(tok, line.Level)+": "+t.Render(ui.TextPrimary, t.Truncate(line.Text, w-8)))
+		text := maskResultText(p, r, line.Text)
+		lines = append(lines, t.Render(tok, line.Level)+": "+t.Render(ui.TextPrimary, t.Truncate(text, w-8)))
 	}
 	return clipLines(strings.Join(lines, "\n"), p.consoleScroll, h)
 }
@@ -959,32 +967,75 @@ func (p *Pane) cmdOpenPager() tea.Cmd {
 	if st == nil || st.result.Response == nil {
 		return nil
 	}
-	body := append([]byte(nil), st.result.Response.Body...)
-	f, err := os.CreateTemp("", "postctl-response-*")
-	if err != nil {
-		return func() tea.Msg {
-			return tui.ToastMsg{Kind: ui.ToastError, Text: err.Error()}
-		}
-	}
-	path := f.Name()
-	if _, err := f.Write(body); err != nil {
-		_ = f.Close()
-		return func() tea.Msg {
-			return tui.ToastMsg{Kind: ui.ToastError, Text: err.Error()}
-		}
-	}
-	_ = f.Close()
+	body := pagerBody(st.result, p.revealSecrets)
 	pager := os.Getenv("PAGER")
 	if pager == "" {
 		pager = "less"
 	}
-	return tea.ExecProcess(exec.Command(pager, path), func(err error) tea.Msg {
-		_ = os.Remove(path)
+	cmd, err := pagerCommand(pager, body)
+	if err != nil {
+		return func() tea.Msg { return tui.ToastMsg{Kind: ui.ToastError, Text: err.Error()} }
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			return tui.ToastMsg{Kind: ui.ToastError, Text: err.Error()}
 		}
 		return tui.ToastMsg{Kind: ui.ToastInfo, Text: "Pager closed"}
 	})
+}
+
+func pagerBody(r tui.SendResult, reveal bool) []byte {
+	if r.Response == nil {
+		return nil
+	}
+	body := append([]byte(nil), r.Response.Body...)
+	if reveal {
+		return body
+	}
+	return MaskBodyForExternalOutput(r)
+}
+
+// MaskBodyForExternalOutput returns a response body with credential-looking
+// fields and every known secret value masked. It is used before bytes leave
+// the live in-memory response viewer, such as through the pager.
+func MaskBodyForExternalOutput(r tui.SendResult) []byte {
+	if r.Response == nil {
+		return nil
+	}
+	return []byte(resultRedactor(r).Body(
+		history.ContentType(r.Response.Headers), string(r.Response.Body)))
+}
+
+func resultRedactor(r tui.SendResult) *history.Redactor {
+	if r.Redactor != nil {
+		return r.Redactor
+	}
+	return history.NewRedactor(nil)
+}
+
+func maskResultText(p *Pane, r tui.SendResult, text string) string {
+	if p.revealSecrets {
+		return text
+	}
+	return strings.ReplaceAll(resultRedactor(r).Text(text), history.Mask, p.th.Glyphs.Mask)
+}
+
+func pagerCommand(spec string, body []byte) (*exec.Cmd, error) {
+	words := strings.Fields(spec)
+	if len(words) == 0 {
+		return nil, fmt.Errorf("PAGER is empty; set it to less, more, bat, or cat")
+	}
+	name := strings.ToLower(filepath.Base(words[0]))
+	switch name {
+	case "less", "more", "most", "bat", "batcat", "cat", "lv", "pg":
+		// Known pagers only: stdin contains response content and must never be
+		// handed to a shell or general-purpose interpreter.
+	default:
+		return nil, fmt.Errorf("PAGER %q is not supported; use less, more, bat, or cat", name)
+	}
+	cmd := exec.Command(words[0], words[1:]...)
+	cmd.Stdin = bytes.NewReader(body)
+	return cmd, nil
 }
 
 func shortErr(err error) string {

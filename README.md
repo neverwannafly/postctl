@@ -130,13 +130,14 @@ See [`docs/keys.md`](docs/keys.md) for the complete reference across all panes a
 postctl ls
 postctl ls --flat
 postctl ls Payments/Billing --json
+postctl ls --workspace ./my-api
 
 # Send a single request from the terminal
 postctl send Payments/Billing/Create -e staging --var amount=100
 postctl send Payments/List\ charges --include --verbose
 
 # Run collections and folders in CI (Newman replacement)
-postctl run Payments -e staging --bail
+postctl run Payments -e staging --var region=local --bail
 postctl run Payments -d data.csv --reporter cli,junit --reporter-junit-export junit.xml
 postctl run Payments --json
 

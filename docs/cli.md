@@ -6,6 +6,11 @@ Paths are `<collection>/<folder>/.../<request>`. Each segment is a display name,
 
 `-e` / `--env` selects an environment by name, slug or ID. When it is omitted, `send`, `run` and `curl` use the active environment (`postctl env use`).
 
+Every subcommand accepts `--workspace DIR` or `-w DIR` after the command name,
+for example `postctl ls --workspace ./api`. An explicit flag wins over
+`POSTCTL_WORKSPACE`; without either, postctl discovers the workspace from the
+current directory.
+
 ## ls
 
 ```sh
@@ -43,6 +48,7 @@ The body is pretty-printed JSON only when stdout is a terminal. Otherwise it is 
 ```sh
 postctl run Payments
 postctl run Payments/Billing -e staging -n 3 --delay 200ms --bail
+postctl run Payments --var region=local --var version=v2
 postctl run Payments -d data.csv --reporter cli,junit --reporter-junit-export junit.xml
 postctl run Payments --json
 postctl run Payments --timeout-request 30s --no-history
@@ -57,7 +63,7 @@ requests or failures.
 
 `--reporter` is a comma-separated list of `cli`, `json` and `junit`. The default is `cli`. `--json` selects the json reporter when `--reporter` is omitted. `json` is NDJSON, one event per line (`run-started`, `iteration-started`, `request-started`, `request-progress`, `request-finished`, `iteration-finished`, `run-finished`). It does not include response bodies. `junit` is XML: one `testsuite` per request (name `path` or `path [#n]` when the iteration is not the first) and one `testcase` per assertion. Script and transport errors are extra failing cases.
 
-Only one reporter may write to stdout. Pass `--reporter-json-export` or `--reporter-junit-export` when combining reporters. `-d` is a CSV or JSON data file. `-n` is the iteration count (`0` uses the engine default). `--delay` is the pause between requests. `--bail` stops after the first failure. `--timeout-request` sets the request timeout on a clone of the collection.
+Only one reporter may write to stdout. Pass `--reporter-json-export` or `--reporter-junit-export` when combining reporters. Repeatable `--var key=value` values seed `pm.variables` at the start of every iteration, matching `send --var`. `-d` is a CSV or JSON data file. `-n` is the iteration count (`0` uses the engine default). `--delay` is the pause between requests. `--bail` stops after the first failure. `--timeout-request` sets the request timeout on a clone of the collection.
 
 ## env
 
@@ -71,7 +77,7 @@ postctl env set staging region us --secret
 postctl env unset staging region
 ```
 
-`ls` marks the active environment with `*` and a production environment with `! prod`. `use` writes `store.State.ActiveEnvironment`. `show` masks secret values. `--reveal` prints them; when stdin is a terminal it asks you to type `y` first. `set --secret` stores the value in the secret store and does not echo it. `--json` works on `ls` and `show`.
+`ls` marks the active environment with `*` and a production environment with `! prod`. `use` writes `store.State.ActiveEnvironment`. `get` is an alias for `show`; both mask secret values. `--reveal` prints them; when stdin is a terminal it asks you to type `y` first. `set --secret` stores the value in the secret store and does not echo it. `--json` works on `ls`, `show`, and `get`.
 
 ## curl
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/script"
@@ -186,6 +187,9 @@ type Outcome struct {
 	Persisted []string
 	// HistoryID is the history entry recorded for this send, or empty.
 	HistoryID string
+	// Redactor contains the known secret values and credential names for this
+	// outcome. Clients use it to mask visible output; it never exposes values.
+	Redactor *history.Redactor
 	// Err is a resolution, transport, OAuth 2.0 or cancellation error.
 	Err error
 }

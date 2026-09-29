@@ -61,11 +61,11 @@ type command struct {
 
 // commands is the subcommand table. main.go dispatches these names here.
 var commands = []command{
-	{"ls", "ls [path] [--flat] [--json]", "List collections, folders and requests.", runLs},
-	{"send", "send <path> [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests.", runSend},
-	{"run", "run <path> [-e env] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--reporter-json-export FILE] [--reporter-junit-export FILE] [--timeout-request 30s] [--no-history] [--json]", "Run a collection or folder. --json streams NDJSON events.", runRun},
-	{"env", "env ls | use <name> | show <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments. -e on send and run defaults to the active environment.", runEnv},
-	{"curl", "curl <path> [-e env] [--with-secrets]", "Print the resolved request as a curl command. Secrets are masked unless --with-secrets is set.", runCurl},
+	{"ls", "ls [path] [--workspace DIR] [--flat] [--json]", "List collections, folders and requests.", runLs},
+	{"send", "send <path> [--workspace DIR] [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests.", runSend},
+	{"run", "run <path> [--workspace DIR] [-e env] [--var k=v] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--reporter-json-export FILE] [--reporter-junit-export FILE] [--timeout-request 30s] [--no-history] [--json]", "Run a collection or folder. --json streams NDJSON events.", runRun},
+	{"env", "env [--workspace DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments. -e on send and run defaults to the active environment.", runEnv},
+	{"curl", "curl <path> [--workspace DIR] [-e env] [--with-secrets]", "Print the resolved request as a curl command. Secrets are masked unless --with-secrets is set.", runCurl},
 }
 
 // Execute runs the subcommand in args[0]. It returns a process exit code.
@@ -97,8 +97,45 @@ func Execute(ctx context.Context, opts Options, args []string) int {
 		fmt.Fprintf(opts.Stderr, "Unknown command %q. Commands: %s\n", args[0], strings.Join(names(), ", "))
 		return ExitUsage
 	}
+	workspace, commandArgs, err := extractWorkspace(args[1:])
+	if err != nil {
+		fmt.Fprintln(opts.Stderr, err)
+		return ExitUsage
+	}
+	if workspace != "" {
+		opts.Workspace = workspace
+	}
 	a := newApp(opts, cmd)
-	return cmd.run(ctx, a, args[1:])
+	return cmd.run(ctx, a, commandArgs)
+}
+
+func extractWorkspace(args []string) (string, []string, error) {
+	var workspace string
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--workspace" || arg == "-w":
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return "", nil, fmt.Errorf("%s requires a directory", arg)
+			}
+			i++
+			workspace = args[i]
+		case strings.HasPrefix(arg, "--workspace="):
+			workspace = strings.TrimPrefix(arg, "--workspace=")
+			if strings.TrimSpace(workspace) == "" {
+				return "", nil, errors.New("--workspace requires a directory")
+			}
+		case strings.HasPrefix(arg, "-w="):
+			workspace = strings.TrimPrefix(arg, "-w=")
+			if strings.TrimSpace(workspace) == "" {
+				return "", nil, errors.New("-w requires a directory")
+			}
+		default:
+			out = append(out, arg)
+		}
+	}
+	return workspace, out, nil
 }
 
 func names() []string {

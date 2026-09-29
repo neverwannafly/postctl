@@ -239,7 +239,7 @@ func (p *Pane) Actions() []tui.Action {
 		{ID: "request.copyCurlSecrets", Title: "Copy as curl (with secrets)", Group: "Request", Enabled: ok, Run: func() tea.Cmd { return p.copyCurl(true) }},
 		{ID: "request.undo", Title: "Undo edit", Group: "Request", Keys: "Ctrl-Z", Enabled: ok, Run: p.undoStep},
 		{ID: "request.redo", Title: "Redo edit", Group: "Request", Keys: "Ctrl-Y", Enabled: ok, Run: p.redoStep},
-		{ID: "request.editor", Title: "Edit in $EDITOR", Group: "Request", Keys: "Ctrl-O", Enabled: ok, Run: p.openEditor},
+		{ID: "request.editor", Title: "Edit in $EDITOR", Group: "Request", Keys: "e / Ctrl-O", Enabled: ok, Run: p.openEditor},
 		{ID: "request.focusURL", Title: "Edit URL", Group: "Request", Keys: "Ctrl-L", Enabled: ok, Run: func() tea.Cmd {
 			p.stopViews()
 			p.setZone(zBar)

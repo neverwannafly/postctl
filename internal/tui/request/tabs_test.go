@@ -278,6 +278,15 @@ func TestEditorRoundTripRawBody(t *testing.T) {
 	}
 }
 
+func TestEditorShortcutEOpensCurrentRequestTab(t *testing.T) {
+	h := newHarness(t, editorDeps(`printf '{"edited with e": true}\n' > "$1"`))
+	h.gotoTab(tabBody)
+	h.key("e")
+	if h.req.Body.Raw != `{"edited with e": true}` {
+		t.Fatalf("e did not open the current tab in $EDITOR: %q", h.req.Body.Raw)
+	}
+}
+
 func TestEditorSeesCurrentTextAndTempFileIsPrivate(t *testing.T) {
 	var mode os.FileMode
 	var seen string

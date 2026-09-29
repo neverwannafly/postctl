@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/store"
 )
 
 // Nothing that identifies a credential may reach the history files: not the
@@ -95,5 +97,51 @@ func TestHistoryDisabled(t *testing.T) {
 	out := f.send(f.findRequest("R"), nil)
 	if out.HistoryID != "" || out.Err != nil {
 		t.Fatalf("outcome: %+v", out)
+	}
+}
+
+func TestHistoryMasksKeychainOAuthTokensByValue(t *testing.T) {
+	const (
+		access  = "synthetic-oauth-access-value"
+		refresh = "synthetic-oauth-refresh-value"
+		idToken = "synthetic-oauth-id-value"
+	)
+	srv := newServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jwt":"` + access + `","renew":"` + refresh + `","identity":"` + idToken + `"}`))
+	})
+	f := newFixture(t, srv)
+	req := model.NewRequest("OAuth history", "GET", "{{baseUrl}}/safe")
+	ref := store.SecretRefFor(store.ScopeOAuth2, req.ID, "")
+	req.Auth = &model.Auth{Type: model.AuthOAuth2, OAuth2: &model.OAuth2Config{
+		GrantType:  model.GrantClientCredentials,
+		AddTokenTo: model.TokenInQuery,
+		Token:      &model.OAuth2Token{Ref: ref, TokenType: "Bearer"},
+	}}
+	if err := f.secrets.Set(context.Background(), ref,
+		`{"access":"`+access+`","refresh":"`+refresh+`","id":"`+idToken+`"}`); err != nil {
+		t.Fatal(err)
+	}
+	f.col.Items = append(f.col.Items, req)
+	f.save()
+
+	unsaved := f.findRequest("OAuth history").Clone()
+	unsaved.URL = model.ParseURL(srv.URL + "/echo/" + access)
+	out := f.send(unsaved, nil)
+	if out.Err != nil {
+		t.Fatal(out.Err)
+	}
+	entry, err := f.eng.cfg.History.(*history.Log).Get(out.HistoryID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := entry.Request.URL
+	if entry.Response != nil {
+		raw += entry.Response.Body
+	}
+	for _, secret := range []string{access, refresh, idToken} {
+		if strings.Contains(raw, secret) {
+			t.Errorf("history exposed a Keychain-hydrated OAuth token")
+		}
 	}
 }

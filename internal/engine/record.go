@@ -29,7 +29,10 @@ func (s *session) record(_ context.Context, out *Outcome) {
 
 func (s *session) entry(out *Outcome) history.Entry {
 	resolved := out.Resolved
-	redactor := s.redactor(authNames(resolved.Auth)...)
+	redactor := out.Redactor
+	if redactor == nil {
+		redactor = s.redactor(authNames(resolved.Auth)...)
+	}
 	counts := out.TestCounts()
 	e := history.Entry{
 		Time:         out.Started,

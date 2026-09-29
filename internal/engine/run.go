@@ -565,6 +565,12 @@ func sleep(ctx context.Context, d time.Duration) bool {
 
 // tally adds one outcome to the summary.
 func tally(sum *RunSummary, o *Outcome, cancelled bool) {
+	mask := func(text string) string {
+		if o.Redactor == nil {
+			return text
+		}
+		return o.Redactor.Text(text)
+	}
 	base := Failure{
 		Iteration: o.Iteration, RequestID: o.RequestID, RequestName: o.RequestName, Path: o.Path,
 	}
@@ -582,20 +588,20 @@ func tally(sum *RunSummary, o *Outcome, cancelled bool) {
 	for _, t := range o.Tests {
 		if !t.Skipped && !t.Passed {
 			f := base
-			f.Kind, f.Name, f.Message = FailureTest, t.Name, t.Message
+			f.Kind, f.Name, f.Message = FailureTest, mask(t.Name), mask(t.Message)
 			sum.Failures = append(sum.Failures, f)
 		}
 	}
 	if o.ScriptError != nil {
 		sum.ScriptErrors++
 		f := base
-		f.Kind, f.Message = FailureScript, o.ScriptError.Text
+		f.Kind, f.Message = FailureScript, mask(o.ScriptError.Text)
 		sum.Failures = append(sum.Failures, f)
 	}
 	if o.Err != nil && !cancelled && o.ScriptError == nil {
 		sum.TransportErrors++
 		f := base
-		f.Kind, f.Message = FailureTransport, o.Err.Error()
+		f.Kind, f.Message = FailureTransport, mask(o.Err.Error())
 		sum.Failures = append(sum.Failures, f)
 	}
 }

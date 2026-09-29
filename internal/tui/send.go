@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 )
@@ -56,6 +57,9 @@ type SendResult struct {
 	Warnings []string
 	// ScriptError describes a script that threw or timed out, or is empty.
 	ScriptError string
+	// Redactor masks all known secret values and credential-bearing fields in
+	// visible output. The live response body remains available unmodified.
+	Redactor *history.Redactor
 	// Skipped reports that a pre-request script called
 	// pm.execution.skipRequest().
 	Skipped bool

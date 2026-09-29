@@ -3,8 +3,8 @@ package response
 import "testing"
 
 func TestSecretHeader(t *testing.T) {
-	if !SecretHeader("Authorization") || SecretHeader("Accept") {
-		t.Fatal("Authorization should be secret, Accept not")
+	if !SecretHeader("Authorization") || !SecretHeader("Set-Cookie") || !SecretHeader("X-Custom-Token") || SecretHeader("Accept") {
+		t.Fatal("credential-bearing headers should be secret, Accept should not")
 	}
 }
 

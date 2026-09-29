@@ -23,6 +23,11 @@ func runRun(ctx context.Context, a *app, args []string) int {
 	timeout := fs.Duration("timeout-request", 0, "per-request timeout")
 	noHistory := fs.Bool("no-history", false, "do not record requests in history")
 	asJSON := fs.Bool("json", false, "stream NDJSON events on stdout")
+	var overrides []string
+	fs.Func("var", "set a local variable for this run, as k=v (repeatable)", func(s string) error {
+		overrides = append(overrides, s)
+		return nil
+	})
 	positional, code := a.parse(fs, args)
 	if code >= 0 {
 		return code
@@ -33,6 +38,11 @@ func runRun(ctx context.Context, a *app, args []string) int {
 	}
 	if *iterations < 0 {
 		fmt.Fprintln(a.err, "-n must be zero or positive.")
+		return ExitUsage
+	}
+	locals, err := parseVars(overrides)
+	if err != nil {
+		fmt.Fprintln(a.err, err.Error())
 		return ExitUsage
 	}
 	names, err := parseReporters(*reporter, *asJSON)
@@ -96,6 +106,7 @@ func runRun(ctx context.Context, a *app, args []string) int {
 		Globals:     a.ws.Globals,
 		Iterations:  *iterations,
 		Data:        rows,
+		Locals:      locals,
 		Delay:       *delay,
 		Bail:        *bail,
 	})

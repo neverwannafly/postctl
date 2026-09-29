@@ -913,12 +913,22 @@ func (m *Model) viewDetail() string {
 }
 
 func outcomeResult(out *engine.Outcome) tui.SendResult {
-	res := tui.SendResult{RequestID: out.RequestID, Response: out.Response, Err: out.Err}
+	mask := func(text string) string {
+		if out.Redactor == nil {
+			return text
+		}
+		return out.Redactor.Text(text)
+	}
+	res := tui.SendResult{
+		RequestID: out.RequestID, Response: out.Response, Err: out.Err, Redactor: out.Redactor,
+	}
 	for _, t := range out.Tests {
-		res.Tests = append(res.Tests, tui.TestOutcome{Name: t.Name, Passed: t.Passed, Skipped: t.Skipped, Message: t.Message})
+		res.Tests = append(res.Tests, tui.TestOutcome{
+			Name: mask(t.Name), Passed: t.Passed, Skipped: t.Skipped, Message: mask(t.Message),
+		})
 	}
 	for _, c := range out.Console {
-		res.Console = append(res.Console, tui.ConsoleLine{Level: c.Level, Text: c.Text, Event: c.Event})
+		res.Console = append(res.Console, tui.ConsoleLine{Level: c.Level, Text: mask(c.Text), Event: c.Event})
 	}
 	return res
 }

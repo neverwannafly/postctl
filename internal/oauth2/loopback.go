@@ -113,7 +113,6 @@ func listen(cfg *model.OAuth2Config, implicit bool, now time.Time) (*loopback, e
 	lb := &loopback{
 		addr:     ln.Addr().String(),
 		path:     spec.path,
-		state:    cfg.State,
 		implicit: implicit,
 		now:      now,
 		result:   make(chan callbackResult, 1),
@@ -125,12 +124,10 @@ func listen(cfg *model.OAuth2Config, implicit bool, now time.Time) (*loopback, e
 		lb.redirect = "http://" + lb.addr + lb.path
 		lb.note = loopbackNote(lb.redirect, cfg.RedirectURI)
 	}
-	if lb.state == "" {
-		lb.state, err = randomToken(32)
-		if err != nil {
-			_ = ln.Close()
-			return nil, errors.New("oauth2: could not prepare sign-in")
-		}
+	lb.state, err = randomToken(32)
+	if err != nil {
+		_ = ln.Close()
+		return nil, errors.New("oauth2: could not prepare sign-in")
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", lb.serve)

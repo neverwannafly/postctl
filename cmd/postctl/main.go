@@ -38,12 +38,12 @@ type command struct {
 
 // commands is the subcommand table; behavior lands in later workstreams.
 var commands = []command{
-	{"import", "import postman <files...> [--workspace DIR] [--env FILE...] [--globals FILE] [--dry-run]", "Import Postman collections, environments and globals."},
-	{"ls", "ls [path] [--flat] [--json]", "List collections, folders and requests."},
-	{"send", "send <path> [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests."},
-	{"run", "run <path> [-e env] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--json]", "Run a collection or folder, like newman."},
-	{"env", "env ls | use <name> | show <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments."},
-	{"curl", "curl <path> [-e env] [--with-secrets]", "Print the resolved request as a curl command."},
+	{"import", "import postman <files...> [--workspace DIR|-w DIR] [--env FILE...] [--globals FILE] [--dry-run]", "Import Postman collections, environments and globals."},
+	{"ls", "ls [path] [--workspace DIR|-w DIR] [--flat] [--json]", "List collections, folders and requests."},
+	{"send", "send <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests."},
+	{"run", "run <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--json]", "Run a collection or folder, like newman."},
+	{"env", "env [--workspace DIR|-w DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments."},
+	{"curl", "curl <path> [--workspace DIR|-w DIR] [-e env] [--with-secrets]", "Print the resolved request as a curl command."},
 }
 
 // launchUI starts the interactive UI; tests replace it.
@@ -64,6 +64,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.Bool("help", false, "show help")
 	fs.Bool("h", false, "show help")
 	workspace := fs.String("workspace", "", "workspace directory (default: found from the current directory)")
+	fs.StringVar(workspace, "w", "", "workspace directory (shorthand)")
 	accessible := fs.Bool("accessible", false, "linear, screen-reader friendly presentation")
 	ascii := fs.Bool("ascii", false, "use ASCII instead of Unicode glyphs")
 	if err := fs.Parse(args); err != nil {
@@ -211,6 +212,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "  --workspace Use this workspace directory")
 	fmt.Fprintln(w, "  --help      Show this help")
 	fmt.Fprintln(w, "  --workspace DIR  Workspace to open (or POSTCTL_WORKSPACE); default: found from the current directory")
+	fmt.Fprintln(w, "  -w DIR           Shorthand for --workspace")
 	fmt.Fprintln(w, "  --accessible     Linear presentation, no alternate screen or animation (or POSTCTL_ACCESSIBLE=1)")
 	fmt.Fprintln(w, "  --ascii          ASCII glyphs instead of Unicode (or POSTCTL_ASCII=1)")
 	fmt.Fprintln(w, "  NO_COLOR         Set to disable color")

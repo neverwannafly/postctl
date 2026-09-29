@@ -87,7 +87,7 @@ var KeyCatalog = []Section{
 			{"Ctrl-S, Ctrl-Enter", "Send request", "Send the active request immediately (Ctrl-S always works)"},
 			{"Ctrl-Z", "Undo", "Undo the previous edit in the request editor"},
 			{"Ctrl-Y", "Redo", "Redo the previously undone edit"},
-			{"Ctrl-O", "Open in $EDITOR", "Open the current request file in your external $EDITOR"},
+			{"e, Ctrl-O", "Open in $EDITOR", "Open the current request tab in your external $EDITOR when not typing"},
 			{"Ctrl-L", "Focus URL bar", "Jump cursor directly to the URL input line"},
 			{"Esc", "Cancel send / OAuth", "Cancel in-flight HTTP request or pending OAuth2 browser login"},
 			{"Enter (URL bar)", "Send request", "Send request immediately while editing URL"},
