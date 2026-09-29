@@ -58,6 +58,11 @@ func NewStoreBackend(root string, opts ...store.Option) Backend {
 // Root implements the interface it is used through.
 func (b *storeBackend) Root() string { return b.root }
 
+// Store returns the lazily opened store used by this backend. It is exposed
+// for process wiring that must share one store with the TUI, such as the send
+// engine.
+func (b *storeBackend) Store() (*store.Store, error) { return b.open() }
+
 // open returns the store, opening it if the workspace appeared after start.
 func (b *storeBackend) open() (*store.Store, error) {
 	if b.s != nil {

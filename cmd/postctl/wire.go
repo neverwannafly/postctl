@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"os"
+	"sync"
+
+	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/oauth2"
 	"github.com/shubham/postctl/internal/store"
@@ -9,19 +14,69 @@ import (
 	"github.com/shubham/postctl/internal/tui/envedit"
 	"github.com/shubham/postctl/internal/tui/fakesend"
 	"github.com/shubham/postctl/internal/tui/request"
+	"github.com/shubham/postctl/internal/tui/tuiengine"
 )
 
-// newSender supplies the send pipeline for the Request pane. It is a fake
-// that plays a plausible exchange until the engine (WS4) lands; replace this
-// one function with the engine adapter.
-func newSender() tui.Sender { return fakesend.New() }
+type storeProvider interface {
+	Store() (*store.Store, error)
+}
+
+type lazyEngine struct {
+	mu      sync.Mutex
+	backend tui.Backend
+	engine  *engine.Engine
+}
+
+func (p *lazyEngine) get() (*engine.Engine, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.engine != nil {
+		return p.engine, nil
+	}
+	provider, ok := p.backend.(storeProvider)
+	if !ok {
+		return nil, store.ErrNotWorkspace
+	}
+	st, err := provider.Store()
+	if err != nil {
+		return nil, err
+	}
+	secrets := st.SecretStore()
+	p.engine, err = engine.New(engine.Config{
+		Store:   st,
+		Secrets: secrets,
+		HTTP:    httpx.NewClient(version),
+		OAuth2:  oauth2.NewSource(secrets, oauth2.Fetch),
+		Version: version,
+	})
+	return p.engine, err
+}
+
+type lazySender struct{ engine *lazyEngine }
+
+func (s *lazySender) Send(ctx context.Context, req tui.SendRequest, progress func(tui.SendStep)) tui.SendResult {
+	eng, err := s.engine.get()
+	if err != nil {
+		result := tui.SendResult{Err: err}
+		if req.Request != nil {
+			result.RequestID = req.Request.ID
+		}
+		return result
+	}
+	return tuiengine.New(eng).Send(ctx, req, progress)
+}
 
 // wireEditors fills in the screens and panes this workstream owns without
 // overwriting anything the caller already set (the response pane is wired in
 // openUI).
 func wireEditors(o *tui.Options) {
+	engines := &lazyEngine{backend: o.Backend}
 	if o.Sender == nil {
-		o.Sender = newSender()
+		if os.Getenv("POSTCTL_FAKE_SENDER") == "1" {
+			o.Sender = fakesend.New()
+		} else {
+			o.Sender = &lazySender{engine: engines}
+		}
 	}
 	if o.NewRequestPane == nil {
 		o.NewRequestPane = request.Factory(request.Deps{
@@ -32,10 +87,12 @@ func wireEditors(o *tui.Options) {
 		o.NewEnvEditor = envedit.Factory(envedit.Deps{})
 	}
 	if o.NewCookieManager == nil && o.Backend != nil {
-		// A workspace whose cookie file cannot be read still opens: the
-		// manager is simply not offered.
-		if jar, err := httpx.NewCookieJar(o.Backend.Root()); err == nil {
-			o.NewCookieManager = cookies.Factory(jar)
+		o.NewCookieManager = func(env tui.ScreenEnv) tui.Screen {
+			eng, err := engines.get()
+			if err != nil {
+				return cookies.New(env, nil)
+			}
+			return cookies.New(env, eng.Cookies())
 		}
 	}
 }
