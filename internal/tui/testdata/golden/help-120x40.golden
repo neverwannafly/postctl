@@ -6,16 +6,17 @@
    Ctrl-P       Command palette                                 ↑            Move up                                   
    E            Environments                                    ↓            Move down                                 
    Ctrl-E       Edit environments                               →            Unfold folder                             
-   /            Filter requests                                 ←            Fold folder or go to parent               
-   Tab          Next pane                                       Enter        Open request or toggle folder             
-   Shift-Tab    Previous pane                                   PgUp PgDn    Page up or down                           
-   1 2 3        Jump to Collections, Request, Response          Home         First row                                 
-   Ctrl-B       Show or hide collections                        n            New request, folder or collection         
-   Ctrl-R       Reload from disk                                r            Rename                                    
-   ?            Help                                            D            Duplicate                                 
-   q            Quit                                            m            Move to another folder                    
-                                                                d            Delete                                    
-   Request and response                                         Alt-↑ Alt-↓  Move up or down in its folder             
+   H            History                                         ←            Fold folder or go to parent               
+   /            Filter requests                                 Enter        Open request or toggle folder             
+   Tab          Next pane                                       PgUp PgDn    Page up or down                           
+   Shift-Tab    Previous pane                                   Home         First row                                 
+   1 2 3        Jump to Collections, Request, Response          n            New request, folder or collection         
+   Ctrl-B       Show or hide collections                        r            Rename                                    
+   Ctrl-R       Reload from disk                                D            Duplicate                                 
+   ?            Help                                            m            Move to another folder                    
+   q            Quit                                            d            Delete                                    
+                                                                Alt-↑ Alt-↓  Move up or down in its folder             
+   Request and response                                         R            Run collection                            
    Ctrl-Enter   Send request (also Ctrl-S)                                                                             
    e            Edit in $EDITOR                                 Lists and dialogs                                      
                                                                 Enter        Choose                                    
@@ -27,7 +28,6 @@
    m            Move                                                                                                   
    D            Duplicate                                                                                              
    R            Run collection                                                                                         
-                                                                                                                       
                                                                                                                        
                                                                                                                        
                                                                                                                        

@@ -488,3 +488,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). Commit `bcaa029`.
 - Blockers / questions: none
 - Next: merge ws/6c-runner-history
+
+### 2026-09-30 03:25 IST · INT2 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `main` in `/Users/shubham/work/postctl`
+- Did: Merged WS7 and WS6c in order. Cross-checked their integration and fixed the help overlay so the working `R` runner and `H` history shortcuts are listed alongside `Ctrl-E`.
+- Files: `internal/tui/keys.go`, `internal/tui/testdata/golden/help-*.golden`, `docs/ledger.md`
+- Decisions: WS7's JUnit reporter is package-private and depends on the CLI app, so it is not reusable by the TUI runner without a reporter extraction; runner JUnit export remains a QA follow-up.
+- Tests: Both post-merge build/race/lint gates passed. Local-server CLI smoke passed (`ls` 2 lines, `send` exit 0, `run` exit 0, one JUnit suite). Private checks passed using temporary workspaces and `--keep-literal-secrets`: local dry-run found 2 collections, 11 folders, 23 requests, 17 pre-request scripts and 3 environments; staging import produced 36 flat items. At 140x40, help lists `R`, `H` and `Ctrl-E`; each opens its documented screen, and a collection run reached the summary.
+- Blockers / questions: QA follow-ups are TUI runner JUnit export and the pre-existing task to move envedit, cookies and textarea scroll-offset adjustment out of `View`.
+- Next: Remove finished worktrees, run the final full gate, and record DONE.

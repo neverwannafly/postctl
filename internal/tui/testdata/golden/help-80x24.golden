@@ -6,6 +6,7 @@
    Ctrl-P       Command palette                                                
    E            Environments                                                   
    Ctrl-E       Edit environments                                              
+   H            History                                                        
    /            Filter requests                                                
    Tab          Next pane                                                      
    Shift-Tab    Previous pane                                                  
@@ -17,8 +18,7 @@
                                                                                
    Collections                                                                 
    ↑            Move up                                                        
-   ↓            Move down                                                      
-   1-16 of 47 lines, scroll for more                                           
+   1-16 of 49 lines, scroll for more                                           
  ──────────────────────────────────────────────────────────────────────────────
  
  Esc Close help   ↑↓ Scroll

@@ -96,8 +96,8 @@ func rows(bs ...key.Binding) []helpRow {
 // focusHints are the focused pane's own hints, appended as their own group.
 func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint) []helpGroup {
 	groups := []helpGroup{
-		{"Everywhere", rows(k.Palette, k.Env, k.EnvEdit, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
-		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.New, k.Rename, k.Duplicate, k.Move, k.Delete, k.MoveUp)},
+		{"Everywhere", rows(k.Palette, k.Env, k.EnvEdit, k.History, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
+		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.New, k.Rename, k.Duplicate, k.Move, k.Delete, k.MoveUp, k.RunCollection)},
 		{"Request and response", rows(k.Send, k.Edit)},
 		{"Lists and dialogs", []helpRow{
 			{"Enter", "Choose"}, {"Esc", "Close or cancel"}, {k.Up.Help().Key + " " + k.Down.Help().Key, "Move"},
