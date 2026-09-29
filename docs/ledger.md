@@ -358,3 +358,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Verified `ws/3-script`. It stayed in scope (plus the `task assets` target and goja dependencies); race tests and lint are green. `TestPrivateCollections` ran (not skipped) and passed: all 17 real pre-request scripts run clean. The committed bundles total 1.8 MB, and `node_modules` is gitignored. Corpus fixtures contain no private data. Merged into `main`.
 - Decisions: Accepted deviations. crypto-js is 4.2.0 (the CVE fix) instead of Postman's 3.3.0. `pm.*` is postctl's own implementation (`instanceof sdk.Request` is false). Query strings are not percent-normalized. Found an integration gap: `httpx.CookieJar` doesn't implement `script.CookieAccess` (missing `ClearCookies`); the WS4 brief assigns an adapter.
 - Next: Launch WS4 (engine, runner, history, tuiengine adapter). WS7 (CLI send/run/ls/env) follows WS4. The TUI runner screen and history pane will be briefed after WS4 and WS6a merge.
+
+### 2026-09-30 02:05 IST · WS4 · Sonnet 5.5 · STARTED
+- Branch/worktree: ws/4-engine
+- Did: Read the WS4 brief, plan §0/§4/§4.1/§9, model.md, scripting.md, the DONE entries of WS2, WS2b and WS3, and the vars/httpx/oauth2/script/store APIs and `internal/tui/send.go`.
+- Files: `docs/ledger.md`
+- Decisions: (1) One internal `session` drives both `Send` and the runner, so a run keeps one `vars.MemStore` across requests and iterations and persists var changes incrementally. (2) Only variables are hydrated (on clones); OAuth 2.0 token strings are read lazily by `oauth2.Source` through the token's `Ref`, so auth is never hydrated. (3) Concurrent sends merge through a per-workspace in-memory commit log so a persist replays other sends' changes instead of overwriting them. (4) The cookie adapter is built only on the existing public `httpx.CookieJar` API (`Get`, `Set`, `List`, `Delete`), so httpx is not touched.
+- Tests: n/a
+- Blockers / questions: `store` has no way to load just `globals.yaml`; the engine reads globals through `LoadLenient` and caches by file stat until the orchestrator adds a narrower call.
+- Next: engine send pipeline, cookie adapter, runner, history, tuiengine, docs.
