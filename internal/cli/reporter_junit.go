@@ -1,0 +1,154 @@
+package cli
+
+import (
+	"encoding/xml"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/shubham/postctl/internal/engine"
+)
+
+// junitReporter writes one testsuite per request and one testcase per assertion.
+type junitReporter struct {
+	a      *app
+	w      io.Writer
+	name   string
+	suites []junitSuite
+}
+
+func newJUnitReporter(a *app, w io.Writer) *junitReporter {
+	return &junitReporter{a: a, w: w}
+}
+
+func (r *junitReporter) close() error { return nil }
+
+func (r *junitReporter) event(ev engine.RunEvent) error {
+	switch e := ev.(type) {
+	case engine.RunStarted:
+		r.name = e.CollectionName
+		if e.FolderName != "" {
+			r.name += "/" + e.FolderName
+		}
+	case engine.RequestFinished:
+		r.suites = append(r.suites, r.suite(e))
+	case engine.RunFinished:
+		return r.write(e.Summary)
+	}
+	return nil
+}
+
+func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
+	o := e.Outcome
+	name := ""
+	if o != nil {
+		name = strings.Join(o.Path, "/")
+	}
+	if e.Iteration > 0 || (o != nil && o.Iteration > 0) {
+		iter := e.Iteration
+		if o != nil {
+			iter = o.Iteration
+		}
+		name = fmt.Sprintf("%s [#%d]", name, iter+1)
+	}
+	s := junitSuite{Name: name}
+	if o == nil {
+		return s
+	}
+	seconds := o.Duration.Seconds()
+	if o.Response != nil {
+		seconds = o.Response.Timings.Total.Seconds()
+	}
+	timeAttr := fmt.Sprintf("%.3f", seconds)
+	for _, t := range o.Tests {
+		tc := junitCase{Name: t.Name, ClassName: name, Time: timeAttr}
+		switch {
+		case t.Skipped:
+			tc.Skipped = &junitSkipped{Message: "skipped"}
+		case !t.Passed:
+			msg := r.a.mask(t.Message)
+			tc.Failure = &junitFailure{Message: msg, Type: "assertion", Text: msg}
+			s.Failures++
+		}
+		s.Cases = append(s.Cases, tc)
+		s.Tests++
+	}
+	if o.ScriptError != nil {
+		msg := r.a.mask(o.ScriptError.Text)
+		s.Cases = append(s.Cases, junitCase{
+			Name: "script", ClassName: name, Time: timeAttr,
+			Failure: &junitFailure{Message: msg, Type: "script", Text: msg},
+		})
+		s.Tests++
+		s.Failures++
+	}
+	if o.Err != nil && !errorsIsCancel(o.Err) {
+		msg := r.a.mask(o.Err.Error())
+		s.Cases = append(s.Cases, junitCase{
+			Name: "request", ClassName: name, Time: timeAttr,
+			Failure: &junitFailure{Message: msg, Type: "transport", Text: msg},
+		})
+		s.Tests++
+		s.Failures++
+	}
+	s.Time = timeAttr
+	return s
+}
+
+func (r *junitReporter) write(sum *engine.RunSummary) error {
+	doc := junitSuites{Name: r.name}
+	for _, s := range r.suites {
+		doc.Tests += s.Tests
+		doc.Failures += s.Failures
+		doc.Suites = append(doc.Suites, s)
+	}
+	if sum != nil {
+		doc.Time = fmt.Sprintf("%.3f", sum.TotalTime.Seconds())
+	}
+	if _, err := io.WriteString(r.w, xml.Header); err != nil {
+		return err
+	}
+	enc := xml.NewEncoder(r.w)
+	enc.Indent("", "  ")
+	if err := enc.Encode(doc); err != nil {
+		return err
+	}
+	_, err := io.WriteString(r.w, "\n")
+	return err
+}
+
+type junitSuites struct {
+	XMLName  xml.Name     `xml:"testsuites"`
+	Name     string       `xml:"name,attr"`
+	Tests    int          `xml:"tests,attr"`
+	Failures int          `xml:"failures,attr"`
+	Time     string       `xml:"time,attr"`
+	Suites   []junitSuite `xml:"testsuite"`
+}
+
+type junitSuite struct {
+	XMLName  xml.Name    `xml:"testsuite"`
+	Name     string      `xml:"name,attr"`
+	Tests    int         `xml:"tests,attr"`
+	Failures int         `xml:"failures,attr"`
+	Time     string      `xml:"time,attr,omitempty"`
+	Cases    []junitCase `xml:"testcase"`
+}
+
+type junitCase struct {
+	Name      string        `xml:"name,attr"`
+	ClassName string        `xml:"classname,attr"`
+	Time      string        `xml:"time,attr,omitempty"`
+	Failure   *junitFailure `xml:"failure,omitempty"`
+	Skipped   *junitSkipped `xml:"skipped,omitempty"`
+}
+
+type junitFailure struct {
+	Message string `xml:"message,attr"`
+	Type    string `xml:"type,attr"`
+	Text    string `xml:",chardata"`
+}
+
+type junitSkipped struct {
+	Message string `xml:"message,attr,omitempty"`
+}

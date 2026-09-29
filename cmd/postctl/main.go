@@ -1,19 +1,21 @@
 // Command postctl is a keyboard-first terminal replacement for Postman.
 //
-// This is the WS0 scaffold: flag handling and subcommand dispatch exist, and
-// every command reports "not implemented yet" (exit status 3) until its
-// workstream lands.
+// With no subcommand it opens the interactive UI. ls, send, run, env and curl
+// are the linear CLI. import loads Postman documents.
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
 
+	"github.com/shubham/postctl/internal/cli"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/response"
@@ -37,10 +39,11 @@ type command struct {
 // commands is the subcommand table; behavior lands in later workstreams.
 var commands = []command{
 	{"import", "import postman <files...> [--workspace DIR] [--env FILE...] [--globals FILE] [--dry-run]", "Import Postman collections, environments and globals."},
-	{"ls", "ls [collection[/folder]] [--json]", "List collections, folders and requests."},
-	{"send", "send <collection/path/request> [-e env] [--var k=v] [--json]", "Send one request and print the response and test results."},
-	{"run", "run <collection[/folder]> [-e env] [-d data.csv] [-n iterations] [--reporter cli|json|junit] [--bail]", "Run a collection or folder, like newman."},
-	{"env", "env ls|use|set|get", "List, select and edit environments."},
+	{"ls", "ls [path] [--flat] [--json]", "List collections, folders and requests."},
+	{"send", "send <path> [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests."},
+	{"run", "run <path> [-e env] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--json]", "Run a collection or folder, like newman."},
+	{"env", "env ls | use <name> | show <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments."},
+	{"curl", "curl <path> [-e env] [--with-secrets]", "Print the resolved request as a curl command."},
 }
 
 // launchUI starts the interactive UI; tests replace it.
@@ -53,6 +56,8 @@ func main() {
 // run executes postctl with args (excluding the program name) and returns the
 // process exit status.
 func run(args []string, stdout, stderr io.Writer) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 	fs := flag.NewFlagSet("postctl", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	showVersion := fs.Bool("version", false, "print the version and exit")
@@ -99,6 +104,25 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		return runImport(importArgs, stdout, stderr)
 	}
+	switch rest[0] {
+	case "ls", "send", "run", "env", "curl":
+		if hasHelpFlag(rest[1:]) {
+			for _, c := range commands {
+				if c.name == rest[0] {
+					fmt.Fprintf(stdout, "Usage: postctl %s\n\n%s\n", c.usage, c.summary)
+					return exitOK
+				}
+			}
+		}
+		return cli.Execute(ctx, cli.Options{
+			Workspace: *workspace,
+			ASCII:     *ascii || *accessible || truthy(os.Getenv("POSTCTL_ASCII")),
+			NoColor:   os.Getenv("NO_COLOR") != "" || *accessible,
+			Stdout:    stdout,
+			Stderr:    stderr,
+			Version:   version,
+		}, rest)
+	}
 	for _, c := range commands {
 		if c.name == rest[0] {
 			if hasHelpFlag(rest[1:]) {
@@ -144,6 +168,15 @@ func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
 		return exitUsage
 	}
 	return exitOK
+}
+
+func truthy(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "t", "true", "y", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 func hasHelpFlag(args []string) bool {
