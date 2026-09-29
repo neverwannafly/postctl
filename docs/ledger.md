@@ -26,7 +26,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Running | ws/0-scaffold | 2026-09-30 00:10 IST |
-| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
+| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:18 IST |
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
 | WS6 editor + response viewer | — | Not started | — | — |
@@ -131,3 +131,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-30 00:18 IST · WS3 · Opus 5 Thinking · STARTED
+- Branch/worktree: ws/3-script
+- Did: Read the brief, plan §0 (Q4/R3/C1), §4.1, §7, `AGENTS.md`, `docs/model.md`, `internal/model`, and the C1 contracts `internal/vars/scope.go` and `internal/httpx/types.go`. Confirmed the toolchain (Go 1.26.1, node 22 via nvm for development-time bundle fetching only) and added `github.com/dop251/goja` + `github.com/dop251/goja_nodejs` to `go.mod`.
+- Files: `go.mod`, `go.sum`, `docs/ledger.md`
+- Decisions: Engine is goja + goja_nodejs (pure Go, no cgo) per plan §4. npm libraries will be vendored as pinned, minified, ES5 CommonJS bundles under `internal/script/assets/` and embedded; node/npm is a development-time-only dependency.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: Build the bundle pipeline and the core `pm.*` surface against in-package fakes for `vars.Store` and `httpx.Sender`.
