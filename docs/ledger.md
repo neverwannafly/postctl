@@ -35,7 +35,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
-| QA-fixes | GPT-5.6 Sol (medium) | In progress | qa/fixes | 2026-09-30 03:15 IST |
+| QA-fixes | GPT-5.6 Sol (medium) | Done | qa/fixes | 2026-09-30 03:29 IST |
 
 ## Entries
 
@@ -545,3 +545,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Part A `go build ./... && go test -race ./... && golangci-lint run` passed.
 - Blockers / questions: none.
 - Next: WebSocket layout.
+
+### 2026-09-30 03:29 IST · QA-fixes · GPT-5.6 Sol (medium) · DONE
+- Branch/worktree: qa/fixes (`/Users/shubham/work/postctl-wt/qa-fixes`, not merged, not pushed)
+- Did: Implemented all five QA decisions: WebSocket requests receive the full request/response width; collection runs skip WebSocket requests and `postctl send` gives HTTP-only guidance; TUI views no longer mutate their models while rendering; CLI JSON/JUnit reporters now live in `internal/report` and power JSON/JUnit runner exports; and a repository-level secret-leak sweep covers engine send/run, history and workspace persistence, both reports, masked curl, and 140×40 request/response-timeline/history renders.
+- Files: shell layout/focus/help and WebSocket goldens; engine/CLI/runner skip handling and report goldens; TUI view-purity fixes and tests; `internal/report`, CLI adapters and TUI runner export; `internal/qa/secret_leak_test.go`.
+- Decisions: TUI runner export infers JSON versus JUnit from `.json`/`.xml` and Tab toggles the format. WebSocket skips emit the fixed reason "WebSocket requests are not run" without scripts or run delay.
+- Tests: Full `go build ./... && go test -race ./... && golangci-lint run` passed before each QA commit. The leak sweep found no persisted, exported, curl or rendered sentinel leak; the echoed response body contains the credential only in memory as explicitly permitted.
+- Blockers / questions: none.
+- Next: independent review and orchestrator merge.
