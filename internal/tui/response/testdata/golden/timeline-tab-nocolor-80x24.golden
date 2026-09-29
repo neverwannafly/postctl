@@ -1,0 +1,21 @@
+200 OK  67 ms  188 B  Tests 2/3                                                 
+Body  Headers(1)  Cookies  Tests(3)  Console(2)  Timeline                       
+─────────────────────────────────────────────────━━━━━━━━───────────────────────
+Timing                                                                          
+DNS         ▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 2 ms                                           
+Connect     ▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 5 ms                                           
+TLS         ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 0 ms                                           
+TTFB        ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱ 50 ms                                          
+Download    ▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱ 10 ms                                          
+Total 67 ms                                                                     
+                                                                                
+Remote    127.0.0.1:443                                                         
+                                                                                
+Request sent                                                                    
+GET     https://api.example.com/v1/items                                        
+Authorization: ••••                                                             
+Accept: application/json                                                        
+                                                                                
+                                                                                
+                                                                                
+                                                                                

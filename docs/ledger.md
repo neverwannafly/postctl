@@ -30,7 +30,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS4 engine/runner | — | Not started | — | — |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Running | ws/6a-request-editor | 2026-09-30 00:20 IST |
-| WS6b response viewer | Composer 2.5 (fast) | Running | ws/6b-response-viewer | 2026-09-30 00:20 IST |
+| WS6b response viewer | Composer 2.5 (fast) | Running | ws/6b-response-viewer | 2026-09-30 00:25 IST |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
@@ -278,6 +278,15 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green. Cold start to first frame with 1,000 requests: 44 ms in the harness, 2.9 ms of that in the app (benchmark); process start to first output about 45 ms in a pty.
 - Blockers / questions: (1) Fold state persistence needs a field in `store.State`. (2) kqueue uses a descriptor per watched directory; the polling fallback covers huge trees but is untested at that scale. (3) WS6: which of `Ctrl-Enter` and `Ctrl-S` sends? Both are reserved in the key map.
 - Next: merge `ws/5-tui-shell` after WS0.1 (swap `deepCopy` for `Clone`, drop the `LoadLenient` shim); then WS6 implements the Request and Response panes.
+
+### 2026-09-30 00:25 IST · WS6b · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/6b-response-viewer
+- Did: Read brief, design-language, send contract, pane API, and ui components. Added chroma and gjson dependencies.
+- Files: `docs/ledger.md`, `go.mod`, `go.sum`
+- Decisions: Implement `internal/tui/response/` as the sole pane owner; wire `NewResponsePane` in `cmd/postctl`; demo via `POSTCTL_DEMO_RESPONSE=1`.
+- Tests: Not run yet.
+- Blockers / questions: WS6a send wiring may land later; pane consumes send messages directly.
+- Next: Core pane, body virtualizer, tabs, tests and goldens.
 
 ### 2026-09-30 00:20 IST · WS5 · Orchestrator · PROGRESS
 - Did: Verified `ws/5-tui-shell` (in scope; golden renders reviewed by hand, e.g. the delete dialog at 200×60 defaults to Cancel and names the folder and request count). Merged into `main`, resolving `go.mod`/`go.sum`/ledger conflicts and a duplicate global `--workspace` flag between WS1 and WS5 in `cmd/postctl/main.go`. Build, race tests and lint are green.
