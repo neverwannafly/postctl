@@ -72,6 +72,8 @@ func (a *app) sidebarKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.reorder(-1)
 	case key.Matches(msg, k.MoveDown):
 		return a.reorder(1)
+	case key.Matches(msg, k.RunCollection):
+		return a.openRunnerFromTree()
 	default:
 		return nil
 	}

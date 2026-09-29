@@ -337,6 +337,8 @@ type ScreenEnv struct {
 	Focus model.ID
 	// ASCII reports the ASCII glyph set.
 	ASCII bool
+	// RunScope seeds the collection runner when opening from the tree.
+	RunScope *RunScope
 }
 
 // ScreenFactory builds a screen.

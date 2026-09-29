@@ -320,6 +320,9 @@ func (a *app) sidebarHints() []ui.Hint {
 	hs = append(hs, hint("n", "New", 1), hint("/", "Filter", 1))
 	if ok && r.kind != rowProblem {
 		hs = append(hs, hint("r", "Rename", 4), hint("d", "Delete", 5), hint("m", "Move", 5), hint("D", "Duplicate", 6))
+		if r.kind == rowCollection || r.kind == rowFolder {
+			hs = append(hs, hint("R", "Run collection", 2))
+		}
 	}
 	if a.tree.query != "" {
 		hs = append(hs, hint("Esc", "Clear filter", 0))

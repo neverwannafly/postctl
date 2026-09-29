@@ -1,0 +1,9 @@
+postctl  demo — Run summary                                                                                                        env  none
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────Iterations  1
+Requests    2
+Tests       3 passed, 1 failed
+Duration    1.2s
+
+Failures
+× Bad: assertion failed
+r Re-run  R Re-run failed  e Export JSON  Esc Close

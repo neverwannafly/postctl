@@ -44,6 +44,9 @@ type Options struct {
 	// NewEnvEditor and NewCookieManager supply the environment editor
 	// (Ctrl-E) and the cookie manager screens. Nil hides their actions.
 	NewEnvEditor, NewCookieManager ScreenFactory
+	// NewRunner and NewHistory supply the collection runner and history
+	// screens. Nil hides their actions and keys.
+	NewRunner, NewHistory ScreenFactory
 	// Registry receives palette actions; a fresh one is used when nil.
 	Registry *Registry
 	// NoWatch disables file watching (tests).
@@ -280,6 +283,10 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.onSaveMsg(msg)
 	case OpenScreenMsg:
 		return a, a.openScreen(msg.Screen)
+	case SelectRequestMsg:
+		return a, a.selectRequest(msg.RequestID)
+	case SendSavedRequestMsg:
+		return a, a.sendSavedRequest(msg.RequestID)
 	case foldPersistMsg:
 		return a, a.onFoldPersist(msg)
 	}
@@ -592,6 +599,8 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	case key.Matches(msg, a.keys.Filter):
 		cmds := []tea.Cmd{a.setFocus(SlotSidebar), a.tree.startFilter()}
 		return tea.Batch(cmds...), true
+	case key.Matches(msg, a.keys.History) && a.opts.NewHistory != nil:
+		return a.openHistory(), true
 	case msg.String() == "1":
 		return a.setFocus(SlotSidebar), true
 	case msg.String() == "2":
@@ -718,6 +727,53 @@ func (a *app) syncSelection(open bool) tea.Cmd {
 		cmds = append(cmds, a.setFocus(SlotRequest))
 	}
 	return tea.Batch(cmds...)
+}
+
+func (a *app) selectRequest(id model.ID) tea.Cmd {
+	if a.tree.reveal(id) {
+		return tea.Batch(a.syncSelection(true), a.setFocus(SlotRequest))
+	}
+	return a.toastWarn("That request is not in the workspace.")
+}
+
+func (a *app) sendSavedRequest(id model.ID) tea.Cmd {
+	if a.ws == nil {
+		return nil
+	}
+	coll, req := findRequest(a.ws, id)
+	if req == nil {
+		return a.toastWarn("That request is not in the workspace.")
+	}
+	return a.startSend(SendRequest{
+		Collection:  coll,
+		Request:     req,
+		Environment: a.activeEnvironment(),
+	})
+}
+
+func findRequest(ws *model.Workspace, id model.ID) (*model.Collection, *model.Request) {
+	for _, c := range ws.Collections {
+		if r := findRequestInItems(c.Items, id); r != nil {
+			return c, r
+		}
+	}
+	return nil, nil
+}
+
+func findRequestInItems(items []model.Item, id model.ID) *model.Request {
+	for _, it := range items {
+		switch v := it.(type) {
+		case *model.Request:
+			if v.ID == id {
+				return v
+			}
+		case *model.Folder:
+			if r := findRequestInItems(v.Items, id); r != nil {
+				return r
+			}
+		}
+	}
+	return nil
 }
 
 // isFirstRun reports whether the guide replaces the main screen: there is
