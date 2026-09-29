@@ -83,4 +83,14 @@ func (e *textEditor) update(msg tea.Msg) bool {
 	return e.ta.Value() != before
 }
 
-func (e *textEditor) view() string { return e.ta.View() }
+func (e *textEditor) view() string {
+	ta := e.ta
+	return ta.View()
+}
+
+func (e *textEditor) render(w, h int) string {
+	ta := e.ta
+	ta.SetWidth(max(4, w))
+	ta.SetHeight(max(1, h))
+	return ta.View()
+}

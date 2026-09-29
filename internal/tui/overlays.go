@@ -206,6 +206,8 @@ func newPicker(a *app, title, placeholder, empty string, items []pickItem, onPic
 	cmd := in.Focus()
 	p := &pickerOverlay{title: title, input: in, all: items, empty: empty, onPick: onPick}
 	p.refilter()
+	g := a.geo()
+	p.setSize(g.width, g.bodyH)
 	return p, cmd
 }
 
@@ -264,11 +266,14 @@ func (p *pickerOverlay) scroll() {
 	}
 }
 
-func (p *pickerOverlay) view(a *app, w, h int) string {
-	t := a.theme
+func (p *pickerOverlay) setSize(w, h int) {
 	p.input.SetWidth(max(8, w-4))
 	p.lastPage = max(1, h-4)
 	p.scroll()
+}
+
+func (p *pickerOverlay) view(a *app, w, h int) string {
+	t := a.theme
 	head := t.Bold().Render(p.title)
 	esc := t.Render(ui.TextSecondary, "Esc Close")
 	gap := max(1, w-ui.Width(head)-ui.Width(esc))

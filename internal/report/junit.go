@@ -1,7 +1,9 @@
-package cli
+package report
 
 import (
+	"context"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -9,21 +11,23 @@ import (
 	"github.com/shubham/postctl/internal/engine"
 )
 
-// junitReporter writes one testsuite per request and one testcase per assertion.
 type junitReporter struct {
-	a      *app
+	opts   Options
 	w      io.Writer
 	name   string
 	suites []junitSuite
 }
 
-func newJUnitReporter(a *app, w io.Writer) *junitReporter {
-	return &junitReporter{a: a, w: w}
+// NewJUnit returns a buffered JUnit XML run reporter.
+func NewJUnit(w io.Writer, opts Options) Reporter {
+	return &junitReporter{opts: opts, w: w}
 }
 
-func (r *junitReporter) close() error { return nil }
+// Close finishes the reporter.
+func (r *junitReporter) Close() error { return nil }
 
-func (r *junitReporter) event(ev engine.RunEvent) error {
+// Event accumulates one run event and writes the report when the run finishes.
+func (r *junitReporter) Event(ev engine.RunEvent) error {
 	switch e := ev.(type) {
 	case engine.RunStarted:
 		r.name = e.CollectionName
@@ -60,13 +64,26 @@ func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
 		seconds = o.Response.Timings.Total.Seconds()
 	}
 	timeAttr := fmt.Sprintf("%.3f", seconds)
+	if o.Skipped {
+		msg := o.SkipReason
+		if msg == "" {
+			msg = "skipped"
+		}
+		s.Cases = append(s.Cases, junitCase{
+			Name: "request", ClassName: name, Time: timeAttr,
+			Skipped: &junitSkipped{Message: msg},
+		})
+		s.Tests++
+		s.Skipped++
+	}
 	for _, t := range o.Tests {
 		tc := junitCase{Name: t.Name, ClassName: name, Time: timeAttr}
 		switch {
 		case t.Skipped:
 			tc.Skipped = &junitSkipped{Message: "skipped"}
+			s.Skipped++
 		case !t.Passed:
-			msg := r.a.mask(t.Message)
+			msg := r.opts.mask(t.Message)
 			tc.Failure = &junitFailure{Message: msg, Type: "assertion", Text: msg}
 			s.Failures++
 		}
@@ -74,7 +91,7 @@ func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
 		s.Tests++
 	}
 	if o.ScriptError != nil {
-		msg := r.a.mask(o.ScriptError.Text)
+		msg := r.opts.mask(o.ScriptError.Text)
 		s.Cases = append(s.Cases, junitCase{
 			Name: "script", ClassName: name, Time: timeAttr,
 			Failure: &junitFailure{Message: msg, Type: "script", Text: msg},
@@ -82,8 +99,8 @@ func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
 		s.Tests++
 		s.Failures++
 	}
-	if o.Err != nil && !errorsIsCancel(o.Err) {
-		msg := r.a.mask(o.Err.Error())
+	if o.Err != nil && !errors.Is(o.Err, context.Canceled) {
+		msg := r.opts.mask(o.Err.Error())
 		s.Cases = append(s.Cases, junitCase{
 			Name: "request", ClassName: name, Time: timeAttr,
 			Failure: &junitFailure{Message: msg, Type: "transport", Text: msg},
@@ -96,10 +113,11 @@ func (r *junitReporter) suite(e engine.RequestFinished) junitSuite {
 }
 
 func (r *junitReporter) write(sum *engine.RunSummary) error {
-	doc := junitSuites{Name: r.name}
+	doc := JUnitSuites{Name: r.name}
 	for _, s := range r.suites {
 		doc.Tests += s.Tests
 		doc.Failures += s.Failures
+		doc.Skipped += s.Skipped
 		doc.Suites = append(doc.Suites, s)
 	}
 	if sum != nil {
@@ -117,11 +135,13 @@ func (r *junitReporter) write(sum *engine.RunSummary) error {
 	return err
 }
 
-type junitSuites struct {
+// JUnitSuites is the XML document emitted by the JUnit reporter.
+type JUnitSuites struct {
 	XMLName  xml.Name     `xml:"testsuites"`
 	Name     string       `xml:"name,attr"`
 	Tests    int          `xml:"tests,attr"`
 	Failures int          `xml:"failures,attr"`
+	Skipped  int          `xml:"skipped,attr"`
 	Time     string       `xml:"time,attr"`
 	Suites   []junitSuite `xml:"testsuite"`
 }
@@ -131,6 +151,7 @@ type junitSuite struct {
 	Name     string      `xml:"name,attr"`
 	Tests    int         `xml:"tests,attr"`
 	Failures int         `xml:"failures,attr"`
+	Skipped  int         `xml:"skipped,attr"`
 	Time     string      `xml:"time,attr,omitempty"`
 	Cases    []junitCase `xml:"testcase"`
 }

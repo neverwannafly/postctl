@@ -56,6 +56,10 @@ func runSend(ctx context.Context, a *app, args []string) int {
 		fmt.Fprintf(a.err, "%q is a %s. postctl send takes a request.\n", path, n.kind())
 		return ExitUsage
 	}
+	if n.request().Kind == model.KindWebSocket {
+		fmt.Fprintln(a.err, "Open WebSocket requests in the TUI; `postctl send` supports HTTP requests.")
+		return ExitUsage
+	}
 	env, code := a.lookupEnv(*envName)
 	if code >= 0 {
 		return code
@@ -182,6 +186,9 @@ func writeSendText(a *app, o *engine.Outcome, include, verbose bool) {
 func (a *app) outcomeStatus(o *engine.Outcome) string {
 	switch {
 	case o.Skipped:
+		if o.SkipReason != "" {
+			return a.view.skip() + " Skipped — " + o.SkipReason
+		}
 		return a.view.skip() + " Skipped"
 	case o.Err != nil && errors.Is(o.Err, context.Canceled):
 		return a.view.fail() + " Canceled"

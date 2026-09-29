@@ -25,6 +25,8 @@ postctl send Payments/List\ charges --include --verbose
 postctl send Payments/List\ charges --json --no-scripts --no-history
 ```
 
+`send` accepts HTTP requests only. Open WebSocket requests in the TUI.
+
 Stdout is the status line, then the body, then tests:
 
 ```text
@@ -49,6 +51,9 @@ postctl run Payments --timeout-request 30s --no-history
 `run` takes a collection or a folder. A request path is an error; use `send`.
 
 The `cli` reporter streams each iteration and request, then a summary (iterations, requests, test scripts, prerequest scripts, assertions: executed and failed; total run duration, data received, average response time) and a numbered failures list. Ctrl-C cancels the run and still prints that summary for whatever finished.
+
+WebSocket requests are listed as skipped and are not counted as executed
+requests or failures.
 
 `--reporter` is a comma-separated list of `cli`, `json` and `junit`. The default is `cli`. `--json` selects the json reporter when `--reporter` is omitted. `json` is NDJSON, one event per line (`run-started`, `iteration-started`, `request-started`, `request-progress`, `request-finished`, `iteration-finished`, `run-finished`). It does not include response bodies. `junit` is XML: one `testsuite` per request (name `path` or `path [#n]` when the iteration is not the first) and one `testcase` per assertion. Script and transport errors are extra failing cases.
 

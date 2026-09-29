@@ -195,16 +195,17 @@ func (f *form) paste(p *Pane, rows func() []formRow, m tea.PasteMsg) bool {
 // view draws the rows in w x h.
 func (f *form) view(p *Pane, rows []formRow, w, h int) string {
 	th := p.th
-	f.clamp(rows)
+	view := *f
+	view.clamp(rows)
 	labelW := min(20, max(10, w/3))
 	valW := max(4, w-2-labelW-1)
-	f.top = scrollTo(f.top, f.cur, h, len(rows))
-	end := min(len(rows), f.top+h)
+	top := scrollTo(view.top, view.cur, h, len(rows))
+	end := min(len(rows), top+h)
 	var out []string
-	for i := f.top; i < end; i++ {
-		out = append(out, f.rowView(p, rows[i], i == f.cur, labelW, valW))
+	for i := top; i < end; i++ {
+		out = append(out, view.rowView(p, rows[i], i == view.cur, labelW, valW))
 	}
-	if (f.top > 0 || end < len(rows)) && len(out) > 0 && h > 1 {
+	if (top > 0 || end < len(rows)) && len(out) > 0 && h > 1 {
 		more := th.Render(ui.TextQuiet, th.Glyphs.Ellipsis+" "+itoa(len(rows))+" fields")
 		out[len(out)-1] = th.Fit(out[len(out)-1], w-ui.Width(more)-1) + " " + more
 	}

@@ -399,6 +399,34 @@ func TestRunSkippedRequestsAreCounted(t *testing.T) {
 	}
 }
 
+func TestRunSkipsWebSocketRequestsWithoutExecutingThem(t *testing.T) {
+	srv := newServer(t, jsonHandler(`{}`))
+	f := newFixture(t, srv)
+	ws := model.NewWebSocketRequest("stream", "wss://socket.example.test/feed")
+	ws.Scripts.PreRequest = js(`throw new Error("must not run")`)
+	httpReq := model.NewRequest("http", "GET", "{{baseUrl}}/http")
+	f.col.Items = append(f.col.Items, ws, httpReq)
+	f.save()
+
+	sum, events := f.run(RunInput{})
+	if sum.Skipped != 1 || sum.Requests != 1 || sum.TransportErrors != 0 || sum.ExitCode() != 0 {
+		t.Fatalf("summary: %+v", sum)
+	}
+	if len(srv.hits()) != 1 {
+		t.Fatalf("HTTP hits = %d, want 1", len(srv.hits()))
+	}
+	var skipped *Outcome
+	for _, ev := range events {
+		if fin, ok := ev.(RequestFinished); ok && fin.Outcome.RequestID == ws.ID {
+			skipped = fin.Outcome
+		}
+	}
+	if skipped == nil || !skipped.Skipped || skipped.SkipReason != WebSocketSkipReason ||
+		skipped.Response != nil || skipped.Err != nil || skipped.ScriptError != nil {
+		t.Fatalf("WebSocket outcome: %+v", skipped)
+	}
+}
+
 func TestRunCancellation(t *testing.T) {
 	srv := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/b" {

@@ -10,6 +10,10 @@ import (
 	"github.com/shubham/postctl/internal/vars"
 )
 
+// WebSocketSkipReason is reported when a collection run encounters a
+// WebSocket request. WebSocket sessions are opened interactively in the TUI.
+const WebSocketSkipReason = "WebSocket requests are not run"
+
 // RunInput configures a collection run. It follows the Postman runner.
 type RunInput struct {
 	// Collection is the collection to run. Required.
@@ -111,7 +115,8 @@ type RunSummary struct {
 	Iterations int
 	// Requests is how many requests were attempted (skipped ones excluded).
 	Requests int
-	// Skipped counts requests a pre-request script skipped.
+	// Skipped counts requests skipped by a pre-request script or because their
+	// kind is not supported by collection runs.
 	Skipped int
 	// Tests tallies every test of every request.
 	Tests TestCounts
@@ -412,34 +417,49 @@ iterations:
 		sum.Iterations++
 		out.emit(IterationStarted{Iteration: iter, Iterations: p.iterations})
 
-		executed, failed := 0, 0
+		executed, visited, failed := 0, 0, 0
 		for i := 0; i < len(p.items); {
 			if ctx.Err() != nil {
 				stop = StopCancelled
 				out.emit(IterationFinished{Iteration: iter, Requests: executed, Failed: failed})
 				break iterations
 			}
-			if !first && in.Delay > 0 && !sleep(ctx, in.Delay) {
+			item := p.items[i]
+			websocket := item.req.Kind == model.KindWebSocket
+			if !websocket && !first && in.Delay > 0 && !sleep(ctx, in.Delay) {
 				stop = StopCancelled
 				out.emit(IterationFinished{Iteration: iter, Requests: executed, Failed: failed})
 				break iterations
 			}
-			first = false
+			if !websocket {
+				first = false
+			}
 
-			item := p.items[i]
-			index := executed
-			executed++
+			index := visited
+			visited++
 			out.emit(RequestStarted{
 				Iteration: iter, Index: index, RequestID: item.req.ID, RequestName: item.req.Name,
 				Path: pathNames(item.chain, item.req.Name),
 			})
-			outcome := s.execute(ctx, item.req, item.chain, iter, func(step Step) {
-				out.emit(RequestProgress{Iteration: iter, RequestID: item.req.ID, Step: step})
-			})
+			var outcome *Outcome
+			if websocket {
+				outcome = &Outcome{
+					RequestID: item.req.ID, RequestName: item.req.Name,
+					Path: pathNames(item.chain, item.req.Name), Iteration: iter,
+					Started: clock(), Skipped: true, SkipReason: WebSocketSkipReason,
+				}
+			} else {
+				outcome = s.execute(ctx, item.req, item.chain, iter, func(step Step) {
+					out.emit(RequestProgress{Iteration: iter, RequestID: item.req.ID, Step: step})
+				})
+			}
 			out.emit(RequestFinished{Iteration: iter, Index: index, Outcome: outcome})
 
 			if outcome.Failed() {
 				failed++
+			}
+			if !outcome.Skipped {
+				executed++
 			}
 			cancelled := ctx.Err() != nil
 			tally(sum, outcome, cancelled)

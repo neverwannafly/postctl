@@ -227,6 +227,10 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width, a.height = msg.Width, msg.Height
 		a.layoutPanes()
+		if o, ok := a.ov.(interface{ setSize(int, int) }); ok {
+			g := a.geo()
+			o.setSize(g.width, g.bodyH)
+		}
 		return a, nil
 	case tea.BackgroundColorMsg:
 		return a, a.setDark(msg.IsDark())
@@ -622,6 +626,9 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 
 // focusOrder lists the slots Tab cycles through in the current layout.
 func (a *app) focusOrder() []Slot {
+	if a.responseHidden() {
+		return []Slot{SlotSidebar, SlotRequest}
+	}
 	if a.layoutKind() == ui.LayoutSingle && a.focus != SlotSidebar {
 		return []Slot{SlotRequest, SlotResponse}
 	}
@@ -654,6 +661,9 @@ func (a *app) toggleSidebar() tea.Cmd {
 
 // setFocus moves keyboard focus to s.
 func (a *app) setFocus(s Slot) tea.Cmd {
+	if s == SlotResponse && a.responseHidden() {
+		return nil
+	}
 	if s == a.focus {
 		return nil
 	}
@@ -690,6 +700,14 @@ func (a *app) layoutKind() ui.Layout {
 		return ui.LayoutSingle
 	}
 	return ui.LayoutFor(a.width)
+}
+
+// responseHidden reports whether a WebSocket request owns the whole content
+// area beside the tree. Single-pane mode keeps its existing slot switching.
+func (a *app) responseHidden() bool {
+	ref := a.currentRef()
+	return a.layoutKind() != ui.LayoutSingle &&
+		ref.Request != nil && ref.Request.Kind == model.KindWebSocket
 }
 
 // ---- selection --------------------------------------------------------------
@@ -729,8 +747,9 @@ func (a *app) syncSelection(open bool) tea.Cmd {
 		return nil
 	}
 	a.lastSel = sig
+	a.layoutPanes()
 	cmds := []tea.Cmd{a.broadcast(SelectionMsg{Ref: ref, Open: open})}
-	if open {
+	if open || (a.responseHidden() && a.focus == SlotResponse) {
 		cmds = append(cmds, a.setFocus(SlotRequest))
 	}
 	return tea.Batch(cmds...)

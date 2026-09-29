@@ -26,9 +26,11 @@ func newCLIReporter(a *app, w io.Writer, methods map[model.ID]string) *cliReport
 	return &cliReporter{a: a, w: w, methods: methods}
 }
 
-func (r *cliReporter) close() error { return nil }
+// Close finishes the reporter.
+func (r *cliReporter) Close() error { return nil }
 
-func (r *cliReporter) event(ev engine.RunEvent) error {
+// Event renders one run event.
+func (r *cliReporter) Event(ev engine.RunEvent) error {
 	switch e := ev.(type) {
 	case engine.RunStarted:
 		r.name = e.CollectionName
@@ -111,6 +113,7 @@ func (r *cliReporter) writeSummary(sum *engine.RunSummary) {
 	rows := [][3]string{
 		{"iterations", fmt.Sprintf("%d", sum.Iterations), fmt.Sprintf("%d", failedIterationCount(sum))},
 		{"requests", fmt.Sprintf("%d", sum.Requests), fmt.Sprintf("%d", failedRequestCount(sum))},
+		{"skipped", fmt.Sprintf("%d", sum.Skipped), "0"},
 		{"test-scripts", fmt.Sprintf("%d", r.testN), fmt.Sprintf("%d", r.testFail)},
 		{"prerequest-scripts", fmt.Sprintf("%d", r.preN), fmt.Sprintf("%d", r.preFail)},
 		{"assertions", fmt.Sprintf("%d", sum.Tests.Total()), fmt.Sprintf("%d", sum.Tests.Failed)},

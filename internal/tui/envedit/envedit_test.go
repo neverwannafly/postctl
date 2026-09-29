@@ -2,6 +2,7 @@ package envedit
 
 import (
 	"context"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -177,6 +178,24 @@ func (h *harness) typ(s string) {
 }
 
 func (h *harness) view() string { return ansi.Strip(h.m.View()) }
+
+func TestViewIsPure(t *testing.T) {
+	h := newHarness(t, 80, 24)
+	h.scr.cur, h.scr.top = 2, 1
+	snapshot := func() any {
+		return struct {
+			Sel      [3]int
+			Cur, Top int
+			Tab      tabKind
+			Zone     zone
+		}{h.scr.sel, h.scr.cur, h.scr.top, h.scr.tab, h.scr.zone}
+	}
+	before := snapshot()
+	first, second := h.m.View(), h.m.View()
+	if first != second || !reflect.DeepEqual(before, snapshot()) {
+		t.Fatalf("View mutated environment editor state: before=%+v after=%+v", before, snapshot())
+	}
+}
 
 func (h *harness) mustHave(sub string) {
 	h.t.Helper()

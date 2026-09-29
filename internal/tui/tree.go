@@ -550,19 +550,20 @@ func (tv *treeState) view(focused bool) string {
 		lines = append(lines, tv.emptyView())
 		return t.Block(strings.Join(lines, "\n"), tv.w, tv.h)
 	}
-	if len(tv.cache) != len(tv.rows) {
-		tv.cache = make([]string, len(tv.rows))
-	}
 	end := min(len(tv.rows), tv.top+n)
 	for i := tv.top; i < end; i++ {
 		if i == tv.cursor {
 			lines = append(lines, tv.renderRow(tv.rows[i], true, focused))
 			continue
 		}
-		if tv.cache[i] == "" {
-			tv.cache[i] = tv.renderRow(tv.rows[i], false, false)
+		row := ""
+		if i < len(tv.cache) {
+			row = tv.cache[i]
 		}
-		lines = append(lines, tv.cache[i])
+		if row == "" {
+			row = tv.renderRow(tv.rows[i], false, false)
+		}
+		lines = append(lines, row)
 	}
 	return t.Block(strings.Join(lines, "\n"), tv.w, tv.h)
 }

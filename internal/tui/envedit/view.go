@@ -281,15 +281,15 @@ func (m *Model) tablePane(w, h int, name, note string) string {
 		return header + "\n\n" + empty
 	}
 	rh := max(1, h-4)
-	m.top = scroll(m.top, m.cur, rh, len(rows))
-	end := min(len(rows), m.top+rh)
-	kv := make([]ui.KVRow, 0, end-m.top)
-	for _, v := range rows[m.top:end] {
+	top := scroll(m.top, m.cur, rh, len(rows))
+	end := min(len(rows), top+rh)
+	kv := make([]ui.KVRow, 0, end-top)
+	for _, v := range rows[top:end] {
 		kv = append(kv, ui.KVRow{Key: v.Key, Value: v.Value, Description: v.Description, Disabled: v.Disabled, Secret: v.IsSecret()})
 	}
 	focus := -1
 	if m.zone == zTable {
-		focus = m.cur - m.top
+		focus = m.cur - top
 	}
 	table := t.KVTable(kv, ui.KVTableOptions{Width: w, Focus: focus, Header: true, Reveal: m.reveal})
 	pad := strings.Repeat("\n", max(0, rh+1-(strings.Count(table, "\n")+1)))

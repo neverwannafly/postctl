@@ -65,9 +65,13 @@ func wsDemo() *model.Workspace {
 }
 
 func routed(t *testing.T) (*harness, *probePane, *probePane) {
+	return routedAt(t, 160, 30)
+}
+
+func routedAt(t *testing.T, w, height int) (*harness, *probePane, *probePane) {
 	t.Helper()
 	httpP, wsP := &probePane{name: "http"}, &probePane{name: "ws"}
-	h := newHarness(t, wsDemo(), 160, 30, func(o *Options) {
+	h := newHarness(t, wsDemo(), w, height, func(o *Options) {
 		o.NewRequestPane = func(PaneEnv) Pane { return httpP }
 		o.NewPaneForKind = map[model.Kind]PaneFactory{model.KindWebSocket: func(PaneEnv) Pane { return wsP }}
 	})
@@ -166,6 +170,47 @@ func TestRouterSizesEveryPane(t *testing.T) {
 	h.msg(sizeMsg(120, 40))
 	if httpP.w == 0 || httpP.w != wsP.w || httpP.h != wsP.h {
 		t.Fatalf("sizes: http %dx%d ws %dx%d", httpP.w, httpP.h, wsP.w, wsP.h)
+	}
+}
+
+func TestWebSocketUsesTheResponseSpaceAndSkipsItsFocus(t *testing.T) {
+	for _, width := range []int{120, 160, 200} {
+		h, _, wsP := routedAt(t, width, 40)
+		h.selectByName("Live feed")
+		h.keys("enter")
+		if h.a.responseHidden() != (width >= 100) {
+			t.Fatalf("width %d: responseHidden=%v", width, h.a.responseHidden())
+		}
+		if width >= 100 {
+			if strings.Contains(strings.Split(h.screen(), "\n")[2], "Response") {
+				t.Fatalf("width %d still shows Response:\n%s", width, h.screen())
+			}
+			if wsP.w != h.a.geo().requestW {
+				t.Fatalf("width %d: WebSocket width=%d, geometry=%d", width, wsP.w, h.a.geo().requestW)
+			}
+			h.keys("tab")
+			if h.a.focus != SlotSidebar {
+				t.Fatalf("width %d: tab should skip Response, focus=%v", width, h.a.focus)
+			}
+			h.keys("3")
+			if h.a.focus == SlotResponse {
+				t.Fatalf("width %d: hidden Response accepted focus", width)
+			}
+		}
+	}
+}
+
+func TestWebSocketLayoutGoldens(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		w, h int
+	}{{"140x40", 140, 40}, {"200x60", 200, 60}} {
+		t.Run(tc.name, func(t *testing.T) {
+			h, _, _ := routedAt(t, tc.w, tc.h)
+			h.selectByName("Live feed")
+			h.keys("enter")
+			golden(t, "websocket-layout-"+tc.name, h.screen())
+		})
 	}
 }
 

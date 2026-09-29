@@ -185,8 +185,8 @@ func (m *Model) curEnv() *model.Environment {
 	if len(es) == 0 {
 		return nil
 	}
-	m.sel[tabEnvs] = min(max(m.sel[tabEnvs], 0), len(es)-1)
-	return es[m.sel[tabEnvs]]
+	sel := min(max(m.sel[tabEnvs], 0), len(es)-1)
+	return es[sel]
 }
 
 func (m *Model) curColl() *model.Collection {
@@ -194,8 +194,8 @@ func (m *Model) curColl() *model.Collection {
 	if len(cs) == 0 {
 		return nil
 	}
-	m.sel[tabCollections] = min(max(m.sel[tabCollections], 0), len(cs)-1)
-	return cs[m.sel[tabCollections]]
+	sel := min(max(m.sel[tabCollections], 0), len(cs)-1)
+	return cs[sel]
 }
 
 // list is the variables being edited, or nil when there is nothing to edit.

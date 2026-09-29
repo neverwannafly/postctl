@@ -114,8 +114,7 @@ func (p *Pane) composerView(w, h int) string {
 		right += "  " + th.Render(ui.StatusSuccess, th.Glyphs.Check+" valid")
 	}
 	head := p.sectionHead("Message", "", p.hasCursor(sComposer), right, w)
-	p.comp.resize(w, max(1, h-1))
-	return head + "\n" + p.comp.view()
+	return head + "\n" + p.comp.render(w, max(1, h-1))
 }
 
 // ---- saved messages -------------------------------------------------------------------
@@ -135,12 +134,12 @@ func (p *Pane) savedView(w, h int) string {
 		return head + "\n  " + th.Render(ui.TextQuiet, th.Truncate("None yet. Ctrl-X saves the message above as a template", max(1, w-2)))
 	}
 	rows := h - 1
-	p.clampSaved()
-	p.savedTop = scrollTo(p.savedTop, p.savedCur, rows, len(ms))
-	end := min(len(ms), p.savedTop+rows)
+	cur := min(max(p.savedCur, 0), len(ms)-1)
+	top := scrollTo(p.savedTop, cur, rows, len(ms))
+	end := min(len(ms), top+rows)
 	lines := []string{head}
-	for i := p.savedTop; i < end; i++ {
-		lines = append(lines, p.savedRow(ms[i], w, i == p.savedCur))
+	for i := top; i < end; i++ {
+		lines = append(lines, p.savedRow(ms[i], w, i == cur))
 	}
 	return strings.Join(lines, "\n")
 }

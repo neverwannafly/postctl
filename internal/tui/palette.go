@@ -22,7 +22,8 @@ func (a *app) builtinActions() []Action {
 			Run: func() tea.Cmd { return tea.Batch(a.setFocus(SlotSidebar), a.tree.startFilter()) }},
 		{ID: "focus.collections", Title: "Go to collections", Group: "Navigation", Keys: "1", Run: in(SlotSidebar)},
 		{ID: "focus.request", Title: "Go to request", Group: "Navigation", Keys: "2", Run: in(SlotRequest)},
-		{ID: "focus.response", Title: "Go to response", Group: "Navigation", Keys: "3", Run: in(SlotResponse)},
+		{ID: "focus.response", Title: "Go to response", Group: "Navigation", Keys: "3",
+			Enabled: func() bool { return !a.responseHidden() }, Run: in(SlotResponse)},
 		{ID: "workspace.reload", Title: "Reload workspace from disk", Group: "Workspace", Keys: "Ctrl-R",
 			Run: func() tea.Cmd { return a.reload() }},
 		{ID: "help.show", Title: "Show help", Group: "Help", Keys: "?",
@@ -48,7 +49,11 @@ func (a *app) reload() tea.Cmd {
 // paneActions asks the panes for their palette actions.
 func (a *app) paneActions() []Action {
 	var out []Action
-	for _, p := range []Pane{a.request, a.response} {
+	panes := []Pane{a.request}
+	if !a.responseHidden() {
+		panes = append(panes, a.response)
+	}
+	for _, p := range panes {
 		if src, ok := p.(ActionSource); ok {
 			out = append(out, src.Actions()...)
 		}

@@ -168,8 +168,11 @@ type Outcome struct {
 	// (pre-request) or was recorded along the way (test), or nil.
 	ScriptError *ScriptFailure
 	// Skipped reports that a pre-request script called
-	// pm.execution.skipRequest().
+	// pm.execution.skipRequest(), or that the request kind is not run.
 	Skipped bool
+	// SkipReason explains why the request was skipped. It is empty for a
+	// script-requested skip and safe to show in reports.
+	SkipReason string
 	// NextRequest is the last setNextRequest argument: nil when no script
 	// called it, a pointer to "" for null (stop the run), else a request
 	// name or ID.

@@ -1,0 +1,60 @@
+ postctl  payments-api                                                                                                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Collections  12 requests                  │ › ws title                                                                                                                                              
+   ▾ Payments                              9 │ ws pane: Live feed                                                                                                                                      
+     ▾ Charges                             4 │                                                                                                                                                         
+         GET   List charges                  │                                                                                                                                                         
+         POST  Create charge                 │                                                                                                                                                         
+         DEL   Refund charge                 │                                                                                                                                                         
+         PATCH Update charge                 │                                                                                                                                                         
+     ▾ Customers                           3 │                                                                                                                                                         
+         POST  Create customer               │                                                                                                                                                         
+         GET   Get customer                  │                                                                                                                                                         
+         PUT   Replace customer              │                                                                                                                                                         
+       GET   Health                          │                                                                                                                                                         
+ ›     WS    Live feed                       │                                                                                                                                                         
+   ▾ Internal admin                        3 │                                                                                                                                                         
+       GET   List users                      │                                                                                                                                                         
+       POST  Ban user                        │                                                                                                                                                         
+       OPT   Preflight                       │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+                                             │                                                                                                                                                         
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ K ws hint   Tab Next pane   ? Help   Ctrl-P Palette   E Environments   q Quit

@@ -38,9 +38,14 @@ func (a *app) geo() geometry {
 	switch g.layout {
 	case ui.LayoutThreePane:
 		g.sidebarW = min(max(30, g.width*22/100), 44)
-		rest := g.width - g.sidebarW - 2*gapWidth
-		g.requestW = rest * 55 / 100
-		g.responseW = rest - g.requestW
+		if a.responseHidden() {
+			g.requestW = g.width - g.sidebarW - gapWidth
+			g.responseW = 0
+		} else {
+			rest := g.width - g.sidebarW - 2*gapWidth
+			g.requestW = rest * 55 / 100
+			g.responseW = rest - g.requestW
+		}
 	case ui.LayoutTwoPane:
 		g.sidebarW = min(max(26, g.width/4), 38)
 		g.requestW = g.width - g.sidebarW - gapWidth
@@ -190,10 +195,17 @@ func (a *app) mainBody(g geometry) string {
 	case ui.LayoutThreePane:
 		sidebar := t.Block(a.paneBlock(SlotSidebar, g.sidebarW, content), g.sidebarW, g.bodyH)
 		req := t.Block(a.paneBlock(SlotRequest, g.requestW, content), g.requestW, g.bodyH)
+		if a.responseHidden() {
+			return ui.Columns([]string{sidebar, req}, t.Gap())
+		}
 		resp := t.Block(a.paneBlock(SlotResponse, g.responseW, content), g.responseW, g.bodyH)
 		return ui.Columns([]string{sidebar, req, resp}, t.Gap())
 	case ui.LayoutTwoPane:
 		sidebar := t.Block(a.paneBlock(SlotSidebar, g.sidebarW, content), g.sidebarW, g.bodyH)
+		if a.responseHidden() {
+			req := t.Block(a.paneBlock(SlotRequest, g.requestW, content), g.requestW, g.bodyH)
+			return ui.Columns([]string{sidebar, req}, t.Gap())
+		}
 		right := a.rightShow
 		if a.focus != SlotSidebar {
 			right = a.focus

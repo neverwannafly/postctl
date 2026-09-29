@@ -95,7 +95,10 @@ type Pane struct {
 func (p *Pane) Title() string { return "Response" }
 
 // SetSize implements [tui.Pane].
-func (p *Pane) SetSize(w, h int) { p.w, p.h = w, h }
+func (p *Pane) SetSize(w, h int) {
+	p.w, p.h = w, h
+	p.prepareCurrent()
+}
 
 // Focus implements [tui.Pane].
 func (p *Pane) Focus() tea.Cmd {
@@ -218,6 +221,7 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 					p.pathFilter = strings.TrimSpace(p.pathInput.Value())
 					p.jsonDoc = nil
 					p.scroll = 0
+					p.prepareCurrent()
 				case "esc":
 					p.pathActive = false
 				}
@@ -319,6 +323,12 @@ func (p *Pane) KeyHints() []ui.Hint {
 
 // View implements [tui.Pane].
 func (p *Pane) View() string {
+	view := *p
+	view.rawIdx.offsets = append([]int(nil), p.rawIdx.offsets...)
+	return view.render()
+}
+
+func (p *Pane) render() string {
 	t := p.th
 	w := max(10, p.w)
 	if p.ref.Request == nil {
@@ -773,6 +783,7 @@ func (p *Pane) applyResult(r tui.SendResult) {
 	p.jsonDoc = nil
 	p.bodyKey = ""
 	p.scroll = 0
+	p.prepareCurrent()
 }
 
 func (p *Pane) current() *storedResult {
@@ -785,6 +796,36 @@ func (p *Pane) current() *storedResult {
 func (p *Pane) syncViewFromSelection() {
 	p.scroll = 0
 	p.jsonDoc = nil
+	p.prepareCurrent()
+}
+
+func (p *Pane) prepareCurrent() {
+	st := p.current()
+	if st == nil || st.result.Response == nil {
+		return
+	}
+	body := st.result.Response.Body
+	ct := ""
+	for _, kv := range st.result.Response.Headers {
+		if strings.EqualFold(kv.Key, "content-type") {
+			ct = kv.Value
+			break
+		}
+	}
+	p.bodyKind = DetectBodyKind(ct, body)
+	if p.bodyKind == BodyBinary && p.bodyMode != modeHex {
+		p.bodyMode = modeHex
+	}
+	p.rawIdx.build(body)
+	if p.bodyMode == modePretty && p.bodyKind == BodyJSON && len(body) < largeBodyThreshold {
+		key := p.cacheKey()
+		if p.jsonDoc == nil || p.bodyKey != key {
+			if doc, err := buildJSONDoc(body, p.pathFilter); err == nil {
+				p.jsonDoc, p.bodyKey = doc, key
+			}
+		}
+	}
+	p.clampScroll()
 }
 
 func (p *Pane) remapAfterReload(ws *model.Workspace) {
@@ -848,6 +889,7 @@ func (p *Pane) togglePrettyRaw() {
 	}
 	p.jsonDoc = nil
 	p.scroll = 0
+	p.prepareCurrent()
 }
 
 func (p *Pane) beginSearch() {

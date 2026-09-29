@@ -94,7 +94,7 @@ func rows(bs ...key.Binding) []helpRow {
 
 // helpGroups builds the help screen from the key map, grouped by context.
 // focusHints are the focused pane's own hints, appended as their own group.
-func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint) []helpGroup {
+func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, responseHidden ...bool) []helpGroup {
 	groups := []helpGroup{
 		{"Everywhere", rows(k.Palette, k.Env, k.EnvEdit, k.History, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
 		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.New, k.Rename, k.Duplicate, k.Move, k.Delete, k.MoveUp, k.RunCollection)},
@@ -105,7 +105,12 @@ func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint) []helpGroup {
 	}
 	groups[1].Rows = replaceRow(groups[1].Rows, k.MoveUp.Help().Key, helpRow{k.MoveUp.Help().Key + " " + k.MoveDown.Help().Key, "Move up or down in its folder"})
 	// The overview rows for the pane numbers read better as one line.
-	groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
+	if len(responseHidden) > 0 && responseHidden[0] {
+		groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2", "Jump to Collections or WebSocket"})
+		groups[2].Title = "WebSocket"
+	} else {
+		groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
+	}
 	groups[1].Rows = replaceRow(groups[1].Rows, k.PageUp.Help().Key, helpRow{"PgUp PgDn", "Page up or down"})
 	if len(focusHints) > 0 {
 		var extra []helpRow

@@ -517,8 +517,8 @@ func (b *bodyView) hints(p *Pane) []ui.Hint {
 func (b *bodyView) view(p *Pane, w, h int) string {
 	th := p.th
 	lay := b.layout(p)
-	b.cur = min(b.cur, len(lay)-1)
-	focusRow := func(i int) bool { return p.zone == zBody && b.cur == i }
+	cur := min(b.cur, len(lay)-1)
+	focusRow := func(i int) bool { return p.zone == zBody && cur == i }
 	head := []string{b.headRow(p, "Type", modeLabel(b.mode(p)), focusRow(0), w)}
 	if b.mode(p) == model.BodyRaw {
 		lang := b.headRow(p, "Language", langLabel(p.req.Body.Language), focusRow(1), w)
@@ -531,14 +531,13 @@ func (b *bodyView) view(p *Pane, w, h int) string {
 	case model.BodyNone:
 		content = th.Render(ui.TextQuiet, th.Truncate("This request has no body. Choose a type above to add one.", w))
 	case model.BodyRaw:
-		b.raw.resize(w, room-1)
-		content = b.raw.view() + "\n" + b.rawStatus(p, w)
+		content = b.raw.render(w, room-1) + "\n" + b.rawStatus(p, w)
 	case model.BodyURLEncoded, model.BodyFormData:
 		content = b.kv(p).view(p, w, room)
 	case model.BodyBinary:
-		content = b.fileView(p, w)
+		content = b.fileView(p, w, cur)
 	case model.BodyGraphQL:
-		content = b.graphqlView(p, w, room)
+		content = b.graphqlView(p, w, room, cur)
 	}
 	return strings.Join(head, "\n") + "\n" + content
 }
@@ -578,16 +577,16 @@ func (b *bodyView) rawStatus(p *Pane, w int) string {
 	return th.Render(tok, th.Truncate(text, w))
 }
 
-func (b *bodyView) fileView(p *Pane, w int) string {
+func (b *bodyView) fileView(p *Pane, w, cur int) string {
 	th := p.th
 	f := &b.file
 	row := b.fileRows(p)[0]
-	line := f.rowView(p, row, p.zone == zBody && b.cur == 1, 10, max(4, w-13))
+	line := f.rowView(p, row, p.zone == zBody && cur == 1, 10, max(4, w-13))
 	note := th.Render(ui.TextQuiet, th.Truncate("The file is sent as the request body, unchanged.", w))
 	return line + "\n\n" + note
 }
 
-func (b *bodyView) graphqlView(p *Pane, w, h int) string {
+func (b *bodyView) graphqlView(p *Pane, w, h, cur int) string {
 	th := p.th
 	qh := max(2, (h-2)*2/3)
 	vh := max(1, h-2-qh)
@@ -598,10 +597,8 @@ func (b *bodyView) graphqlView(p *Pane, w, h int) string {
 		}
 		return th.Render(tok, text)
 	}
-	b.gq.resize(w, qh)
-	b.gv.resize(w, vh)
-	return label("Query", b.cur == 1 && p.zone == zBody) + "\n" + b.gq.view() + "\n" +
-		label("Variables (JSON)", b.cur == 2 && p.zone == zBody) + "\n" + b.gv.view()
+	return label("Query", cur == 1 && p.zone == zBody) + "\n" + b.gq.render(w, qh) + "\n" +
+		label("Variables (JSON)", cur == 2 && p.zone == zBody) + "\n" + b.gv.render(w, vh)
 }
 
 // external implements externalEditable for the raw and GraphQL editors.
