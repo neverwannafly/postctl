@@ -55,7 +55,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: none
 - Next: model types, then store, then scaffold/CLI, theme skeleton, docs.
 
-### 2026-09-29 23:50 IST · WS0 · Sonnet 5.5 · PROGRESS
+### 2026-09-29 23:26 IST · WS0 · Sonnet 5.5 · PROGRESS
 - Branch/worktree: ws/0-scaffold
 - Did: Shipped `internal/model` (Workspace/Collection/Folder/Request/Item tree with ops, URL, KV, Body modes, Auth types incl. OAuth2 grants, Variable/SecretRef/Environment/Globals, Scripts, Settings, Examples, IDs via UUIDv7, Validate) and `internal/store` (Discover/Open/Init, Load, Save/SaveCollection/SaveRequest, env/globals, atomic writes, prune, slug collisions, ordering, SecretStore + MemorySecrets + macOS Keychain via `/usr/bin/security -i`, schema migration hook, local state). Round-trip, golden, secrets-leak, ordering, prune and Keychain tests green (real Keychain test opt-in via `POSTCTL_KEYCHAIN_TESTS=1`, verified once).
 - Files: `internal/model/*`, `internal/store/*`, `internal/store/testdata/golden/**`
