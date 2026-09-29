@@ -20,15 +20,15 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS | Owner (model) | Status | Branch | Last update |
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | v1 locked | main | 2026-09-29 |
-| WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
+| WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:40 IST |
 | WS1 Postman importer | GPT-5.6 Sol (medium) | Done, merged to main | ws/1-importer | 2026-09-29 23:55 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
-| WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
-| WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
+| WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-29 23:35 IST |
+| WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-29 23:35 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
-| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-30 00:10 IST |
+| WS3 script runtime | Opus 5 Thinking (high) | Running | ws/3-script | 2026-09-29 23:35 IST |
 | WS4 engine/runner | — | Not started | — | — |
-| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-30 00:10 IST |
+| WS5 UI components + TUI shell | Sonnet 5.5 (high) | Running | ws/5-tui-shell | 2026-09-29 23:35 IST |
 | WS6 editor + response viewer | — | Not started | — | — |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
@@ -123,12 +123,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: (1) `POSTCTL_HOME` overrides only the global fallback dir, not project discovery: OK? (2) Literal credentials in auth fields are written to YAML as-is; should the store auto-move non-`{var}` literals to Keychain? (3) Load is strict (a malformed file fails the whole load); want a lenient mode that reports per-file problems? (4) plan §8 line on prod confirmation contradicts §0 Q10; suggest updating.
 - Next: merge `ws/0-scaffold`; WS1/WS2/WS5 can start against `internal/model`, `internal/store`, `internal/ui`.
 
-### 2026-09-30 00:10 IST · WS0 · Orchestrator · PROGRESS
+### 2026-09-29 23:35 IST · WS0 · Orchestrator · PROGRESS
 - Did: Reviewed and merged `ws/0-scaffold`. Resolved `go.mod`/`go.sum`/ledger conflicts with the WS1b merge and ran `go mod tidy`. Added missing godoc to WS1b code that the new revive rule flagged. On `main`: build, race tests and lint are green.
 - Decisions: Recorded D1–D4 (answers to WS0's open questions) and C1 in plan §0. Fixed the plan §8 production-confirmation inconsistency (badge only). Committed the shared contracts `internal/httpx/types.go` and `internal/vars/scope.go` so WS2, WS3 and WS4 can build in parallel. Split OAuth2 into WS2b.
 - Next: Launch Wave 2: WS0.1 (resume), WS1, WS2, WS2b, WS3, WS5.
 
-### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
+### 2026-09-29 23:35 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
 
