@@ -44,3 +44,15 @@ tasks:
     desc: Tidy go.mod
     cmds:
       - go mod tidy
+
+  assets:
+    desc: Rebuild the embedded JavaScript bundles (needs node and npm)
+    dir: internal/script/assets
+    cmds:
+      - npm ci
+      - node build.js
+    sources:
+      - internal/script/assets/package-lock.json
+      - internal/script/assets/build.js
+    generates:
+      - internal/script/assets/bundles/*.js
