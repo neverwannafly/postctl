@@ -261,6 +261,11 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	}
 	label := th.Render(labelTok, th.Fit(r.label, labelW))
 	var val string
+	editNote := ""
+	if focused && f.edit && r.warn && r.note != "" {
+		editNote = " " + r.note
+		valW = max(4, valW-ui.Width(editNote))
+	}
 	switch r.kind {
 	case rowChoice:
 		v := r.value
@@ -296,6 +301,9 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 		val = th.Render(ui.TextSecondary, th.Truncate(r.value, valW))
 	}
 	line := marker + label + " " + val
+	if editNote != "" {
+		line += th.Render(ui.StatusWarning, editNote)
+	}
 	if r.note != "" && !(focused && f.edit) {
 		room := valW - ui.Width(val)
 		note := " " + r.note

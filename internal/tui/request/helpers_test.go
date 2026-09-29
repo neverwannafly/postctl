@@ -3,6 +3,7 @@ package request
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ type harness struct {
 	out    []tea.Msg // messages the pane sent toward the shell
 	clip   []string
 	deps   Deps
+	be     tui.Backend
 }
 
 func newRequest() *model.Request {
@@ -83,7 +85,7 @@ func newHarness(t *testing.T, opts ...option) *harness {
 		o(h)
 	}
 	th := ui.NewTheme(true, false, false)
-	h.p = New(tui.PaneEnv{Theme: th, Actions: &tui.Registry{}}, h.deps)
+	h.p = New(tui.PaneEnv{Theme: th, Actions: &tui.Registry{}, Backend: h.be}, h.deps)
 	h.p.SetSize(80, 24)
 	h.send(tui.WorkspaceReloadedMsg{Workspace: h.ws})
 	h.send(tui.EnvironmentChangedMsg{Env: h.env})
@@ -127,6 +129,12 @@ func (h *harness) run(cmd tea.Cmd) {
 	case timerMsg:
 		h.timers = append(h.timers, m)
 	default:
+		// The pane's own messages (editor finished, curl built, OAuth events)
+		// come straight back to it, as the runtime would deliver them.
+		if reflect.TypeOf(m).PkgPath() == reflect.TypeOf(harness{}).PkgPath() {
+			h.send(m)
+			return
+		}
 		h.out = append(h.out, m)
 	}
 }
