@@ -32,9 +32,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Done, merged to main | ws/6a-request-editor | 2026-09-30 02:15 IST |
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
 | WS7 CLI | Grok 4.7 (high, fast) | Done, merged to main | ws/7-cli | 2026-09-30 03:15 IST |
-| WS8 docs/release | — | Not started | — | — |
+| WS8 docs/release | GPT-5.6 Sol | Ready to merge | ws/8-docs | 2026-09-30 03:31 IST |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
+| QA/INT4 final integration | GPT-5.6 Sol | In progress | fix/security | 2026-09-30 03:31 IST |
 
 ## Entries
 
@@ -535,3 +536,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green.
 - Blockers / questions: `git merge-tree` against current `main` (a9761cc) reports one conflict, `docs/ledger.md` (append-only entries and the status row); code merges cleanly.
 - Next: merge; WS7 may want `postctl ws` (connect, send, tail) on top of `wsx`.
+
+### 2026-09-30 03:31 IST · INT4 · gpt-5.6 · STARTED
+- Branch/worktree: `main`, then `fix/security`
+- Did: Read the binding plan decisions, design language, integration instructions, independent review, and ledger. Verified the main worktree is clean and has no stale WS6a merge state. Verified `qa/fixes` does not modify `docs/plan.md`, `docs/briefs/`, or `docs/design-language.md`.
+- Files: `docs/ledger.md`
+- Decisions: Merge with `--no-ff`; use the shared history redactor for all requested visible and persisted masking paths.
+- Tests: Not run yet.
+- Blockers / questions: none.
+- Next: Merge and gate `qa/fixes`, then merge WS8 and regenerate the key reference.
