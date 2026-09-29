@@ -55,7 +55,7 @@ sequenceDiagram
         Note over E: an error keeps response, tests so far and variables
     end
     E-->>C: "Saving variables" (only if something changed)
-    E->>D: SaveEnvironment / SaveCollection / SaveGlobals
+    E->>D: SaveEnvironment / SaveCollectionVariables / SaveGlobals
     E->>D: history.Append (redacted)
     E-->>C: Outcome
 ```
@@ -256,7 +256,8 @@ the TUI and the CLI can share it.
 | `SendRequest{Collection, Request, Environment}` | `SendInput` |
 | `SendStep{Text}` | `Step.Text` |
 | `SendResult.Tests` | `Outcome.Tests` (name, passed, skipped, message) |
-| `SendResult.Console` | `Outcome.Console` with its event; `Outcome.Warnings` first, as `warn` lines with event `engine` |
+| `SendResult.Console` | `Outcome.Console` with its event |
+| `SendResult.Warnings` | `Outcome.Warnings`; the response pane labels them above the body |
 | `SendResult.ScriptError` | "Pre-request script failed: …", "Test script (collection) failed: …", "… timed out: …" |
 | `SendResult.Skipped`, `.Err`, `.Response`, `.Started`, `.RequestID` | same fields |
 

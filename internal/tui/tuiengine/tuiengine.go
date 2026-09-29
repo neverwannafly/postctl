@@ -11,10 +11,6 @@ import (
 	"github.com/shubham/postctl/internal/tui"
 )
 
-// EngineEvent is the console Event value of lines the adapter adds for engine
-// warnings (unresolved variables, save problems), which no script produced.
-const EngineEvent = "engine"
-
 // Sender implements [tui.Sender] on top of an [engine.Engine].
 type Sender struct {
 	engine *engine.Engine
@@ -31,8 +27,7 @@ func New(e *engine.Engine) *Sender { return &Sender{engine: e} }
 //
 //   - tests, console lines and the skipped flag map one to one;
 //   - a script failure becomes ScriptError text naming its event;
-//   - engine warnings, which the TUI contract has no field for, are put at the
-//     start of Console as "warn" lines with Event [EngineEvent];
+//   - engine warnings map to Warnings;
 //   - a transport, OAuth 2.0, resolution or cancellation error is Err.
 func (s *Sender) Send(ctx context.Context, req tui.SendRequest, progress func(tui.SendStep)) tui.SendResult {
 	var steps func(engine.Step)
@@ -60,15 +55,13 @@ func result(out *engine.Outcome) tui.SendResult {
 		Started:   out.Started,
 		Response:  out.Response,
 		Skipped:   out.Skipped,
+		Warnings:  append([]string(nil), out.Warnings...),
 		Err:       out.Err,
 	}
 	for _, t := range out.Tests {
 		res.Tests = append(res.Tests, tui.TestOutcome{
 			Name: t.Name, Passed: t.Passed, Skipped: t.Skipped, Message: t.Message,
 		})
-	}
-	for _, w := range out.Warnings {
-		res.Console = append(res.Console, tui.ConsoleLine{Level: "warn", Text: w, Event: EngineEvent})
 	}
 	for _, c := range out.Console {
 		res.Console = append(res.Console, tui.ConsoleLine{Level: c.Level, Text: c.Text, Event: c.Event})

@@ -87,12 +87,14 @@ func TestSendMapsOutcome(t *testing.T) {
 		got = append(got, c.Event+"/"+c.Level+"/"+c.Text)
 	}
 	want := []string{
-		"engine/warn/Unresolved variable {{missing}} in the URL",
 		"prerequest/warn/before",
 		"test/log/after",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("console:\n got %q\nwant %q", got, want)
+	}
+	if wantWarnings := []string{"Unresolved variable {{missing}} in the URL"}; !reflect.DeepEqual(res.Warnings, wantWarnings) {
+		t.Fatalf("warnings: got %q want %q", res.Warnings, wantWarnings)
 	}
 }
 

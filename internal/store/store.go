@@ -50,6 +50,7 @@ func newStore(abs string, opts []Option) *Store {
 	for _, o := range opts {
 		o(s)
 	}
+	s.secrets = NewCachingSecrets(s.secrets)
 	return s
 }
 
@@ -268,6 +269,33 @@ func (s *Store) LoadCollection(id model.ID) (*model.Collection, error) {
 		}
 	}
 	return nil, fmt.Errorf("%w: collection %q", model.ErrNotFound, id)
+}
+
+// LoadGlobals reads globals.yaml without loading the rest of the workspace.
+// It returns nil when the workspace has no globals file and never hydrates
+// secret values.
+func (s *Store) LoadGlobals() (*model.Globals, error) {
+	path := filepath.Join(s.root, globalsYAML)
+	if !isFile(path) {
+		return nil, nil
+	}
+	var gf globalsFile
+	if _, err := s.decode(path, KindGlobals, 0, &gf); err != nil {
+		return nil, err
+	}
+	g := gf.Globals
+	if g.ID == "" {
+		var wf workspaceFile
+		if _, err := s.decode(filepath.Join(s.root, workspaceYAML), KindWorkspace, 0, &wf); err != nil {
+			return nil, err
+		}
+		workspaceID := wf.ID
+		if workspaceID == "" {
+			workspaceID = model.DeriveID("workspace", filepath.Base(s.root))
+		}
+		g.ID = model.DeriveID(workspaceID, "globals")
+	}
+	return &g, nil
 }
 
 func (s *Store) collectionDirs() ([]string, error) {

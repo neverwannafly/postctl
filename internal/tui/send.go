@@ -51,6 +51,9 @@ type SendResult struct {
 	Tests []TestOutcome
 	// Console is the combined script console output, in order.
 	Console []ConsoleLine
+	// Warnings are non-fatal engine problems, shown above the response body.
+	// They never contain secret values.
+	Warnings []string
 	// ScriptError describes a script that threw or timed out, or is empty.
 	ScriptError string
 	// Skipped reports that a pre-request script called

@@ -31,6 +31,10 @@
 | C1 | Shared contracts | Orchestrator committed `internal/httpx/types.go` (`Sender`, `Response`, `Timings`, `SentRequest`) and `internal/vars/scope.go` (`Scope`, `Store`, `Change`) so WS2, WS3 and WS4 can build in parallel. Changes must be additive. |
 | D5 | Send keys | `Ctrl-Enter` sends when the terminal supports enhanced keyboard reporting; `Ctrl-S` always sends (edits autosave, so no save key is needed); `Enter` in the URL bar sends. The footer shows whichever send key works. |
 | D6 | Tree fold state | Persisted in `.postctl/state.yaml` (`store.State.Folded`). |
+| D7 | Variable persistence | The store exposes `SaveCollectionVariables` (re-read and rewrite only collection variables and secrets) and `LoadGlobals`; the engine uses these narrow calls so a send cannot overwrite concurrent collection edits. |
+| D8 | Cookie storage | The cookie jar remains plaintext in gitignored `.postctl/cookies.json`, like a browser cookie store; the file is created with mode `0600`. |
+| D9 | Send warnings | `tui.SendResult.Warnings` carries non-fatal engine warnings. The response pane renders labeled `! <text>` warning lines above the body in the warning semantic color. |
+| D10 | Secret reads | Stores wrap their configured `SecretStore` with a process-local read cache by default; `Set` and `Delete` invalidate the affected key. |
 | C2 | TUI send contract | Orchestrator committed `internal/tui/send.go` (`Sender`, `SendRequest`, `SendResult`, send messages) so WS6a, WS6b and WS4 build in parallel. WS6 is split: **WS6a** request editor + env editor + cookies + send wiring (Sonnet 5.5), **WS6b** response viewer (Composer 2.5). |
 | R4 | Local Postman data | WS1b may read the IndexedDB locally, read-only, from a temp copy. Never print variable values, tokens, headers values, or bodies in logs, ledger, or chat; only counts, key names, and structure. |
 

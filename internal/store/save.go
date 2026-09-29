@@ -469,6 +469,48 @@ func (s *Store) SaveCollection(ctx context.Context, c *model.Collection) error {
 	return s.updateCollectionOrder(func(order []string) []string { return replaceOrAppend(order, old, name) })
 }
 
+// SaveCollectionVariables updates only the variables in collection.yaml.
+// The file is re-read immediately before writing so concurrent request,
+// metadata, auth, script-reference, and order edits are preserved.
+func (s *Store) SaveCollectionVariables(ctx context.Context, id model.ID, variables []model.Variable) error {
+	idx, err := s.collectionIndex()
+	if err != nil {
+		return err
+	}
+	var dir string
+	for name, collectionID := range idx {
+		if collectionID == id {
+			dir = filepath.Join(s.root, collectionsDir, name)
+			break
+		}
+	}
+	if dir == "" {
+		return fmt.Errorf("%w: collection %q", model.ErrNotFound, id)
+	}
+	path := filepath.Join(dir, collectionYAML)
+	var cf collectionFile
+	if _, err := s.decode(path, KindCollection, 0, &cf); err != nil {
+		return err
+	}
+	candidate := cf.Collection
+	candidate.Variables = variables
+	if err := candidate.Validate(); err != nil {
+		return err
+	}
+	oldRefs := refsInVars(cf.Variables)
+	sw := newSecretWriter(ctx, s.secrets)
+	cf.Variables, err = sw.vars(ScopeCollection, id, variables)
+	if err != nil {
+		return err
+	}
+	cf.SchemaVersion = model.SchemaVersion
+	if err := newWriter(true).yaml(path, &cf); err != nil {
+		return err
+	}
+	s.deleteRefs(ctx, oldRefs, sw.used)
+	return nil
+}
+
 func replaceOrAppend(order []string, old, name string) []string {
 	for i, n := range order {
 		if n == old || n == name {

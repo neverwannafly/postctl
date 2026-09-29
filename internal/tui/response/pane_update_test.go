@@ -2,6 +2,7 @@ package response
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +41,7 @@ func TestSendStateTransitions(t *testing.T) {
 	pane, _ = pane.Update(tui.SendResultMsg{Result: tui.SendResult{
 		RequestID: id,
 		Response:  &httpx.Response{StatusCode: 200, Status: "OK", Body: []byte(`{"ok":true}`), Timings: httpx.Timings{Total: time.Millisecond}},
+		Warnings:  []string{"Unresolved variable"},
 	}})
 	p = pane.(*Pane)
 	if p.sendingID != "" {
@@ -48,6 +50,9 @@ func TestSendStateTransitions(t *testing.T) {
 	view = p.View()
 	if !contains(view, "200") {
 		t.Fatalf("expected result chip, got %q", view)
+	}
+	if warning, body := strings.Index(view, "! Unresolved variable"), strings.Index(view, `"ok"`); warning < 0 || body < 0 || warning > body {
+		t.Fatalf("warning should be labeled above body, got %q", view)
 	}
 
 	pane, _ = pane.Update(tui.SendResultMsg{Result: tui.SendResult{

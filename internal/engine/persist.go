@@ -94,11 +94,11 @@ func (e *Engine) loadGlobals() (*model.Globals, error) {
 		}
 		return w.globals.Clone(), nil
 	}
-	ws, _, err := e.cfg.Store.LoadLenient()
+	globals, err := e.cfg.Store.LoadGlobals()
 	if err != nil {
 		return nil, err
 	}
-	w.globals, w.globalsInfo, w.globalsRead = ws.Globals, st, true
+	w.globals, w.globalsInfo, w.globalsRead = globals, st, true
 	if w.globals == nil {
 		return nil, nil
 	}
@@ -217,7 +217,7 @@ func (s *session) persistCollection(ctx context.Context, changes []vars.Change) 
 	}
 	out := *s.collection
 	out.Variables = writable(s.collection.Variables, changes, theirs)
-	return s.e.cfg.Store.SaveCollection(ctx, &out)
+	return s.e.cfg.Store.SaveCollectionVariables(ctx, out.ID, out.Variables)
 }
 
 func (s *session) persistGlobals(ctx context.Context, changes []vars.Change) error {

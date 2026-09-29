@@ -3,6 +3,8 @@ package httpx
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/shubham/postctl/internal/model"
@@ -60,6 +62,25 @@ func TestCookieJarPersistenceRoundTripAndManagement(t *testing.T) {
 	cookies, err = reloaded.Get("https://api.example.test/")
 	if err != nil || len(cookies) != 0 {
 		t.Fatalf("cookies after clear = %d, err = %v", len(cookies), err)
+	}
+}
+
+func TestCookieJarFileIsPrivate(t *testing.T) {
+	t.Parallel()
+	workspace := t.TempDir()
+	jar, err := NewCookieJar(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jar.Set("https://example.test/", &http.Cookie{Name: "session", Value: "synthetic"}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(workspace, ".postctl", "cookies.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("cookies.json mode = %04o, want 0600", got)
 	}
 }
 

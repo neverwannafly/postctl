@@ -30,6 +30,67 @@ type SecretStore interface {
 	Delete(ctx context.Context, ref model.SecretRef) error
 }
 
+type cachedSecret struct {
+	value string
+	err   error
+}
+
+// CachingSecrets decorates a SecretStore with a process-local read cache.
+// Successful reads and missing refs are cached; Set and Delete invalidate the
+// affected ref.
+type CachingSecrets struct {
+	mu    sync.Mutex
+	store SecretStore
+	cache map[model.SecretRef]cachedSecret
+}
+
+// NewCachingSecrets returns a caching decorator over store. Nil stays nil.
+func NewCachingSecrets(store SecretStore) SecretStore {
+	if store == nil {
+		return nil
+	}
+	if _, ok := store.(*CachingSecrets); ok {
+		return store
+	}
+	return &CachingSecrets{store: store, cache: make(map[model.SecretRef]cachedSecret)}
+}
+
+// Get implements SecretStore.
+func (s *CachingSecrets) Get(ctx context.Context, ref model.SecretRef) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if got, ok := s.cache[ref]; ok {
+		return got.value, got.err
+	}
+	value, err := s.store.Get(ctx, ref)
+	if err == nil || errors.Is(err, ErrSecretNotFound) {
+		s.cache[ref] = cachedSecret{value: value, err: err}
+	}
+	return value, err
+}
+
+// Set implements SecretStore and invalidates the cached ref.
+func (s *CachingSecrets) Set(ctx context.Context, ref model.SecretRef, value string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.store.Set(ctx, ref, value); err != nil {
+		return err
+	}
+	delete(s.cache, ref)
+	return nil
+}
+
+// Delete implements SecretStore and invalidates the cached ref.
+func (s *CachingSecrets) Delete(ctx context.Context, ref model.SecretRef) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.store.Delete(ctx, ref); err != nil {
+		return err
+	}
+	delete(s.cache, ref)
+	return nil
+}
+
 // MemorySecrets is an in-memory [SecretStore].
 type MemorySecrets struct {
 	mu sync.Mutex

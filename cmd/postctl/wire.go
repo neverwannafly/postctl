@@ -7,6 +7,7 @@ import (
 
 	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/httpx"
+	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/oauth2"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
@@ -24,6 +25,7 @@ type storeProvider interface {
 type lazyEngine struct {
 	mu      sync.Mutex
 	backend tui.Backend
+	store   *store.Store
 	engine  *engine.Engine
 }
 
@@ -41,6 +43,7 @@ func (p *lazyEngine) get() (*engine.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.store = st
 	secrets := st.SecretStore()
 	p.engine, err = engine.New(engine.Config{
 		Store:   st,
@@ -50,6 +53,15 @@ func (p *lazyEngine) get() (*engine.Engine, error) {
 		Version: version,
 	})
 	return p.engine, err
+}
+
+func (p *lazyEngine) secrets() (store.SecretStore, error) {
+	if _, err := p.get(); err != nil {
+		return nil, err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.store.SecretStore(), nil
 }
 
 type lazySender struct{ engine *lazyEngine }
@@ -66,6 +78,36 @@ func (s *lazySender) Send(ctx context.Context, req tui.SendRequest, progress fun
 	return tuiengine.New(eng).Send(ctx, req, progress)
 }
 
+type lazySecrets struct{ engine *lazyEngine }
+
+func (s lazySecrets) store() (store.SecretStore, error) {
+	return s.engine.secrets()
+}
+
+func (s lazySecrets) Get(ctx context.Context, ref model.SecretRef) (string, error) {
+	secrets, err := s.store()
+	if err != nil {
+		return "", err
+	}
+	return secrets.Get(ctx, ref)
+}
+
+func (s lazySecrets) Set(ctx context.Context, ref model.SecretRef, value string) error {
+	secrets, err := s.store()
+	if err != nil {
+		return err
+	}
+	return secrets.Set(ctx, ref, value)
+}
+
+func (s lazySecrets) Delete(ctx context.Context, ref model.SecretRef) error {
+	secrets, err := s.store()
+	if err != nil {
+		return err
+	}
+	return secrets.Delete(ctx, ref)
+}
+
 // wireEditors fills in the screens and panes this workstream owns without
 // overwriting anything the caller already set (the response pane is wired in
 // openUI).
@@ -80,7 +122,7 @@ func wireEditors(o *tui.Options) {
 	}
 	if o.NewRequestPane == nil {
 		o.NewRequestPane = request.Factory(request.Deps{
-			Tokens: oauth2.NewSource(store.NewKeychain(""), nil),
+			Tokens: oauth2.NewSource(lazySecrets{engine: engines}, nil),
 		})
 	}
 	if o.NewEnvEditor == nil {

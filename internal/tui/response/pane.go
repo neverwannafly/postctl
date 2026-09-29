@@ -507,6 +507,22 @@ func (p *Pane) contentHeight() int {
 }
 
 func (p *Pane) viewBody(r tui.SendResult, w, h int) string {
+	var lines []string
+	for _, warning := range r.Warnings {
+		text := "! " + warning
+		lines = append(lines, p.th.Render(ui.StatusWarning, p.th.Truncate(text, w)))
+	}
+	if len(lines) >= h {
+		return strings.Join(lines[:h], "\n")
+	}
+	body := p.viewBodyContent(r, w, h-len(lines))
+	if body != "" {
+		lines = append(lines, body)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (p *Pane) viewBodyContent(r tui.SendResult, w, h int) string {
 	t := p.th
 	if r.Response == nil {
 		return t.EmptyState("No body", "There is no response body for this request.", "", w)

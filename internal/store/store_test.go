@@ -1124,6 +1124,65 @@ func TestKeychainReal(t *testing.T) {
 	}
 }
 
+func TestSaveCollectionVariablesPreservesConcurrentMetadata(t *testing.T) {
+	s, _, root := newTestStore(t)
+	c := model.NewCollection("C")
+	c.Description = "original"
+	c.Items = []model.Item{model.NewRequest("R", "GET", "https://example.test")}
+	if err := s.SaveCollection(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(root, collectionsDir, "c", collectionYAML)
+	var cf collectionFile
+	if _, err := s.decode(path, KindCollection, 0, &cf); err != nil {
+		t.Fatal(err)
+	}
+	cf.Description = "edited while send was running"
+	if err := newWriter(true).yaml(path, &cf); err != nil {
+		t.Fatal(err)
+	}
+
+	vars := []model.Variable{{Key: "plain", Value: "updated"}, {Key: "secret", Type: model.VarSecret, Value: "synthetic"}}
+	if err := s.SaveCollectionVariables(ctx, c.ID, vars); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoadCollection(c.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Description != "edited while send was running" || len(got.Items) != 1 {
+		t.Fatalf("concurrent collection edits were lost: %#v", got)
+	}
+	if plain, ok := model.Lookup(got.Variables, "plain"); !ok || plain.Value != "updated" {
+		t.Fatalf("variables not updated: %#v", got.Variables)
+	}
+	if secret, ok := model.Lookup(got.Variables, "secret"); !ok || secret.Value != "" || secret.SecretRef == "" {
+		t.Fatalf("secret was not externalized: %#v", got.Variables)
+	}
+}
+
+func TestLoadGlobalsReadsOnlyGlobals(t *testing.T) {
+	s, _, root := newTestStore(t)
+	g := &model.Globals{ID: model.NewID(), Name: "Globals", Variables: []model.Variable{{Key: "base", Value: "https://example.test"}}}
+	if err := s.SaveGlobals(ctx, g); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, collectionsDir, "broken"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, collectionsDir, "broken", collectionYAML), []byte("not: [valid"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.LoadGlobals()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, g) {
+		t.Fatalf("globals = %#v, want %#v", got, g)
+	}
+}
+
 func TestDiscoverExplicitWorkspace(t *testing.T) {
 	base := t.TempDir()
 	proj := filepath.Join(base, "proj")
