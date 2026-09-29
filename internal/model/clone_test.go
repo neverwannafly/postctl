@@ -19,13 +19,13 @@ import (
 //     original must still equal a freshly built twin.
 
 var (
-	timeType     = reflect.TypeOf(time.Time{})
-	itemType     = reflect.TypeOf((*Item)(nil)).Elem()
-	requestType  = reflect.TypeOf(Request{})
-	folderType   = reflect.TypeOf(Folder{})
-	idType       = reflect.TypeOf(ID(""))
-	secretType   = reflect.TypeOf(SecretRef(""))
-	anyMapType   = reflect.TypeOf(map[string]any{})
+	timeType    = reflect.TypeOf(time.Time{})
+	itemType    = reflect.TypeOf((*Item)(nil)).Elem()
+	requestType = reflect.TypeOf(Request{})
+	folderType  = reflect.TypeOf(Folder{})
+	idType      = reflect.TypeOf(ID(""))
+	secretType  = reflect.TypeOf(SecretRef(""))
+	anyMapType  = reflect.TypeOf(map[string]any{})
 )
 
 type filler struct {
