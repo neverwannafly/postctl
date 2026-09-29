@@ -140,3 +140,30 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: none yet.
 - Blockers / questions: none.
 - Next: Build the bundle pipeline and the core `pm.*` surface against in-package fakes for `vars.Store` and `httpx.Sender`.
+
+### 2026-09-30 00:06 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Built the development-time bundle pipeline (browserify + terser, ES5) and embedded ten pinned npm libraries under `internal/script/assets/bundles/`; each one was checked to actually load and run in goja. Implemented the core `pm.*` surface in JavaScript against a narrow Go bridge: `PropertyList` and the property types, `Url`, `Request`, `Response`, `VariableScope`, `pm.test`/`pm.expect` on real chai + chai-postman, and the `Run`/`Input`/`Result` API.
+- Files: `internal/script/{script,convert,programs,bridge,run}.go`, `internal/script/assets/{package.json,build.js,assets.go,bundles/,sandbox/}`
+- Decisions: (1) The `pm.*` objects are hand-written against postman-collection's source rather than built on the `postman-collection` bundle, because that bundle costs ~26 ms to evaluate per VM against a 5 ms budget for a whole script; the bundle stays requirable by name. (2) `crypto` and `console` globals are polyfilled before any bundle loads — uuid and postman-collection need `crypto.getRandomValues`, ajv needs `console` — with randomness from Go's `crypto/rand`. (3) crypto-js is pinned to 4.2.0 rather than Postman's 3.3.0, which carries CVE-2023-46233; the only visible difference is the PBKDF2 defaults. (4) Go↔JS passes Postman v2.1 definitions as JSON strings, so the wire format is the one both sides already understand.
+- Tests: Unit tests for console capture, variable scopes, pm.test and request mutation; a load-and-run test per bundle.
+- Blockers / questions: none.
+- Next: `pm.sendRequest`, timers and the timeout/interrupt path.
+
+### 2026-09-30 00:16 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Added async `pm.sendRequest` in both callback and promise form, the event loop with `setTimeout`/`setInterval`, the timeout and interrupt path, the cookie jar, the tier-3 legacy globals, and error mapping from goja positions back to `Script.File` and line. Added benchmarks.
+- Files: `internal/script/{run,bridge}.go`, `internal/script/assets/sandbox/{70-cookies,80-pm,90-legacy,99-boot}.js`, `internal/script/*_test.go`
+- Decisions: (1) `pm.sendRequest` creates its keep-alive timer in JavaScript, not Go: `eventloop.SetTimeout` increments the job count asynchronously, which lets the loop exit before an in-flight send lands. (2) `eventloop.Terminate` leaves the job count inflated, so the finish step talks to the runtime directly instead of scheduling one more loop job. (3) goja reports syntax errors as `file: Line L:C msg`, not `file:line:col`, so positions are parsed from that form.
+- Tests: `go test -race ./internal/script` green, including timeout, pending-timer and context-cancellation cases. Warm run of a trivial script 0.47 ms; crypto-js signing 3.4 ms; five chai assertions 3.7 ms — all inside the 5 ms budget.
+- Blockers / questions: none.
+- Next: The compatibility corpus and the private-data run.
+
+### 2026-09-30 01:45 IST · WS3 · Opus 5 Thinking · PROGRESS
+- Branch/worktree: ws/3-script
+- Did: Wrote the 46-case compatibility corpus (golden `.js` + `.json` pairs under `internal/script/testdata/corpus/`, regenerable with `-update`) and the private-data test over the extracted collections.
+- Files: `internal/script/{corpus,private}_test.go`, `internal/script/testdata/corpus/`, `internal/script/assets/sandbox/{10-util,30-url,60-varscope}.js`, `internal/script/bridge.go`, `internal/script/assets/README.md`, `Taskfile.yml`
+- Decisions: Writing the corpus found four fidelity bugs, now fixed: `Url.update` ignored a `{raw: …}` definition so host/path/protocol were empty for every script that read `pm.request.url`; `Url.toString` left `:name` path segments unresolved where postman-collection substitutes them (`toJSON` still emits the unresolved form, since the values travel separately and `model.URL` keeps them apart); `console` did no printf substitution; and `toObject()` crossed into JavaScript as a Go map, so its key order changed between runs.
+- Tests: **Private data: 17 of 17 real pre-request scripts ran clean — no ScriptError, no unsupported-API warning.** Across the 17 chains the scripts made 30 variable writes and 17 `pm.sendRequest` calls, so they are doing real work, not exiting early. Counts only; nothing from that data is logged anywhere.
+- Blockers / questions: none.
+- Next: `docs/scripting.md`, then the full build/test/lint gate.
