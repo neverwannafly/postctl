@@ -48,6 +48,10 @@ type Config struct {
 	Clock func() time.Time
 	// ScriptTimeout bounds each script run. Zero means script.DefaultTimeout.
 	ScriptTimeout time.Duration
+	// ScriptMemoryLimit stops a script whose run grows the heap by more than
+	// this many bytes. Zero means script.DefaultMemoryLimit; negative
+	// disables the limit.
+	ScriptMemoryLimit int64
 	// MaxBodyBytes caps the response body kept in memory. Zero means the
 	// httpx default.
 	MaxBodyBytes int64

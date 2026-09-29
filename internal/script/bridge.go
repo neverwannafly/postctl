@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -22,6 +24,83 @@ type bridge struct {
 	res  *Result
 	loop *eventloop.EventLoop
 	now  func() time.Time
+
+	// mu guards res, the Vars mutations and abandoned. It is
+	// uncontended while the VM runs (one goroutine), and exists so that a
+	// run the caller has given up on (see [bridge.abandon]) can no longer
+	// change anything the caller now owns. It is never held across a call
+	// into the VM.
+	mu        sync.Mutex
+	abandoned bool
+
+	// sends counts pm.sendRequest calls this run; slots bounds how many
+	// are in flight at once.
+	sends int
+	slots chan struct{}
+}
+
+// Limits on pm.sendRequest, so a script cannot spawn goroutines and sockets
+// without bound inside its timeout.
+const (
+	// maxSendRequests is how many pm.sendRequest calls one run may make.
+	maxSendRequests = 256
+	// sendConcurrency is how many of them may be on the wire at once.
+	sendConcurrency = 8
+)
+
+// mutate runs fn under the bridge lock unless the run was abandoned. Every
+// write a script can make to state outside the VM goes through it.
+func (b *bridge) mutate(fn func()) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.abandoned {
+		return
+	}
+	fn()
+}
+
+// unlessAbandoned is [bridge.mutate] for calls that may block, which is what a
+// cookie jar backed by a lock or the disk can do. It cannot hold the lock
+// across the call, or a stuck jar would stop [bridge.abandon] from ever
+// getting it. The check is therefore not atomic with the call: a call already
+// in flight at the moment of abandonment completes, and every later one is
+// refused.
+func (b *bridge) unlessAbandoned(fn func()) {
+	b.mu.Lock()
+	gone := b.abandoned
+	b.mu.Unlock()
+	if !gone {
+		fn()
+	}
+}
+
+// withResult runs fn with the lock held so the run loop and the caller of
+// [bridge.abandon] never touch the Result at once.
+func (b *bridge) withResult(fn func(res *Result)) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	fn(b.res)
+}
+
+// abandon marks the run as given up on and returns a private copy of what it
+// recorded so far. After it returns no bridge call changes the Result, the
+// variables or the cookies, even if the stuck VM eventually wakes up.
+func (b *bridge) abandon() *Result {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.abandoned = true
+	out := *b.res
+	out.Tests = append([]TestResult(nil), b.res.Tests...)
+	out.Console = append([]ConsoleEntry(nil), b.res.Console...)
+	if b.res.Err != nil {
+		e := *b.res.Err
+		out.Err = &e
+	}
+	if b.res.NextRequest != nil {
+		n := *b.res.NextRequest
+		out.NextRequest = &n
+	}
+	return &out
 }
 
 // maxRandomBytes caps one crypto.getRandomValues call.
@@ -77,7 +156,8 @@ func (b *bridge) varSet(call goja.FunctionCall) goja.Value {
 	if !ok {
 		s = vars.Local
 	}
-	b.in.Vars.Set(s, call.Argument(1).String(), exportValue(call.Argument(2)))
+	key, val := call.Argument(1).String(), exportValue(call.Argument(2))
+	b.mutate(func() { b.in.Vars.Set(s, key, val) })
 	return goja.Undefined()
 }
 
@@ -86,7 +166,7 @@ func (b *bridge) varUnset(scope, key string) {
 		return
 	}
 	if s, ok := scopeNames[scope]; ok {
-		b.in.Vars.Unset(s, key)
+		b.mutate(func() { b.in.Vars.Unset(s, key) })
 	}
 }
 
@@ -107,7 +187,7 @@ func (b *bridge) varClear(scope string) {
 		return
 	}
 	if s, ok := scopeNames[scope]; ok {
-		b.in.Vars.Clear(s)
+		b.mutate(func() { b.in.Vars.Clear(s) })
 	}
 }
 
@@ -157,21 +237,25 @@ func (b *bridge) varResolve(template string) string {
 }
 
 func (b *bridge) console(level, message string) {
-	b.res.Console = append(b.res.Console, ConsoleEntry{
-		Level:   ConsoleLevel(level),
-		Message: message,
-		Time:    b.now(),
+	b.mutate(func() {
+		b.res.Console = append(b.res.Console, ConsoleEntry{
+			Level:   ConsoleLevel(level),
+			Message: message,
+			Time:    b.now(),
+		})
 	})
 }
 
 func (b *bridge) test(name string, passed, skipped, async bool, errText string, index int) {
-	b.res.Tests = append(b.res.Tests, TestResult{
-		Name:    name,
-		Passed:  passed,
-		Skipped: skipped,
-		Async:   async,
-		Error:   errText,
-		Index:   index,
+	b.mutate(func() {
+		b.res.Tests = append(b.res.Tests, TestResult{
+			Name:    name,
+			Passed:  passed,
+			Skipped: skipped,
+			Async:   async,
+			Error:   errText,
+			Index:   index,
+		})
 	})
 }
 
@@ -180,10 +264,10 @@ func (b *bridge) setNextRequest(name goja.Value) {
 	if name != nil && !goja.IsNull(name) && !goja.IsUndefined(name) {
 		next = name.String()
 	}
-	b.res.NextRequest = &next
+	b.mutate(func() { b.res.NextRequest = &next })
 }
 
-func (b *bridge) skipRequest() { b.res.SkipRequest = true }
+func (b *bridge) skipRequest() { b.mutate(func() { b.res.SkipRequest = true }) }
 
 func (b *bridge) randomBytes(n int) []int {
 	if n < 0 {
@@ -220,12 +304,29 @@ func (b *bridge) sendRequest(defJSON string, cb goja.Callable) {
 		return
 	}
 
+	b.sends++
+	if b.sends > maxSendRequests {
+		b.laterOnLoop(func(vm *goja.Runtime) {
+			fail(vm, fmt.Sprintf("pm.sendRequest was called more than %d times in one script run", maxSendRequests))
+		})
+		return
+	}
+
 	req := defToRequest(d)
 	ctx := b.ctx
 	sender := b.in.Sender
 	opts := b.in.SendOptions
 
 	go func() {
+		// Wait for one of the in-flight slots; the run's deadline frees the
+		// wait too.
+		select {
+		case b.slots <- struct{}{}:
+			defer func() { <-b.slots }()
+		case <-ctx.Done():
+			b.loop.RunOnLoop(func(vm *goja.Runtime) { fail(vm, ctx.Err().Error()) })
+			return
+		}
 		resp, err := sender.Send(ctx, req, opts)
 		b.loop.RunOnLoop(func(vm *goja.Runtime) {
 			if err != nil {
@@ -275,7 +376,9 @@ func (b *bridge) cookieSet(rawURL string, def map[string]any) string {
 	if b.in.Cookies == nil {
 		return "no cookie store is available"
 	}
-	if err := b.in.Cookies.SetCookie(rawURL, defToCookie(def)); err != nil {
+	var err error
+	b.unlessAbandoned(func() { err = b.in.Cookies.SetCookie(rawURL, defToCookie(def)) })
+	if err != nil {
 		return err.Error()
 	}
 	return ""
@@ -285,7 +388,9 @@ func (b *bridge) cookieUnset(rawURL, name string) string {
 	if b.in.Cookies == nil {
 		return "no cookie store is available"
 	}
-	if err := b.in.Cookies.UnsetCookie(rawURL, name); err != nil {
+	var err error
+	b.unlessAbandoned(func() { err = b.in.Cookies.UnsetCookie(rawURL, name) })
+	if err != nil {
 		return err.Error()
 	}
 	return ""
@@ -295,17 +400,21 @@ func (b *bridge) cookieClear(rawURL string) string {
 	if b.in.Cookies == nil {
 		return "no cookie store is available"
 	}
-	if err := b.in.Cookies.ClearCookies(rawURL); err != nil {
+	var err error
+	b.unlessAbandoned(func() { err = b.in.Cookies.ClearCookies(rawURL) })
+	if err != nil {
 		return err.Error()
 	}
 	return ""
 }
 
 func (b *bridge) scriptError(index int, name, message, stack string) {
-	if b.res.Err != nil {
-		return
-	}
-	b.res.Err = &ScriptError{ScriptIndex: index, Name: name, Message: message, Stack: stack}
+	b.mutate(func() {
+		if b.res.Err != nil {
+			return
+		}
+		b.res.Err = &ScriptError{ScriptIndex: index, Name: name, Message: message, Stack: stack}
+	})
 }
 
 // object builds the host object handed to __postctl_init.

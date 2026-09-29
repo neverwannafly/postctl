@@ -73,6 +73,7 @@ func ConvertObject(raw map[string]any, options Options) (*Document, Report, erro
 			moveCollectionSecrets(collection, &report)
 		}
 		report.Counts.Collections = 1
+		report.Counts.OAuthTokens = countOAuthTokens(collection)
 		report.sort()
 		return &Document{Kind: KindCollection, Collection: collection}, report, nil
 	}
@@ -505,11 +506,15 @@ func convertVariables(value any, environment bool) []model.Variable {
 		}
 		if environment {
 			variable.Disabled = raw["enabled"] != nil && !boolValue(raw["enabled"])
-			switch variable.DataType {
-			case "secret":
-				variable.Type = model.VarSecret
-				variable.DataType = ""
-			case "default", "any":
+		}
+		switch variable.DataType {
+		case "secret":
+			// A variable the user marked secret in Postman never lands in
+			// YAML as plaintext, in an environment or in a collection.
+			variable.Type = model.VarSecret
+			variable.DataType = ""
+		case "default", "any":
+			if environment {
 				variable.DataType = ""
 			}
 		}

@@ -25,8 +25,6 @@ import (
 type session struct {
 	e  *Engine
 	id uint64
-	// seen is the last commit sequence number this session has accounted for.
-	seen uint64
 
 	// collection, env and globals are deep copies taken when the session
 	// started, with secret variable values hydrated. Nothing outside the
@@ -76,7 +74,6 @@ func (e *Engine) newSession(
 		}
 		s.globals = g
 	}
-	s.seen = e.ws.currentSeq()
 
 	missing := 0
 	hydrate := func(list []model.Variable) error {
@@ -86,6 +83,16 @@ func (e *Engine) newSession(
 	}
 	if err := hydrate(s.collection.Variables); err != nil {
 		return nil, fmt.Errorf("read secret variables: %w", err)
+	}
+	var hydrateErr error
+	_ = s.collection.Walk(func(it model.Item, _ model.Container, _ int) error {
+		if folder, ok := it.(*model.Folder); ok && hydrateErr == nil {
+			hydrateErr = hydrate(folder.Variables)
+		}
+		return nil
+	})
+	if hydrateErr != nil {
+		return nil, fmt.Errorf("read secret variables: %w", hydrateErr)
 	}
 	var envVars, globalVars []model.Variable
 	if s.env != nil {
@@ -120,6 +127,12 @@ func (s *session) refreshSecrets() {
 		}
 	}
 	add(s.collection.Variables)
+	_ = s.collection.Walk(func(it model.Item, _ model.Container, _ int) error {
+		if folder, ok := it.(*model.Folder); ok {
+			add(folder.Variables)
+		}
+		return nil
+	})
 	if s.env != nil {
 		add(s.env.Variables)
 	}
@@ -269,6 +282,9 @@ func (s *session) execute(
 		Iteration:      iteration,
 		IterationCount: s.iterationCount,
 	}
+	// Folder variables depend on where the request sits, so they are
+	// installed per request, before any script or resolution runs.
+	s.store.SetFolderVariables(vars.FolderVariables(chain))
 	opts := e.httpOptions()
 	sender := &varSender{inner: e.cfg.HTTP, store: s.store}
 
@@ -285,6 +301,7 @@ func (s *session) execute(
 			SendOptions: opts,
 			Cookies:     e.cookies,
 			Timeout:     e.cfg.ScriptTimeout,
+			MemoryLimit: e.cfg.ScriptMemoryLimit,
 		})
 		if err != nil {
 			out.Err = err
@@ -347,6 +364,7 @@ func (s *session) execute(
 			SendOptions: opts,
 			Cookies:     e.cookies,
 			Timeout:     e.cfg.ScriptTimeout,
+			MemoryLimit: e.cfg.ScriptMemoryLimit,
 		})
 		if err != nil {
 			out.Err = err

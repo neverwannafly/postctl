@@ -218,26 +218,27 @@ func envSet(ctx context.Context, a *app, name, key, value string, secret bool) i
 		fmt.Fprintln(a.err, "The variable key is empty.")
 		return ExitUsage
 	}
-	found := false
-	for i := range env.Variables {
-		if env.Variables[i].Key == key {
-			env.Variables[i].Value = value
-			env.Variables[i].Disabled = false
-			if secret {
-				env.Variables[i].Type = model.VarSecret
+	// The store re-reads the file under its lock, so a concurrent TUI edit or
+	// run keeps its variables; only this key changes.
+	err := a.store.UpdateEnvironmentVariables(ctx, env.ID, func(current []model.Variable) []model.Variable {
+		next := append([]model.Variable(nil), current...)
+		for i := range next {
+			if next[i].Key == key {
+				next[i].Value = value
+				next[i].Disabled = false
+				if secret {
+					next[i].Type = model.VarSecret
+				}
+				return next
 			}
-			found = true
-			break
 		}
-	}
-	if !found {
 		v := model.Variable{Key: key, Value: value}
 		if secret {
 			v.Type = model.VarSecret
 		}
-		env.Variables = append(env.Variables, v)
-	}
-	if err := a.store.SaveEnvironment(ctx, env); err != nil {
+		return append(next, v)
+	})
+	if err != nil {
 		fmt.Fprintf(a.err, "Cannot save the environment: %v\n", err)
 		return ExitUsage
 	}
@@ -258,21 +259,23 @@ func envUnset(ctx context.Context, a *app, name, key string) int {
 		fmt.Fprintln(a.err, "Pass an environment name.")
 		return ExitUsage
 	}
-	next := env.Variables[:0]
 	removed := false
-	for _, v := range env.Variables {
-		if v.Key == key {
-			removed = true
-			continue
+	err := a.store.UpdateEnvironmentVariables(ctx, env.ID, func(current []model.Variable) []model.Variable {
+		next := make([]model.Variable, 0, len(current))
+		for _, v := range current {
+			if v.Key == key {
+				removed = true
+				continue
+			}
+			next = append(next, v)
 		}
-		next = append(next, v)
-	}
-	if !removed {
+		return next
+	})
+	if err == nil && !removed {
 		fmt.Fprintf(a.err, "No variable %q on %s.\n", key, env.Name)
 		return ExitUsage
 	}
-	env.Variables = next
-	if err := a.store.SaveEnvironment(ctx, env); err != nil {
+	if err != nil {
 		fmt.Fprintf(a.err, "Cannot save the environment: %v\n", err)
 		return ExitUsage
 	}

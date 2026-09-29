@@ -37,7 +37,7 @@ sequenceDiagram
 
     C->>E: SendInput, progress
     E->>D: hydrate secret variables (on clones)
-    E->>E: build vars store (global < collection < env < data < local)
+    E->>E: build vars store (global < collection < folder < env < data < local)
     loop collection, each folder, request
         E-->>C: "Running … pre-request script"
         E->>S: Run(prerequest, unresolved request)
@@ -105,6 +105,34 @@ Details that matter:
 `Outcome.Failed()` is true for a transport error, a script error or a failing
 test.
 
+## Variable precedence
+
+From lowest to highest, a `{{name}}` resolves to the first scope below that
+defines it: **global < collection < folder < environment < data < local**
+(`pm.variables.set`, `--var`).
+
+Folder variables (`folder.yaml`, Postman v2.1 `item[].variable` on a folder) are
+part of the collection tier, as in Postman: they beat collection variables and
+lose to the environment. With nested folders the inner one wins. Only the
+folders above the request being sent apply, and disabled variables are
+ignored.
+
+There is one resolution path. `vars.FolderVariables(chain)` collects the
+folders' variables and `MemStore.SetFolderVariables` installs them on the
+variable store; the engine does this per request in `execute` (so a run
+crossing folders resolves each request with its own chain), `postctl curl`
+does it before resolving, and the TUI preview and copy-as-curl build the same
+layering (`TestScopeMatchesEngineFolderPrecedence` keeps them equal). Secret
+folder variables are hydrated from the `SecretStore` and masked in history like
+any other secret.
+
+Folder variables are read-only for scripts. `pm.variables.get`, `pm.variables.has`
+and `{{name}}` see them; `pm.collectionVariables.get`, `.has`, `toObject()` and
+`pm.variables.toObject()` do not list them. `pm.collectionVariables.set(k, v)`
+writes the collection's own variable `k`, which a folder variable of the same
+name still shadows for requests below that folder. A send never writes a folder
+variable back to disk.
+
 ## Persistence
 
 Plan §0 R3: `pm.environment`, `pm.collectionVariables` and `pm.globals` writes
@@ -119,21 +147,22 @@ values stay live for the rest of a run.
   the store moves the value to the `SecretStore`. Only secrets a script
   changed are handed to the store with a value, so an untouched secret is saved
   by reference and never re-written to the Keychain.
-- **Concurrency.** All persistence runs under one mutex per workspace
-  directory (shared by every `Engine` in the process). Concurrent sends start
-  from the same stale copy of the environment, so each persist first replays the
-  changes other sends committed since it started (an in-memory commit log,
-  1,024 entries) and then applies its own on top. Writes to different variables
-  never get lost; writes to the same variable are last-writer-wins.
+- **Concurrency.** The engine never writes back the snapshot it took when the
+  send started. Each persist hands the store only the keys the send changed
+  (`UpdateEnvironmentVariables`, `UpdateCollectionVariables`,
+  `UpdateGlobalsVariables`); the store re-reads the file under the workspace
+  write lock, applies those keys, and writes it atomically (temp file and
+  rename), keeping everything else as it is on disk: other variables, the
+  environment name and `production` flag, and every secret it did not touch.
+  The lock is a per-directory mutex plus an advisory `flock` on
+  `.postctl/store.lock`, and every store writer takes it (the TUI's saves, the
+  CLI's `env set`, imports, the engine), so a TUI edit, a send and a
+  `postctl run` in another terminal never drop each other's variables. Writes
+  to the same key are last-writer-wins.
 - **No environment selected.** An environment write cannot be saved; the send
   gets a warning.
 - **Globals** come from `SendInput.Globals` or, when nil, from `globals.yaml`
   (cached by size and mtime). A missing file is created on the first write.
-
-Known limit: the store has no narrow "save collection variables" call, so a
-collection-variable write saves the collection snapshot taken when the send
-started. An edit to that collection made while the send was in flight can be
-reverted on disk. Environment and globals writes are not affected.
 
 ## Cookies and `pm.sendRequest`
 

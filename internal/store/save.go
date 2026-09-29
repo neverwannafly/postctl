@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -359,6 +360,11 @@ func (s *Store) writeWorkspaceFile(ws *model.Workspace, order []string) error {
 // SaveMeta writes postctl.yaml (name, description, defaults, extra) from ws,
 // keeping the collection order already on disk.
 func (s *Store) SaveMeta(ws *model.Workspace) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if ws.ID == "" {
 		return &model.ValidationError{Problems: []string{"workspace: missing id"}}
 	}
@@ -377,6 +383,11 @@ func (s *Store) Save(ctx context.Context, ws *model.Workspace) error {
 	if err := ws.Validate(); err != nil {
 		return err
 	}
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	for _, d := range []string{collectionsDir, environmentsDir} {
 		if err := os.MkdirAll(filepath.Join(s.root, d), dirPerm); err != nil {
 			return err
@@ -426,12 +437,12 @@ func (s *Store) Save(ctx context.Context, ws *model.Workspace) error {
 		order = append(order, name)
 	}
 	for _, e := range ws.Environments {
-		if err := s.SaveEnvironment(ctx, e); err != nil {
+		if err := s.saveEnvironment(ctx, e); err != nil {
 			return err
 		}
 	}
 	if ws.Globals != nil {
-		if err := s.SaveGlobals(ctx, ws.Globals); err != nil {
+		if err := s.saveGlobals(ctx, ws.Globals); err != nil {
 			return err
 		}
 	} else if isFile(filepath.Join(s.root, globalsYAML)) {
@@ -459,6 +470,15 @@ func (s *Store) envParses(stem string) bool {
 // collection moves to its new directory. The workspace's collection order gains
 // the collection if it is new.
 func (s *Store) SaveCollection(ctx context.Context, c *model.Collection) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return s.saveCollection(ctx, c)
+}
+
+func (s *Store) saveCollection(ctx context.Context, c *model.Collection) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
@@ -469,10 +489,31 @@ func (s *Store) SaveCollection(ctx context.Context, c *model.Collection) error {
 	return s.updateCollectionOrder(func(order []string) []string { return replaceOrAppend(order, old, name) })
 }
 
-// SaveCollectionVariables updates only the variables in collection.yaml.
-// The file is re-read immediately before writing so concurrent request,
-// metadata, auth, script-reference, and order edits are preserved.
+// SaveCollectionVariables replaces only the variables in collection.yaml.
+// The file is re-read under the store lock immediately before writing so
+// concurrent request, metadata, auth, script-reference, and order edits are
+// preserved. Use [Store.UpdateCollectionVariables] to change some variables
+// without replacing the others.
 func (s *Store) SaveCollectionVariables(ctx context.Context, id model.ID, variables []model.Variable) error {
+	return s.UpdateCollectionVariables(ctx, id, func([]model.Variable) []model.Variable { return variables })
+}
+
+// UpdateCollectionVariables re-reads collection.yaml under the store lock,
+// hands its current variables to mutate, and writes back what mutate returns,
+// leaving every other part of the file as it was. mutate sees secret
+// variables as they are on disk: a ref and no value. Give one a value to store
+// a new secret; leave the value empty to keep the stored one. mutate must not
+// modify the slice it is given, and runs while other writers wait, so it must
+// be quick and must not call the store. Nothing is written when mutate
+// returns the variables unchanged.
+func (s *Store) UpdateCollectionVariables(
+	ctx context.Context, id model.ID, mutate func([]model.Variable) []model.Variable,
+) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	idx, err := s.collectionIndex()
 	if err != nil {
 		return err
@@ -492,6 +533,10 @@ func (s *Store) SaveCollectionVariables(ctx context.Context, id model.ID, variab
 	if _, err := s.decode(path, KindCollection, 0, &cf); err != nil {
 		return err
 	}
+	variables := mutate(cf.Variables)
+	if sameVariables(cf.Variables, variables) {
+		return nil
+	}
 	candidate := cf.Collection
 	candidate.Variables = variables
 	if err := candidate.Validate(); err != nil {
@@ -509,6 +554,15 @@ func (s *Store) SaveCollectionVariables(ctx context.Context, id model.ID, variab
 	}
 	s.deleteRefs(ctx, oldRefs, sw.used)
 	return nil
+}
+
+// sameVariables reports whether two variable lists are identical, treating a
+// nil and an empty list as equal.
+func sameVariables(a, b []model.Variable) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	return len(a) == 0 || reflect.DeepEqual(a, b)
 }
 
 func replaceOrAppend(order []string, old, name string) []string {
@@ -647,6 +701,11 @@ func (s *Store) writeRequest(w *writer, sw *secretWriter, r *model.Request, loc 
 // autosave. If the request is new, renamed, or moved (its planned file does not
 // exist yet) it falls back to [Store.SaveCollection].
 func (s *Store) SaveRequest(ctx context.Context, c *model.Collection, id model.ID) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	it, _, _, ok := c.Find(id)
 	r, isReq := it.(*model.Request)
 	if !ok || !isReq {
@@ -666,12 +725,12 @@ func (s *Store) SaveRequest(ctx context.Context, c *model.Collection, id model.I
 		}
 	}
 	if dirName == "" {
-		return s.SaveCollection(ctx, c)
+		return s.saveCollection(ctx, c)
 	}
 	lay := planCollection(c, filepath.Join(s.root, collectionsDir, dirName))
 	loc := lay.nodes[id]
 	if !isFile(filepath.Join(loc.dir, loc.stem+".yaml")) {
-		return s.SaveCollection(ctx, c)
+		return s.saveCollection(ctx, c)
 	}
 	w := newWriter(true)
 	if err := s.writeRequest(w, newSecretWriter(ctx, s.secrets), r, loc); err != nil {
@@ -720,6 +779,11 @@ func (s *Store) PathOf(c *model.Collection, id model.ID) (string, error) {
 // DeleteCollection removes a collection's files and its secrets. Files the
 // store does not own are left in place.
 func (s *Store) DeleteCollection(ctx context.Context, id model.ID) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	idx, err := s.collectionIndex()
 	if err != nil {
 		return err
@@ -773,6 +837,32 @@ func collectionRefs(c *model.Collection) []model.SecretRef {
 	return refs
 }
 
+// DeleteRemovedSecrets deletes from the SecretStore the secrets that old (a
+// collection as it was loaded before a replacement such as a re-import)
+// referenced and the collection as it is now on disk no longer does: the OAuth
+// 2.0 tokens and secret variables of requests, folders and variables that were
+// dropped. Call it after saving. Nothing is deleted when the saved collection
+// cannot be read back; delete failures are ignored.
+func (s *Store) DeleteRemovedSecrets(ctx context.Context, old *model.Collection) {
+	if old == nil {
+		return
+	}
+	unlock, err := s.lock()
+	if err != nil {
+		return
+	}
+	defer unlock()
+	current, err := s.LoadCollection(old.ID)
+	if err != nil {
+		return
+	}
+	keep := map[model.SecretRef]bool{}
+	for _, ref := range collectionRefs(current) {
+		keep[ref] = true
+	}
+	s.deleteRefs(ctx, collectionRefs(old), keep)
+}
+
 // deleteRefs removes refs from the SecretStore except those in keep.
 func (s *Store) deleteRefs(ctx context.Context, refs []model.SecretRef, keep map[model.SecretRef]bool) {
 	if s.secrets == nil {
@@ -791,6 +881,15 @@ func (s *Store) deleteRefs(ctx context.Context, refs []model.SecretRef, keep map
 // A renamed environment moves to its new file name, and secrets of variables
 // that were removed are deleted.
 func (s *Store) SaveEnvironment(ctx context.Context, e *model.Environment) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return s.saveEnvironment(ctx, e)
+}
+
+func (s *Store) saveEnvironment(ctx context.Context, e *model.Environment) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
@@ -825,8 +924,74 @@ func (s *Store) SaveEnvironment(ctx context.Context, e *model.Environment) error
 	return nil
 }
 
+// UpdateEnvironmentVariables re-reads the environment file under the store
+// lock, hands its current variables to mutate, and writes back what mutate
+// returns, leaving the name, the production flag and every other part of the
+// environment as they are on disk. The rules for mutate are those of
+// [Store.UpdateCollectionVariables]. Nothing is written when mutate returns
+// the variables unchanged.
+func (s *Store) UpdateEnvironmentVariables(
+	ctx context.Context, id model.ID, mutate func([]model.Variable) []model.Variable,
+) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	idx, err := s.envIndex()
+	if err != nil {
+		return err
+	}
+	for stem, eid := range idx {
+		if eid != id {
+			continue
+		}
+		var ef environmentFile
+		if _, err := s.decode(filepath.Join(s.root, environmentsDir, stem+".yaml"), KindEnvironment, 0, &ef); err != nil {
+			return err
+		}
+		env := ef.Environment
+		env.ID = id
+		env.Variables = mutate(ef.Variables)
+		if sameVariables(ef.Variables, env.Variables) {
+			return nil
+		}
+		return s.saveEnvironment(ctx, &env)
+	}
+	return fmt.Errorf("%w: environment %q", model.ErrNotFound, id)
+}
+
+// UpdateGlobalsVariables is [Store.UpdateEnvironmentVariables] for
+// globals.yaml. A workspace with no globals file gets one when mutate returns
+// variables; mutate then receives an empty list.
+func (s *Store) UpdateGlobalsVariables(ctx context.Context, mutate func([]model.Variable) []model.Variable) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	g, err := s.LoadGlobals()
+	if err != nil {
+		return err
+	}
+	if g == nil {
+		g = &model.Globals{ID: model.NewID(), Name: "Globals"}
+	}
+	current := g.Variables
+	g.Variables = mutate(current)
+	if sameVariables(current, g.Variables) {
+		return nil
+	}
+	return s.saveGlobals(ctx, g)
+}
+
 // DeleteEnvironment removes an environment file and its secrets.
 func (s *Store) DeleteEnvironment(ctx context.Context, id model.ID) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	idx, err := s.envIndex()
 	if err != nil {
 		return err
@@ -853,6 +1018,15 @@ func (s *Store) removeEnvFile(ctx context.Context, stem string) error {
 
 // SaveGlobals writes globals.yaml. Secret values go to the SecretStore.
 func (s *Store) SaveGlobals(ctx context.Context, g *model.Globals) error {
+	unlock, err := s.lock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	return s.saveGlobals(ctx, g)
+}
+
+func (s *Store) saveGlobals(ctx context.Context, g *model.Globals) error {
 	if err := g.Validate(); err != nil {
 		return err
 	}

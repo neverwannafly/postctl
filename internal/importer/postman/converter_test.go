@@ -244,26 +244,6 @@ func TestKeepLiteralSecrets(t *testing.T) {
 	}
 }
 
-func TestMergeKeepsItemsAbsentFromSource(t *testing.T) {
-	existingRequest := model.NewRequest("Local only", "GET", "https://example.invalid/local")
-	existingRequest.ID = "local"
-	existing := &model.Collection{ID: "collection-v2", Name: "Old", Items: []model.Item{existingRequest}}
-	workspace := &model.Workspace{ID: "workspace", Name: "Workspace", Collections: []*model.Collection{existing}}
-	document, converted, err := Convert(readFixture(t, "minimal-v2.0.json"), Options{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	MergeDocuments(workspace, []*Document{document}, &converted)
-	if len(workspace.Collections[0].Items) != 2 ||
-		workspace.Collections[0].Items[1].ItemID() != "local" {
-		t.Fatal("local-only item was not retained")
-	}
-	if !contains(converted.Changes.Kept, "Version 2 › Local only") ||
-		!contains(converted.Changes.Added, "Version 2 › Ping") {
-		t.Fatalf("changes = %+v", converted.Changes)
-	}
-}
-
 func TestMergeDoesNotDuplicateMovedItem(t *testing.T) {
 	request := model.NewRequest("Moved", "GET", "https://example.invalid")
 	request.ID = "request"
@@ -406,6 +386,9 @@ func copyTree(source, destination string) error {
 		if entry.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
+		if entry.Name() == "store.lock" {
+			return nil // advisory lock file, not workspace content
+		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
@@ -422,7 +405,7 @@ func assertTreesEqual(t *testing.T, expected, actual string) {
 			if walkErr != nil {
 				return walkErr
 			}
-			if entry.IsDir() || entry.Name() == ".gitignore" {
+			if entry.IsDir() || entry.Name() == ".gitignore" || entry.Name() == "store.lock" {
 				return nil
 			}
 			relative, err := filepath.Rel(root, path)

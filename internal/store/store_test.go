@@ -215,6 +215,9 @@ func readTree(t *testing.T, root string) map[string]string {
 			return nil
 		}
 		rel, _ := filepath.Rel(root, p)
+		if filepath.ToSlash(rel) == ".postctl/"+lockName {
+			return nil // advisory lock file: local state, not workspace content
+		}
 		b, err := os.ReadFile(p)
 		if err != nil {
 			return err

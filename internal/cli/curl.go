@@ -63,6 +63,9 @@ func (a *app) resolveRequest(ctx context.Context, n node, env *model.Environment
 		environment = hydrateVars(ctx, a.store, env.Variables)
 	}
 	store := vars.New(globals, collection, environment, nil)
+	// Folder variables resolve exactly as they do on send (docs/engine.md,
+	// "Variable precedence").
+	store.SetFolderVariables(hydrateVars(ctx, a.store, vars.FolderVariables(n.containers())))
 	resolved, err := vars.ResolveRequest(n.request(), n.containers(), store)
 	if err != nil {
 		return nil, err
