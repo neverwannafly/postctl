@@ -32,7 +32,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Done, merged to main | ws/6a-request-editor | 2026-09-30 02:15 IST |
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
 | WS7 CLI | Grok 4.7 (high, fast) | Done, merged to main | ws/7-cli | 2026-09-30 03:15 IST |
-| WS8 docs/release | Gemini 3.8 Flash (high) | Done, ready for merge | ws/8-docs | 2026-09-30 04:00 IST |
+| WS8 docs/release | Gemini 3.8 Flash (high) | Done, merged to main | ws/8-docs | 2026-09-30 03:34 IST |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
 | QA/INT4 final integration | GPT-5.6 Sol | In progress | fix/security | 2026-09-30 03:31 IST |
@@ -582,3 +582,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). All tests pass with -race.
 - Blockers / questions: Noted inconsistencies between existing docs and CLI code: --workspace flag position on root command vs subcommands, lack of --var flag on postctl run, TUI runner JSON-only export vs CLI JUnit/NDJSON.
 - Next: Orchestrator review and merge ws/8-docs.
+
+### 2026-09-30 03:34 IST · INT4 · gpt-5.6 · PROGRESS
+- Branch/worktree: `main`
+- Did: Merged `qa/fixes` and `ws/8-docs` with merge commits, preserving both sides of their ledger entries. Replaced the obsolete WebSocket TODO in the generated key reference with the implemented WebSocket bindings and added explicit coverage tests. Removed both merged worktrees; left `fix-data` untouched.
+- Files: merged QA/WS8 files, `cmd/genkeys/main.go`, `cmd/genkeys/main_test.go`, `internal/tui/keys_test.go`, `docs/keys.md`, `docs/ledger.md`
+- Decisions: WebSocket key coverage enumerates connection, composer, saved-message, log, and detail actions.
+- Tests: After each merge, `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed. Generator and TUI key tests passed after regeneration.
+- Blockers / questions: none.
+- Next: Create `fix/security` and verify each assigned review finding with a failing regression test before fixing it.
