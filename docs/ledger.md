@@ -27,7 +27,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Done, merged to main | ws/2b-oauth2 | 2026-09-29 23:58 IST |
 | WS0.1 lenient load + Clone | Sonnet 5.5 (resumed WS0) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:45 IST |
 | WS3 script runtime | Opus 5 Thinking (high) | Done, merged to main | ws/3-script | 2026-09-30 01:55 IST |
-| WS4 engine/runner | — | Not started | — | — |
+| WS4 engine/runner | Sonnet 5.5 (high) | Running | ws/4-engine | 2026-09-30 02:00 IST |
 | WS5 UI components + TUI shell | Sonnet 5.5 (high) | Done, merged to main | ws/5-tui-shell | 2026-09-30 00:15 IST |
 | WS6a request editor + send wiring | Sonnet 5.5 (high) | Running | ws/6a-request-editor | 2026-09-30 00:20 IST |
 | WS6b response viewer | Composer 2.5 (fast) | Done, merged to main | ws/6b-response-viewer | 2026-09-30 01:30 IST |
@@ -353,3 +353,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` all green. Corpus 46/46. **Private data: 17 of 17 real pre-request scripts run clean, no unsupported-API errors or warnings.** Warm run of a trivial script 0.47 ms, crypto-js signing 3.4 ms, five chai assertions 3.7 ms, against a 5 ms budget.
 - Blockers / questions: none.
 - Next: none. Ready for the orchestrator to review and merge.
+
+### 2026-09-30 02:00 IST · WS3 · Orchestrator · PROGRESS
+- Did: Verified `ws/3-script`. It stayed in scope (plus the `task assets` target and goja dependencies); race tests and lint are green. `TestPrivateCollections` ran (not skipped) and passed: all 17 real pre-request scripts run clean. The committed bundles total 1.8 MB, and `node_modules` is gitignored. Corpus fixtures contain no private data. Merged into `main`.
+- Decisions: Accepted deviations. crypto-js is 4.2.0 (the CVE fix) instead of Postman's 3.3.0. `pm.*` is postctl's own implementation (`instanceof sdk.Request` is false). Query strings are not percent-normalized. Found an integration gap: `httpx.CookieJar` doesn't implement `script.CookieAccess` (missing `ClearCookies`); the WS4 brief assigns an adapter.
+- Next: Launch WS4 (engine, runner, history, tuiengine adapter). WS7 (CLI send/run/ls/env) follows WS4. The TUI runner screen and history pane will be briefed after WS4 and WS6a merge.
