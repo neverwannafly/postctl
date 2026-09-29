@@ -65,7 +65,7 @@ func ConvertObject(raw map[string]any, options Options) (*Document, Report, erro
 	if info := object(raw["info"]); info != nil {
 		schema := text(info["schema"])
 		if schema != schemaV21 && schema != schemaV20 {
-			return nil, Report{}, fmt.Errorf("unsupported Postman collection schema %q (want v2.0 or v2.1)", schema)
+			return nil, Report{}, errors.New("unsupported Postman collection schema (want v2.0 or v2.1)")
 		}
 		report := Report{}
 		collection := convertCollection(raw, &report)

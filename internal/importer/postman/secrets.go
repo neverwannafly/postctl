@@ -151,7 +151,7 @@ func lintScript(path, kind string, script *model.Script, report *Report) {
 	for _, match := range requirePattern.FindAllStringSubmatch(source, -1) {
 		if !supported[match[1]] {
 			report.AddWarning(path, "script-unknown-require-"+kind,
-				fmt.Sprintf("require(%q) is not supported", match[1]))
+				"An unsupported require() module is used")
 		}
 	}
 }
