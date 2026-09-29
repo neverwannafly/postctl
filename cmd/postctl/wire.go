@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/shubham/postctl/internal/engine"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/oauth2"
@@ -14,7 +16,9 @@ import (
 	"github.com/shubham/postctl/internal/tui/cookies"
 	"github.com/shubham/postctl/internal/tui/envedit"
 	"github.com/shubham/postctl/internal/tui/fakesend"
+	histui "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
+	"github.com/shubham/postctl/internal/tui/runner"
 	"github.com/shubham/postctl/internal/tui/tuiengine"
 )
 
@@ -55,6 +59,16 @@ func (p *lazyEngine) get() (*engine.Engine, error) {
 	return p.engine, err
 }
 
+func (p *lazyEngine) historyLog() (tui.HistoryReader, error) {
+	if _, err := p.get(); err != nil {
+		return nil, err
+	}
+	p.mu.Lock()
+	root := p.store.StateDir()
+	p.mu.Unlock()
+	return history.Open(filepath.Join(root, "history"), history.Options{})
+}
+
 func (p *lazyEngine) secrets() (store.SecretStore, error) {
 	if _, err := p.get(); err != nil {
 		return nil, err
@@ -62,6 +76,16 @@ func (p *lazyEngine) secrets() (store.SecretStore, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.store.SecretStore(), nil
+}
+
+type lazyRunner struct{ engine *lazyEngine }
+
+func (r *lazyRunner) RunAsync(ctx context.Context, in engine.RunInput) (<-chan engine.RunEvent, error) {
+	eng, err := r.engine.get()
+	if err != nil {
+		return nil, err
+	}
+	return tuiengine.NewRunner(eng).RunAsync(ctx, in)
 }
 
 type lazySender struct{ engine *lazyEngine }
@@ -136,6 +160,15 @@ func wireEditors(o *tui.Options) {
 			}
 			return cookies.New(env, eng.Cookies())
 		}
+	}
+	if o.NewRunner == nil && o.Backend != nil {
+		o.NewRunner = runner.Factory(runner.Deps{Runner: &lazyRunner{engine: engines}})
+	}
+	if o.NewHistory == nil && o.Backend != nil {
+		o.NewHistory = histui.Factory(histui.Deps{
+			Log:  func() (tui.HistoryReader, error) { return engines.historyLog() },
+			Curl: histui.DefaultCurl,
+		})
 	}
 }
 

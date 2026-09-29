@@ -38,6 +38,16 @@ type RunInput struct {
 	Bail bool
 	// StopOnScriptError stops the run after the first script error.
 	StopOnScriptError bool
+	// NoPersist skips writing environment, collection and global variable
+	// changes to disk for this run. Scripts still mutate the live variable
+	// store, so later requests in the same run see the values (R3 in memory
+	// only). The zero value keeps normal persistence.
+	NoPersist bool
+	// OnlyRequests limits the run to these request IDs, in their usual
+	// depth-first order within the scope. Empty runs every request in the
+	// scope. pm.execution.setNextRequest to a request outside this set
+	// ends the run with [StopNextMissing].
+	OnlyRequests []model.ID
 }
 
 // StopReason says why a run ended early.
@@ -331,6 +341,7 @@ func (e *Engine) planRun(ctx context.Context, in RunInput) (*runPlan, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.noPersist = in.NoPersist
 	var scope model.Container = s.collection
 	name := ""
 	if in.FolderID != "" {
@@ -348,13 +359,31 @@ func (e *Engine) planRun(ctx context.Context, in RunInput) (*runPlan, error) {
 		iterations = max(1, len(in.Data))
 	}
 	s.iterationCount = iterations
+	items := scopeItems(s.collection, scope)
+	if len(in.OnlyRequests) > 0 {
+		items = filterRunItems(items, in.OnlyRequests)
+	}
 	return &runPlan{
 		s:          s,
 		in:         in,
-		items:      scopeItems(s.collection, scope),
+		items:      items,
 		iterations: iterations,
 		scopeName:  name,
 	}, nil
+}
+
+func filterRunItems(items []runItem, only []model.ID) []runItem {
+	allowed := make(map[model.ID]struct{}, len(only))
+	for _, id := range only {
+		allowed[id] = struct{}{}
+	}
+	out := make([]runItem, 0, len(only))
+	for _, it := range items {
+		if _, ok := allowed[it.req.ID]; ok {
+			out = append(out, it)
+		}
+	}
+	return out
 }
 
 func (p *runPlan) run(ctx context.Context, events chan<- RunEvent) *RunSummary {

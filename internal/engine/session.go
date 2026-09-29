@@ -42,6 +42,8 @@ type session struct {
 	// outcome.
 	warnings       []string
 	iterationCount int
+	// noPersist skips disk writes for variable changes (collection runs).
+	noPersist bool
 }
 
 // newSession snapshots the models, hydrates their secret variables and builds

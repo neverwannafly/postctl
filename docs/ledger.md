@@ -34,6 +34,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS7 CLI | Grok 4.7 (high, fast) | Done, merged to main | ws/7-cli | 2026-09-30 03:15 IST |
 | WS8 docs/release | — | Not started | — | — |
 | WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
+| WS6c runner + history TUI | Composer 2.5 (fast) | Done (branch) | ws/6c-runner-history | 2026-09-30 03:10 IST |
 
 ## Entries
 
@@ -461,3 +462,29 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). CLI tests cover path ambiguity and case, exit codes 0/1/2/3, reporter text, NDJSON and JUnit structure, bail, cancel during `--delay`, CSV iterations, secret masking (`--reveal` and `curl --with-secrets` only), `--no-history`, and a read-only `ls` of `testdata/private/staging` when that directory is present (names and counts only).
 - Blockers / questions: None.
 - Next: none.
+
+### 2026-09-30 02:30 IST · WS6c · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/6c-runner-history
+- Did: Read WS6c brief, design language, engine runner/history APIs, and shell screen patterns (envedit/cookies). Created worktree from main.
+- Files: `docs/ledger.md`
+- Tests: n/a
+- Blockers / questions: none
+- Next: runner screen, history screen, wire.go, tests and goldens.
+
+### 2026-09-30 02:45 IST · WS6c · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/6c-runner-history
+- Did: Shipped `internal/tui/runner` (setup form, live progress via `RunAsync` events, summary with failures, JSON export, request detail) and `internal/tui/history` (day-grouped list, text/status filters, redacted detail with response snapshot rendering, open/re-send/clear/curl). Wired `Options.NewRunner`/`NewHistory`, `CollectionRunner`/`HistoryReader`, tree `R`, global `H`, palette actions, and `lazyEngine.historyLog()` in `cmd/postctl/wire.go`. Added `internal/tui/fakerun`, `tuiengine.Runner`, and `response.Snapshot`.
+- Files: `internal/tui/{runner,history,fakerun,runner.go,historyreader.go,response/snapshot.go,tuiengine/runner.go}`, shell `{app,screens,keys,sidebar,layout,pane}.go`, `cmd/postctl/wire.go`, `docs/ledger.md`
+- Decisions: (1) Pause skipped — engine has no pause API. (2) Re-run failed in TUI re-runs the full collection until WS7 reporters land; export is JSON-only (no JUnit in tree). (3) `Persist variables` is shown on the setup form; persistence follows engine R3 regardless. (4) History curl uses `httpx.Curl` on already-redacted snapshots.
+- Design checklist: (a) Active environment visible in header on both screens: pass. (b) Waiting/cancel/error states explain next step (spinner + step text, cancel confirm, empty history guide): pass. (c) Keyboard-only, NO_COLOR/ASCII goldens for runner setup/summary: pass. (d) Method and status codes are text labels: pass. (e) Readable at 80×24 and 140×40 (runner goldens): pass. (f) Tests assert no secret values in runner/history frames: pass. (g) Tree method column preserved; sidebar adds `R Run collection` hint: pass. (h) Borders on confirm modals only: pass.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). Commits `529a8bc` (runner), `e349d06` (history).
+- Blockers / questions: none
+- Next: none
+
+### 2026-09-30 03:10 IST · WS6c · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/6c-runner-history
+- Did: Fixed runner deviations: `RunInput.NoPersist` and `OnlyRequests` in the engine (with tests), wired setup “Persist variables” and “Re-run failed”, documented `OnlyRequests`/`setNextRequest` in `docs/engine.md`, and JSON export now uses a prefilled editable path plus a toast with the absolute path.
+- Files: `internal/engine/{run.go,persist.go,session.go,run_options_test.go}`, `internal/tui/runner/runner.go`, `docs/engine.md`, `docs/ledger.md`
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` green (0 issues). Commit `bcaa029`.
+- Blockers / questions: none
+- Next: merge ws/6c-runner-history

@@ -81,6 +81,37 @@ func (a *app) openCookies() tea.Cmd {
 	return a.openScreen(a.opts.NewCookieManager(a.screenEnv("")))
 }
 
+func (a *app) openRunner(scope *RunScope) tea.Cmd {
+	if a.opts.NewRunner == nil || a.ws == nil {
+		return a.toastInfo("The collection runner is not available in this build.")
+	}
+	env := a.screenEnv("")
+	env.RunScope = scope
+	return a.openScreen(a.opts.NewRunner(env))
+}
+
+func (a *app) openRunnerFromTree() tea.Cmd {
+	r, ok := a.tree.current()
+	if !ok || r.node == nil {
+		return a.toastInfo("Select a collection or folder to run.")
+	}
+	switch r.kind {
+	case rowCollection:
+		return a.openRunner(&RunScope{Collection: r.node.coll})
+	case rowFolder:
+		return a.openRunner(&RunScope{Collection: r.node.coll, FolderID: r.id})
+	default:
+		return a.toastInfo("Select a collection or folder to run.")
+	}
+}
+
+func (a *app) openHistory() tea.Cmd {
+	if a.opts.NewHistory == nil {
+		return a.toastInfo("History is not available in this build.")
+	}
+	return a.openScreen(a.opts.NewHistory(a.screenEnv("")))
+}
+
 // screenActions are the palette entries for the hosted screens.
 func (a *app) screenActions() []Action {
 	var out []Action
@@ -92,6 +123,15 @@ func (a *app) screenActions() []Action {
 	if a.opts.NewCookieManager != nil {
 		out = append(out, Action{ID: "cookies.open", Title: "Cookies", Group: "Workspace",
 			Run: func() tea.Cmd { return a.openCookies() }})
+	}
+	if a.opts.NewRunner != nil {
+		out = append(out, Action{ID: "runner.open", Title: "Run collection…", Group: "Runner", Keys: "R",
+			Enabled: func() bool { return a.ws != nil },
+			Run:     func() tea.Cmd { return a.openRunnerFromTree() }})
+	}
+	if a.opts.NewHistory != nil {
+		out = append(out, Action{ID: "history.open", Title: "History", Group: "Workspace", Keys: "H",
+			Run: func() tea.Cmd { return a.openHistory() }})
 	}
 	return out
 }

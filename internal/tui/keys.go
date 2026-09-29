@@ -17,8 +17,10 @@ type keyMap struct {
 	// Tree.
 	Up, Down, PageUp, PageDown, Home, End, Fold, Unfold, Open, Toggle key.Binding
 	New, Rename, Duplicate, Move, Delete, MoveUp, MoveDown            key.Binding
+	RunCollection                                                     key.Binding
 
 	// Reserved for the request and response panes (WS6); listed in help so
+	History key.Binding
 	// the shell's keys never collide with them.
 	Send, Edit key.Binding
 }
@@ -48,26 +50,28 @@ func newKeyMap(ascii bool) keyMap {
 		Pane3:     b("3", "Response", "3", "alt+3"),
 		Back:      b("Esc", "Back or cancel", "esc"),
 
-		Up:        b(up, "Move up", "up"),
-		Down:      b(down, "Move down", "down"),
-		PageUp:    b("PgUp", "Page up", "pgup"),
-		PageDown:  b("PgDn", "Page down", "pgdown"),
-		Home:      b("Home", "First row", "home"),
-		End:       b("End", "Last row", "end"),
-		Fold:      b(left, "Fold folder or go to parent", "left"),
-		Unfold:    b(right, "Unfold folder", "right"),
-		Open:      b("Enter", "Open request or toggle folder", "enter"),
-		Toggle:    b("Space", "Fold or unfold", "space"),
-		New:       b("n", "New request, folder or collection", "n"),
-		Rename:    b("r", "Rename", "r"),
-		Duplicate: b("D", "Duplicate", "D"),
-		Move:      b("m", "Move to another folder", "m"),
-		Delete:    b("d", "Delete", "d"),
-		MoveUp:    b("Alt-"+up, "Move up in its folder", "alt+up"),
-		MoveDown:  b("Alt-"+down, "Move down in its folder", "alt+down"),
+		Up:            b(up, "Move up", "up"),
+		Down:          b(down, "Move down", "down"),
+		PageUp:        b("PgUp", "Page up", "pgup"),
+		PageDown:      b("PgDn", "Page down", "pgdown"),
+		Home:          b("Home", "First row", "home"),
+		End:           b("End", "Last row", "end"),
+		Fold:          b(left, "Fold folder or go to parent", "left"),
+		Unfold:        b(right, "Unfold folder", "right"),
+		Open:          b("Enter", "Open request or toggle folder", "enter"),
+		Toggle:        b("Space", "Fold or unfold", "space"),
+		New:           b("n", "New request, folder or collection", "n"),
+		Rename:        b("r", "Rename", "r"),
+		Duplicate:     b("D", "Duplicate", "D"),
+		Move:          b("m", "Move to another folder", "m"),
+		Delete:        b("d", "Delete", "d"),
+		MoveUp:        b("Alt-"+up, "Move up in its folder", "alt+up"),
+		MoveDown:      b("Alt-"+down, "Move down in its folder", "alt+down"),
+		RunCollection: b("R", "Run collection", "R"),
 
-		Send: b("Ctrl-Enter", "Send request (also Ctrl-S)", "ctrl+enter", "ctrl+s"),
-		Edit: b("e", "Edit in $EDITOR", "e"),
+		History: b("H", "History", "H"),
+		Send:    b("Ctrl-Enter", "Send request (also Ctrl-S)", "ctrl+enter", "ctrl+s"),
+		Edit:    b("e", "Edit in $EDITOR", "e"),
 	}
 }
 
