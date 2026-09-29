@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/model"
@@ -14,8 +11,8 @@ import (
 
 // reporter consumes a collection run. close finishes any buffered export.
 type reporter interface {
-	event(ev engine.RunEvent) error
-	close() error
+	Event(ev engine.RunEvent) error
+	Close() error
 }
 
 func parseReporters(flagValue string, jsonFlag bool) ([]string, error) {
@@ -64,7 +61,7 @@ func openReporters(a *app, names []string, jsonExport, junitExport string, metho
 	stdoutUsed := ""
 	cleanup := func() {
 		for _, r := range reps {
-			_ = r.close()
+			_ = r.Close()
 		}
 		for _, f := range files {
 			_ = f.Close()
@@ -160,9 +157,3 @@ func failedIterationCount(sum *engine.RunSummary) int {
 	}
 	return len(seen)
 }
-
-func errorsIsCancel(err error) bool {
-	return errors.Is(err, context.Canceled)
-}
-
-func durationMS(d time.Duration) int64 { return d.Milliseconds() }

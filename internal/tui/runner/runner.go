@@ -4,7 +4,6 @@ package runner
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,7 +14,9 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/engine"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/report"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/response"
 	"github.com/shubham/postctl/internal/tui/textin"
@@ -96,7 +97,9 @@ type Model struct {
 
 	runCancel  context.CancelFunc
 	runCh      <-chan engine.RunEvent
+	runEvents  []engine.RunEvent
 	exportPath *textin.Input
+	exportXML  bool
 	conf       ui.Confirm
 	notice     string
 	fail       bool
@@ -151,9 +154,9 @@ func (m *Model) KeyHints() []ui.Hint {
 	case phLive:
 		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}, {Key: "Enter", Label: "Detail", Priority: 2}, {Key: "f", Label: "Failures only", Priority: 3}}
 	case phExport:
-		return []ui.Hint{{Key: "Enter", Label: "Export", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
+		return []ui.Hint{{Key: "Tab", Label: "JSON / JUnit", Priority: 2}, {Key: "Enter", Label: "Export", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
 	case phSummary:
-		return []ui.Hint{{Key: "r", Label: "Re-run", Priority: 1}, {Key: "R", Label: "Re-run failed", Priority: 2}, {Key: "e", Label: "Export JSON", Priority: 3}, {Key: "Esc", Label: "Close", Priority: 1}}
+		return []ui.Hint{{Key: "r", Label: "Re-run", Priority: 1}, {Key: "R", Label: "Re-run failed", Priority: 2}, {Key: "e", Label: "Export", Priority: 3}, {Key: "Esc", Label: "Close", Priority: 1}}
 	case phDetail:
 		return []ui.Hint{{Key: "Tab", Label: "Section", Priority: 2}, {Key: "Esc", Label: "Back", Priority: 1}}
 	}
@@ -306,6 +309,9 @@ func (m *Model) exportKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc":
 		m.phase = phSummary
+	case "tab":
+		m.exportXML = !m.exportXML
+		m.exportPath.Set(swapExportExtension(m.exportPath.Text(), m.exportXML))
 	case "enter":
 		return m, m.confirmExport()
 	default:
@@ -319,12 +325,17 @@ func (m *Model) beginExport() (tui.Screen, tea.Cmd) {
 		return m, nil
 	}
 	m.phase = phExport
-	m.exportPath.Set(defaultExportPath(m.env))
+	m.exportXML = false
+	m.exportPath.Set(defaultExportPath(m.env, false))
 	return m, nil
 }
 
-func defaultExportPath(env tui.ScreenEnv) string {
-	name := fmt.Sprintf("postctl-run-%d.json", time.Now().Unix())
+func defaultExportPath(env tui.ScreenEnv, xml bool) string {
+	ext := ".json"
+	if xml {
+		ext = ".xml"
+	}
+	name := fmt.Sprintf("postctl-run-%d%s", time.Now().Unix(), ext)
 	dir, err := os.UserHomeDir()
 	if err != nil {
 		dir = "."
@@ -477,6 +488,7 @@ func (m *Model) resetLive(in engine.RunInput) {
 	m.rows = nil
 	m.summary = nil
 	m.detail = nil
+	m.runEvents = nil
 	m.cur, m.top = 0, 0
 	m.runStart = time.Now()
 	m.planRows(in)
@@ -525,6 +537,7 @@ func folderContains(f *model.Folder, id model.ID) bool {
 }
 
 func (m *Model) applyEvent(ev engine.RunEvent) {
+	m.runEvents = append(m.runEvents, ev)
 	switch e := ev.(type) {
 	case engine.RunStarted:
 		m.iterTotal = e.Iterations
@@ -609,12 +622,13 @@ func (m *Model) confirmExport() tea.Cmd {
 	if path == "" {
 		return func() tea.Msg { return exportDoneMsg{err: fmt.Errorf("choose a file path")} }
 	}
-	sum := m.summary
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext != ".json" && ext != ".xml" {
+		return func() tea.Msg { return exportDoneMsg{err: fmt.Errorf("export path must end in .json or .xml")} }
+	}
+	events := append([]engine.RunEvent(nil), m.runEvents...)
+	mask := m.reportMask()
 	return func() tea.Msg {
-		b, err := json.MarshalIndent(sum, "", "  ")
-		if err != nil {
-			return exportDoneMsg{err: err}
-		}
 		abs, err := filepath.Abs(path)
 		if err != nil {
 			return exportDoneMsg{err: err}
@@ -622,8 +636,60 @@ func (m *Model) confirmExport() tea.Cmd {
 		if err := os.MkdirAll(filepath.Dir(abs), 0o700); err != nil {
 			return exportDoneMsg{err: err}
 		}
-		return exportDoneMsg{path: abs, err: os.WriteFile(abs, b, 0o600)}
+		f, err := os.OpenFile(abs, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+		if err != nil {
+			return exportDoneMsg{err: err}
+		}
+		opts := report.Options{Mask: mask}
+		var rep report.Reporter
+		if ext == ".xml" {
+			rep = report.NewJUnit(f, opts)
+		} else {
+			rep = report.NewJSON(f, opts)
+		}
+		writeErr := report.Write(rep, events)
+		closeErr := f.Close()
+		if writeErr != nil {
+			return exportDoneMsg{err: writeErr}
+		}
+		return exportDoneMsg{path: abs, err: closeErr}
 	}
+}
+
+func swapExportExtension(path string, xml bool) string {
+	ext := ".json"
+	if xml {
+		ext = ".xml"
+	}
+	old := filepath.Ext(path)
+	if strings.EqualFold(old, ".json") || strings.EqualFold(old, ".xml") {
+		return strings.TrimSuffix(path, old) + ext
+	}
+	return path + ext
+}
+
+func (m *Model) reportMask() func(string) string {
+	var values []string
+	add := func(vars []model.Variable) {
+		for _, v := range vars {
+			if v.IsSecret() && v.Value != "" {
+				values = append(values, v.Value)
+			}
+		}
+	}
+	if ws := m.env.Workspace; ws != nil {
+		if ws.Globals != nil {
+			add(ws.Globals.Variables)
+		}
+		for _, env := range ws.Environments {
+			add(env.Variables)
+		}
+		for _, coll := range ws.Collections {
+			add(coll.Variables)
+		}
+	}
+	redactor := history.NewRedactor(values)
+	return redactor.Text
 }
 
 func (m *Model) currentRow() *row {
@@ -651,7 +717,7 @@ func (m *Model) visibleRows() []row {
 	if !m.failuresOnly {
 		return m.rows
 	}
-	out := m.rows[:0]
+	out := make([]row, 0, len(m.rows))
 	for _, r := range m.rows {
 		if r.testsFail > 0 || r.errText != "" {
 			out = append(out, r)
@@ -832,7 +898,7 @@ func (m *Model) viewSummary() string {
 			body += "\n" + t.Render(ui.StatusDanger, "× "+f.RequestName+": "+t.Truncate(f.Message, m.w-10))
 		}
 	}
-	body += "\n" + t.Render(ui.TextQuiet, "r Re-run  R Re-run failed  e Export JSON  Esc Close")
+	body += "\n" + t.Render(ui.TextQuiet, "r Re-run  R Re-run failed  e Export  Esc Close")
 	return body
 }
 
@@ -883,6 +949,11 @@ func (m *Model) viewConfirm() string {
 
 func (m *Model) viewExport() string {
 	body := m.header("Export run summary")
+	format := "JSON (NDJSON)"
+	if m.exportXML {
+		format = "JUnit XML"
+	}
+	body += m.th.Render(ui.TextSecondary, "Format") + "  " + m.th.Render(ui.AccentPrimary, format) + m.th.Render(ui.TextQuiet, "  Tab toggles") + "\n"
 	body += m.th.Render(ui.TextSecondary, "File path") + "\n"
 	body += m.th.Render(ui.AccentPrimary, m.exportPath.View(m.th, m.w-2, true))
 	return body

@@ -26,9 +26,11 @@ func newCLIReporter(a *app, w io.Writer, methods map[model.ID]string) *cliReport
 	return &cliReporter{a: a, w: w, methods: methods}
 }
 
-func (r *cliReporter) close() error { return nil }
+// Close finishes the reporter.
+func (r *cliReporter) Close() error { return nil }
 
-func (r *cliReporter) event(ev engine.RunEvent) error {
+// Event renders one run event.
+func (r *cliReporter) Event(ev engine.RunEvent) error {
 	switch e := ev.(type) {
 	case engine.RunStarted:
 		r.name = e.CollectionName

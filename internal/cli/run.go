@@ -109,7 +109,7 @@ func runRun(ctx context.Context, a *app, args []string) int {
 			summary = fin.Summary
 		}
 		for _, rep := range reps {
-			if err := rep.event(ev); err != nil {
+			if err := rep.Event(ev); err != nil {
 				fmt.Fprintf(a.err, "Reporter failed: %v\n", err)
 				return ExitRequest
 			}
