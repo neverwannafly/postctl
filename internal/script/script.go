@@ -149,6 +149,11 @@ type ConsoleEntry struct {
 
 // ScriptError is a syntax or runtime error that stopped the chain. The
 // remaining scripts do not run.
+//
+// The name stutters as script.ScriptError, but it is the one the WS3 brief,
+// Result.Err and docs/scripting.md all use.
+//
+//nolint:revive // deliberate, see above.
 type ScriptError struct {
 	// ScriptIndex is the position in the chain passed to [Run].
 	ScriptIndex int

@@ -3,6 +3,7 @@ package script
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -166,24 +167,10 @@ func jsonResponse(code int, body string) *httpx.Response {
 }
 
 func statusText(code int) string {
-	switch code {
-	case 200:
-		return "OK"
-	case 201:
-		return "Created"
-	case 204:
-		return "No Content"
-	case 400:
-		return "Bad Request"
-	case 401:
-		return "Unauthorized"
-	case 404:
-		return "Not Found"
-	case 500:
-		return "Internal Server Error"
-	default:
-		return fmt.Sprintf("Status %d", code)
+	if text := http.StatusText(code); text != "" {
+		return text
 	}
+	return fmt.Sprintf("Status %d", code)
 }
 
 // fakeJar is a URL-keyed cookie store standing in for WS2's jar.

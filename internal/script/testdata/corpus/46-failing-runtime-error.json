@@ -1,0 +1,14 @@
+{
+  "description": "A TypeError partway through a test script: earlier tests still report, the error is attributed.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"items\":[]}"
+  },
+  "expect": {
+    "tests": [
+      "PASS this one runs"
+    ],
+    "error": "TypeError: Cannot read property 'total' of undefined"
+  }
+}

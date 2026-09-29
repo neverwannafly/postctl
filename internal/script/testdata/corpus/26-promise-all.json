@@ -1,0 +1,46 @@
+{
+  "description": "Three concurrent pm.sendRequest promises resolved with Promise.all.",
+  "event": "prerequest",
+  "vars": {
+    "environment": {
+      "lookupUrl": "https://lookup.example.com"
+    }
+  },
+  "sendResponses": [
+    {
+      "code": 200,
+      "body": "{\"name\":\"regions\"}",
+      "match": "/regions"
+    },
+    {
+      "code": 200,
+      "body": "{\"name\":\"currencies\"}",
+      "match": "/currencies"
+    },
+    {
+      "code": 200,
+      "body": "{\"name\":\"locales\"}",
+      "match": "/locales"
+    }
+  ],
+  "expect": {
+    "console": [
+      "log: codes 200,200,200",
+      "log: names regions,currencies,locales",
+      "log: all ok true"
+    ],
+    "varChanges": {
+      "collection": [
+        "set lookupNames=regions,currencies,locales"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1"
+    ],
+    "sentRequests": [
+      "GET https://lookup.example.com/currencies",
+      "GET https://lookup.example.com/locales",
+      "GET https://lookup.example.com/regions"
+    ]
+  }
+}

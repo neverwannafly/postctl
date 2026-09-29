@@ -1,0 +1,29 @@
+{
+  "description": "moment date arithmetic feeding query parameters and environment variables.",
+  "event": "prerequest",
+  "request": {
+    "url": "https://api.example.com/v1/reports?format=csv"
+  },
+  "vars": {
+    "environment": {
+      "anchorDate": "2024-03-15T10:30:00Z"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: window 2024-03-08 -\u003e 2024-03-15",
+      "log: weekday Friday quarter 1"
+    ],
+    "varChanges": {
+      "environment": [
+        "set windowStart=2024-03-08",
+        "set windowEnd=2024-03-15",
+        "set isoTimestamp=2024-03-15T10:30:00.000Z",
+        "set epochSeconds=1710498600"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/reports?format=csv\u0026from=2024-03-08\u0026to=2024-03-15"
+    ]
+  }
+}

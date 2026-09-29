@@ -115,16 +115,28 @@ func (b *bridge) varClear(scope string) {
 // merged object ends up with the value a lookup would return.
 var allScopes = []vars.Scope{vars.Global, vars.Collection, vars.Environment, vars.Data, vars.Local}
 
-func (b *bridge) varObject(scope string) map[string]any {
-	out := map[string]any{}
+// varObject returns [[key, value], ...] rather than a map. goja hands a Go
+// map's keys to JavaScript in an arbitrary order, so a script that serialises
+// pm.environment.toObject() would see the key order change between runs; the
+// store's own order is the one Postman shows.
+func (b *bridge) varObject(scope string) [][2]any {
+	out := [][2]any{}
 	if b.in.Vars == nil {
 		return out
 	}
+	at := map[string]int{}
 	collect := func(s vars.Scope) {
 		for _, k := range b.in.Vars.Keys(s) {
-			if v, ok := b.in.Vars.GetIn(s, k); ok {
-				out[k] = v
+			v, ok := b.in.Vars.GetIn(s, k)
+			if !ok {
+				continue
 			}
+			if i, seen := at[k]; seen {
+				out[i][1] = v
+				continue
+			}
+			at[k] = len(out)
+			out = append(out, [2]any{k, v})
 		}
 	}
 	if s, ok := scopeNames[scope]; ok {

@@ -1,0 +1,29 @@
+{
+  "description": "moment building a month reporting window from a fixed UTC anchor.",
+  "event": "prerequest",
+  "request": {
+    "url": "https://api.example.com/v1/reports"
+  },
+  "vars": {
+    "environment": {
+      "anchorDate": "2024-02-15T09:30:00Z"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: window 2024-02-01 to 2024-02-29",
+      "log: days in month 29",
+      "log: week of year 7",
+      "log: relative 168 hours",
+      "log: formatted Thursday, 15 February 2024 09:30:00 UTC"
+    ],
+    "varChanges": {
+      "environment": [
+        "set reportWindow=2024-02"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/reports?from=2024-02-01\u0026to=2024-02-29\u0026generatedAt=2024-02-15T09:30:00.000Z"
+    ]
+  }
+}

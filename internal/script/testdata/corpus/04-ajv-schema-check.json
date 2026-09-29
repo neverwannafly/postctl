@@ -1,0 +1,15 @@
+{
+  "description": "ajv schema validation, directly and via the chai-postman jsonSchema assertion.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"id\":\"ord-1\",\"status\":\"open\",\"items\":[{\"sku\":\"A-1\",\"qty\":2}]}"
+  },
+  "expect": {
+    "tests": [
+      "PASS response matches the order schema",
+      "PASS chai-postman jsonSchema assertion agrees",
+      "PASS a bad payload is rejected"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "description": "pm.iterationData and the legacy data global during a runner iteration.",
+  "event": "prerequest",
+  "info": {
+    "requestName": "Corpus request",
+    "requestId": "req-corpus",
+    "collectionName": "Corpus",
+    "iteration": 2,
+    "iterationCount": 4
+  },
+  "vars": {
+    "data": {
+      "amount": 42.5,
+      "customerId": "cust-7"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: iteration 2 of 4",
+      "log: row cust-7 42.5",
+      "log: object {\"amount\":42.5,\"customerId\":\"cust-7\"}",
+      "log: visible through pm.variables cust-7",
+      "log: legacy data global cust-7"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1\u0026customer=cust-7"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "XML response parsed with xml2js and with the legacy xml2Json global.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "headers": {
+      "Content-Type": "application/xml"
+    },
+    "body": "\u003corder\u003e\u003cid\u003eord-5\u003c/id\u003e\u003clines\u003e\u003cline\u003e\u003csku\u003eA-1\u003c/sku\u003e\u003c/line\u003e\u003cline\u003e\u003csku\u003eB-2\u003c/sku\u003e\u003c/line\u003e\u003c/lines\u003e\u003c/order\u003e"
+  },
+  "expect": {
+    "tests": [
+      "PASS xml2js parses the envelope",
+      "PASS legacy xml2Json agrees"
+    ],
+    "console": [
+      "log: rebuilt \u003cack\u003e\u003cid\u003eord-5\u003c/id\u003e\u003c/ack\u003e"
+    ]
+  }
+}

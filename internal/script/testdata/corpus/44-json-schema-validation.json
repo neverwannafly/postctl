@@ -1,0 +1,15 @@
+{
+  "description": "JSON Schema checked through chai-postman's jsonSchema and directly through tv4.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"id\":\"ord-12\",\"status\":\"open\",\"amount\":99.5,\"tags\":[\"eu\"]}"
+  },
+  "expect": {
+    "tests": [
+      "PASS matches the schema through chai",
+      "PASS matches the schema through tv4",
+      "PASS rejects a bad document"
+    ]
+  }
+}

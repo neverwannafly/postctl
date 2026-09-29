@@ -53,6 +53,19 @@ Url.prototype.update = function (def) {
     if (typeof def === 'string') { def = Url.parse(def); }
     def = def || {};
 
+    /* A {raw: ...} definition (what the Go side sends, and what a v2.1
+     * collection stores) is parsed here. An explicit query or variable list
+     * still wins: those carry disabled rows and path-variable values that the
+     * raw string cannot express. */
+    if (def.raw !== undefined && def.host === undefined && def.path === undefined && def.protocol === undefined) {
+        var parsed = Url.parse(def.raw);
+
+        if (def.query !== undefined) { parsed.query = def.query; }
+        if (def.variable !== undefined) { parsed.variable = def.variable; }
+        if (def.variables !== undefined) { parsed.variable = def.variables; }
+        def = parsed;
+    }
+
     this.protocol = def.protocol;
     this.auth = def.auth;
     this.host = def.host;
@@ -69,8 +82,10 @@ Url.prototype.getHost = function () {
     return Array.isArray(this.host) ? this.host.join('.') : String(this.host);
 };
 
+/* getPath(true) keeps ":name" segments as written; the default substitutes
+ * their values from the path variable list, as postman-collection does. */
 Url.prototype.getPath = function (unresolved) {
-    if (unresolved === true || (unresolved && unresolved.unresolved)) {
+    if (unresolved) {
         return '/' + (this.path ? this.path.join('/') : '');
     }
 
@@ -120,42 +135,47 @@ Url.prototype.removeQueryParams = function (params) {
     this.query.remove(function (param) { return keys.indexOf(param.key) !== -1; });
 };
 
-Url.prototype.toString = function (forceProtocol) {
+function buildUrl (url, forceProtocol, unresolvedPath) {
     var out = '',
-        protocol = this.protocol,
+        protocol = url.protocol,
         auth = '',
         qs;
 
     forceProtocol && !protocol && (protocol = 'http');
     if (protocol) { out += protocol + '://'; }
 
-    if (this.auth) {
-        if (typeof this.auth.user === 'string') { auth = this.auth.user; }
-        if (typeof this.auth.password === 'string') { auth += ':' + this.auth.password; }
+    if (url.auth) {
+        if (typeof url.auth.user === 'string') { auth = url.auth.user; }
+        if (typeof url.auth.password === 'string') { auth += ':' + url.auth.password; }
         if (auth) { out += auth + '@'; }
     }
 
-    if (this.host) { out += this.getHost(); }
-    if (this.port !== undefined && this.port !== null && this.port !== '') { out += ':' + String(this.port); }
-    if (this.path) { out += this.getPath(true); }
+    if (url.host) { out += url.getHost(); }
+    if (url.port !== undefined && url.port !== null && url.port !== '') { out += ':' + String(url.port); }
+    if (url.path) { out += url.getPath(unresolvedPath); }
 
-    if (this.query && this.query.count()) {
-        qs = this.getQueryString();
+    if (url.query && url.query.count()) {
+        qs = url.getQueryString();
         if (qs === '') {
-            qs = this.query.find(function (p) { return !(p && p.disabled); }) !== undefined ? '' : undefined;
+            qs = url.query.find(function (p) { return !(p && p.disabled); }) !== undefined ? '' : undefined;
         }
         if (typeof qs === 'string') { out += '?' + qs; }
     }
 
-    if (typeof this.hash === 'string') { out += '#' + this.hash; }
+    if (typeof url.hash === 'string') { out += '#' + url.hash; }
 
     return out;
-};
+}
+
+/* Path variables are substituted, matching postman-collection. */
+Url.prototype.toString = function (forceProtocol) { return buildUrl(this, forceProtocol, false); };
 
 Url.prototype.valueOf = function () { return this.toString(); };
 
 Url.prototype.toJSON = function () {
-    var out = { raw: this.toString() };
+    /* The raw handed back to Go keeps ":name" segments: their values travel
+     * separately in `variable`, and model.URL stores the two apart too. */
+    var out = { raw: buildUrl(this, false, true) };
 
     this.protocol !== undefined && (out.protocol = this.protocol);
     this.auth !== undefined && (out.auth = this.auth);

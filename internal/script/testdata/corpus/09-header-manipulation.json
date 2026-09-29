@@ -1,0 +1,27 @@
+{
+  "description": "add/upsert/remove/get/has/each/toObject on pm.request.headers, case-insensitively.",
+  "event": "prerequest",
+  "request": {
+    "headers": {
+      "Accept": "*/*",
+      "X-Legacy": "drop",
+      "X-Remove-Me": "gone"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: count 3",
+      "log: has accept true",
+      "log: get added two",
+      "log: object {\"accept\":\"application/json\",\"x-added\":\"two\",\"x-via-request\":\"yes\"}",
+      "log: getHeaders {\"Accept\":\"application/json\",\"X-Added\":\"two\",\"X-Via-Request\":\"yes\"}",
+      "log: keys Accept,X-Added,X-Via-Request"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header Accept: application/json",
+      "header X-Added: two",
+      "header X-Via-Request: yes"
+    ]
+  }
+}

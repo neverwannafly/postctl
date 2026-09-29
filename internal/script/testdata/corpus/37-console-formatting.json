@@ -1,0 +1,19 @@
+{
+  "description": "console log/info/warn/error/debug formatting, including circular and printf style.",
+  "event": "prerequest",
+  "expect": {
+    "console": [
+      "log: plain string",
+      "log: multiple 1 true null undefined",
+      "info: object { a: 1, b: [ 1, 2 ], c: { d: 'e' } }",
+      "warn: array [ 1, 'two', { three: 3 } ]",
+      "error: error boom",
+      "debug: nested { level1: { level2: { level3: { level4: 'deep' } } } }",
+      "log: circular { name: 'root', self: [Circular] }",
+      "log: printf style: alice scored 42"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1"
+    ]
+  }
+}

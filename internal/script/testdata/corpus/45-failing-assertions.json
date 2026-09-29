@@ -1,0 +1,18 @@
+{
+  "description": "Deliberately failing assertions, sync and async, to pin the failure messages.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"items\":[{\"sku\":\"A-1\"}]}",
+    "timeMs": 12
+  },
+  "expect": {
+    "tests": [
+      "PASS passing assertion",
+      "FAIL wrong status | AssertionError: expected response to have status code 201 but got 200",
+      "FAIL missing property | AssertionError: expected { items: [ { sku: 'A-1' } ] } to have property 'total'",
+      "FAIL bad deep equality | AssertionError: expected [ { sku: 'A-1' } ] to deeply equal [ { sku: 'B-2' } ]",
+      "FAIL failing async assertion | AssertionError: expected 12 to be above 10000"
+    ]
+  }
+}

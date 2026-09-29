@@ -1,0 +1,28 @@
+{
+  "description": "serverError assertions plus setNextRequest(null) to stop the run after three attempts.",
+  "event": "test",
+  "response": {
+    "code": 500,
+    "body": "{\"error\":\"internal\"}"
+  },
+  "vars": {
+    "collection": {
+      "attempts": 2
+    }
+  },
+  "expect": {
+    "tests": [
+      "PASS is a server error",
+      "PASS is neither ok nor success"
+    ],
+    "console": [
+      "warn: giving up after 3 attempts"
+    ],
+    "varChanges": {
+      "collection": [
+        "set attempts=3"
+      ]
+    },
+    "nextRequest": ""
+  }
+}

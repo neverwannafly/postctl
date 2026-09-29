@@ -1,0 +1,30 @@
+{
+  "description": "pm.cookies.jar() set/get/getAll/unset in both callback and promise form.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{}"
+  },
+  "cookies": [
+    {
+      "Name": "locale",
+      "Value": "en-GB",
+      "Domain": "api.example.com",
+      "Path": "/",
+      "Expires": "",
+      "MaxAge": "",
+      "HostOnly": false,
+      "HTTPOnly": false,
+      "Secure": false,
+      "Session": false
+    }
+  ],
+  "expect": {
+    "tests": [
+      "PASS promise form round-trips"
+    ],
+    "console": [
+      "log: callback get tok-55"
+    ]
+  }
+}

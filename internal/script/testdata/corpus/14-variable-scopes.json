@@ -1,0 +1,42 @@
+{
+  "description": "pm.globals / collectionVariables / environment / variables precedence, has, unset and toObject.",
+  "event": "prerequest",
+  "vars": {
+    "collection": {
+      "tier": "collection-tier"
+    },
+    "environment": {
+      "tier": "env-tier"
+    },
+    "globals": {
+      "region": "eu-west-1",
+      "tier": "global-tier"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: globals global-tier collection collection-tier",
+      "log: environment env-tier",
+      "log: merged wins env-tier",
+      "log: only in globals eu-west-1",
+      "log: local local-only false",
+      "log: after unset false undefined",
+      "log: env object {\"tier\":\"env-tier\"}",
+      "log: collection object {\"tier\":\"collection-tier\",\"lastRun\":\"2024-03-15\"}"
+    ],
+    "varChanges": {
+      "collection": [
+        "set lastRun=2024-03-15"
+      ],
+      "globals": [
+        "unset region"
+      ],
+      "local": [
+        "set runScoped=local-only"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1"
+    ]
+  }
+}

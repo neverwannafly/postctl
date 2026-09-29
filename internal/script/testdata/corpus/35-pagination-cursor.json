@@ -1,0 +1,28 @@
+{
+  "description": "Cursor pagination: accumulate ids in a collection variable and re-queue the request.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"items\":[{\"id\":\"o-3\"},{\"id\":\"o-4\"}],\"nextCursor\":\"c-2\"}"
+  },
+  "vars": {
+    "collection": {
+      "seenIds": "[\"o-1\",\"o-2\"]"
+    }
+  },
+  "expect": {
+    "tests": [
+      "PASS page is well formed"
+    ],
+    "console": [
+      "log: continuing from c-2 with 4 seen"
+    ],
+    "varChanges": {
+      "collection": [
+        "set seenIds=[\"o-1\",\"o-2\",\"o-3\",\"o-4\"]",
+        "set cursor=c-2"
+      ]
+    },
+    "nextRequest": "List orders"
+  }
+}

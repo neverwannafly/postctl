@@ -1,0 +1,22 @@
+{
+  "description": "btoa/atob, crypto-js Base64 and Buffer agreeing on a Basic auth header.",
+  "event": "prerequest",
+  "vars": {
+    "environment": {
+      "basicPass": "s3cr3t",
+      "basicUser": "reporting"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: all three agree true",
+      "log: encoded cmVwb3J0aW5nOnMzY3IzdA==",
+      "log: round trip true",
+      "log: url safe YT9iL2M="
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header Authorization: Basic cmVwb3J0aW5nOnMzY3IzdA=="
+    ]
+  }
+}

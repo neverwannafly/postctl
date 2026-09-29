@@ -34,7 +34,17 @@ VariableScope.prototype.has = function (key) { return host.varHas(this._scope, S
 
 VariableScope.prototype.clear = function () { host.varClear(this._write); };
 
-VariableScope.prototype.toObject = function () { return host.varObject(this._scope); };
+/* The host hands back [key, value] pairs so the store's order survives; a Go
+ * map would reach JavaScript with its keys in an arbitrary order. */
+VariableScope.prototype.toObject = function () {
+    var pairs = host.varObject(this._scope),
+        out = {},
+        i;
+
+    for (i = 0; i < pairs.length; i++) { out[pairs[i][0]] = pairs[i][1]; }
+
+    return out;
+};
 
 VariableScope.prototype.toJSON = function () {
     return { id: this._scope, values: this.values.toJSON() };

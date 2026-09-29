@@ -1,0 +1,26 @@
+{
+  "description": "Tier-3 legacy surface: tests[], responseBody, responseCode, responseTime, responseHeaders, postman.*.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"id\":\"ord-88\"}"
+  },
+  "expect": {
+    "tests": [
+      "PASS Status code is 200",
+      "PASS Status name is OK",
+      "PASS Body has an id",
+      "PASS Response is fast",
+      "PASS Content-Type is json",
+      "PASS Header helper agrees"
+    ],
+    "varChanges": {
+      "environment": [
+        "set lastOrderId=ord-88"
+      ],
+      "globals": [
+        "set lastRunStatus=OK"
+      ]
+    }
+  }
+}

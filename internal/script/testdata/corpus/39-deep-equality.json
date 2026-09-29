@@ -1,0 +1,15 @@
+{
+  "description": "chai deep.equal, nested.property, deep.include and members assertions.",
+  "event": "test",
+  "response": {
+    "code": 200,
+    "body": "{\"order\":{\"id\":\"ord-9\",\"customer\":{\"id\":\"cust-1\",\"tags\":[\"vip\",\"eu\"]},\"lines\":[{\"sku\":\"A-1\",\"qty\":1}]}}"
+  },
+  "expect": {
+    "tests": [
+      "PASS the whole object matches",
+      "PASS nested members and shapes",
+      "PASS members and ordering"
+    ]
+  }
+}

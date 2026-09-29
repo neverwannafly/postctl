@@ -1,0 +1,23 @@
+{
+  "description": "clientError / status / header / jsonBody assertions on a 404.",
+  "event": "test",
+  "response": {
+    "code": 404,
+    "headers": {
+      "Content-Type": "application/problem+json"
+    },
+    "body": "{\"status\":404,\"detail\":\"order not found\"}",
+    "timeMs": 31
+  },
+  "expect": {
+    "tests": [
+      "PASS is a client error",
+      "PASS is not a success or a server error",
+      "PASS has a problem+json body"
+    ],
+    "console": [
+      "log: reason Not Found",
+      "log: size true"
+    ]
+  }
+}

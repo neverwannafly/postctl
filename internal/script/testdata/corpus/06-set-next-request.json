@@ -1,0 +1,27 @@
+{
+  "description": "pm.execution.setNextRequest driving a polling loop through collection variables.",
+  "event": "test",
+  "response": {
+    "code": 202,
+    "body": "{\"state\":\"pending\"}"
+  },
+  "vars": {
+    "collection": {
+      "pollAttempts": 1
+    }
+  },
+  "expect": {
+    "tests": [
+      "PASS status is accepted"
+    ],
+    "console": [
+      "log: still pending, retrying (attempt 2)"
+    ],
+    "varChanges": {
+      "collection": [
+        "set pollAttempts=2"
+      ]
+    },
+    "nextRequest": "Poll job status"
+  }
+}

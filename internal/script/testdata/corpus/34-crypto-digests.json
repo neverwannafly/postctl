@@ -1,0 +1,29 @@
+{
+  "description": "crypto-js MD5/SHA1/SHA256/SHA512/HmacSHA1 and an AES round trip.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example.com/v1/documents",
+    "body": "{\"title\":\"Q1 report\"}"
+  },
+  "vars": {
+    "environment": {
+      "signingKey": "k3y"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: md5 838faaf6851a040e7c53bd7d1a260adf",
+      "log: sha1 b2baf8faff83816470472fb92c9aaf39fc8832cb",
+      "log: sha512 prefix 915354c25f5b824f35b317dbd255e1b5",
+      "log: hmac-sha1 5d59db96ba00aa917d1f602393ce9822264e175b",
+      "log: aes round trip true"
+    ],
+    "request": [
+      "POST https://api.example.com/v1/documents",
+      "header Content-MD5: 838faaf6851a040e7c53bd7d1a260adf",
+      "header X-Content-Sha256: 059385637b32b12687223df7c1e542b90e3aede25119865107758aae260c09fb",
+      "body raw {\"title\":\"Q1 report\"}"
+    ]
+  }
+}

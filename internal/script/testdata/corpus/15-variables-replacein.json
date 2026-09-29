@@ -1,0 +1,30 @@
+{
+  "description": "replaceIn across the merged chain, within one scope, and with a dynamic variable.",
+  "event": "prerequest",
+  "request": {
+    "url": "https://api.example.com/v1/orders"
+  },
+  "vars": {
+    "collection": {
+      "version": "v2"
+    },
+    "environment": {
+      "host": "api.example.com"
+    },
+    "globals": {
+      "scheme": "https"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: chained https://api.example.com/v2/orders",
+      "log: unknown stays api.example.com/{{notDefined}}",
+      "log: environment only api.example.com|{{version}}",
+      "log: dynamic ts=1700000000",
+      "log: url https://api.example.com/v1/orders?callback=https://api.example.com/callback"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?callback=https://api.example.com/callback"
+    ]
+  }
+}

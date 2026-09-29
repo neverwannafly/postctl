@@ -1,0 +1,25 @@
+{
+  "description": "Pre-request script parses, enriches and rewrites the raw JSON request body.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example.com/v1/orders",
+    "body": "{\"items\":[{\"sku\":\"A\",\"qty\":2,\"unitPrice\":5},{\"sku\":\"B\",\"qty\":1,\"unitPrice\":12}]}"
+  },
+  "vars": {
+    "environment": {
+      "fixedRequestId": "req-0001"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: mode raw total 22",
+      "log: isEmpty false"
+    ],
+    "request": [
+      "POST https://api.example.com/v1/orders",
+      "header Content-Type: application/json",
+      "body raw {\"items\":[{\"sku\":\"A\",\"qty\":2,\"unitPrice\":5,\"total\":10},{\"sku\":\"B\",\"qty\":1,\"unitPrice\":12,\"total\":12}],\"requestId\":\"req-0001\",\"grandTotal\":22}"
+    ]
+  }
+}

@@ -156,11 +156,35 @@ NS.inspect = function (value) {
     catch (e) { return '[unprintable: ' + (e && e.message) + ']'; }
 };
 
+/* console.log('%s scored %d', name, score), as Node's util.format does it: a
+ * leading format string consumes arguments, and whatever is left is inspected
+ * and appended. */
 NS.format = function (args) {
     var out = [],
+        next = 0,
         i;
 
-    for (i = 0; i < args.length; i++) { out.push(NS.inspect(args[i])); }
+    if (typeof args[0] === 'string' && /%[sdifjoOc%]/.test(args[0])) {
+        next = 1;
+        out.push(args[0].replace(/%([sdifjoOc%])/g, function (match, verb) {
+            if (verb === '%') { return '%'; }
+            if (next >= args.length) { return match; }
+
+            var arg = args[next++];
+
+            switch (verb) {
+            case 's': return typeof arg === 'string' ? arg : NS.inspect(arg);
+            case 'd': return typeof arg === 'bigint' ? String(arg) : String(Number(arg));
+            case 'i': return String(parseInt(arg, 10));
+            case 'f': return String(parseFloat(arg));
+            case 'j': try { return JSON.stringify(arg); } catch (e) { return '[Circular]'; }
+            case 'c': return '';
+            default: return NS.inspect(arg);
+            }
+        }));
+    }
+
+    for (i = next; i < args.length; i++) { out.push(NS.inspect(args[i])); }
 
     return out.join(' ');
 };

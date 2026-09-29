@@ -1,0 +1,29 @@
+{
+  "description": "GraphQL body variables edited before the request is sent.",
+  "event": "prerequest",
+  "request": {
+    "method": "POST",
+    "url": "https://api.example.com/graphql",
+    "bodyMode": "graphql",
+    "body": "query Orders($first: Int, $after: String, $tenant: ID) {\n  orders(first: $first, after: $after, tenant: $tenant) { id }\n}"
+  },
+  "vars": {
+    "collection": {
+      "cursor": "c-9"
+    },
+    "environment": {
+      "tenantId": "tenant-3"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: mode graphql",
+      "log: query starts query Orders($first: Int, $after: String, $tenant: ID) {",
+      "log: variables {\"first\":25,\"after\":\"c-9\",\"tenant\":\"tenant-3\"}"
+    ],
+    "request": [
+      "POST https://api.example.com/graphql",
+      "body graphql variables {\"first\":25,\"after\":\"c-9\",\"tenant\":\"tenant-3\"}"
+    ]
+  }
+}

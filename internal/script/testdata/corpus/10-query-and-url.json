@@ -1,0 +1,23 @@
+{
+  "description": "pm.request.url toString/getHost/getPath/getQueryString plus query parameter editing.",
+  "event": "prerequest",
+  "request": {
+    "url": "https://api.example.com:8443/v1/orders/summary?page=1\u0026debug=true#section"
+  },
+  "expect": {
+    "console": [
+      "log: toString https://api.example.com:8443/v1/orders/summary?page=1\u0026debug=true#section",
+      "log: host api.example.com",
+      "log: path /v1/orders/summary",
+      "log: query page=1\u0026debug=true",
+      "log: remote api.example.com:8443",
+      "log: pathWithQuery /v1/orders/summary?page=1\u0026debug=true",
+      "log: protocol https port 8443",
+      "log: after https://api.example.com:8443/v1/orders/summary?page=2\u0026sort=created#section",
+      "log: params {\"page\":\"2\",\"sort\":\"created\",\"internal\":\"yes\"}"
+    ],
+    "request": [
+      "GET https://api.example.com:8443/v1/orders/summary?page=2\u0026sort=created#section"
+    ]
+  }
+}

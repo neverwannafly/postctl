@@ -1,0 +1,22 @@
+{
+  "description": "uuid v4/v5 and crypto.randomUUID backed by the host's crypto/rand.",
+  "event": "prerequest",
+  "expect": {
+    "console": [
+      "log: v5 is stable 1a6c50c1-d6b4-5f14-8242-d0f8ee476ee1",
+      "log: v5 matches a second call true",
+      "log: v4 looks like a uuid true 4",
+      "log: v4 values differ true",
+      "log: crypto.randomUUID true"
+    ],
+    "varChanges": {
+      "collection": [
+        "set correlationId=1a6c50c1-d6b4-5f14-8242-d0f8ee476ee1"
+      ]
+    },
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "header X-Correlation-Id: 1a6c50c1-d6b4-5f14-8242-d0f8ee476ee1"
+    ]
+  }
+}

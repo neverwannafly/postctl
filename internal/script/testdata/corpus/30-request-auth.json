@@ -1,0 +1,26 @@
+{
+  "description": "pm.request.auth read through parameters() and replaced with update().",
+  "event": "prerequest",
+  "request": {
+    "auth": "bearer:token=inherited-token"
+  },
+  "vars": {
+    "environment": {
+      "apiKey": "key-42"
+    }
+  },
+  "expect": {
+    "console": [
+      "log: inherited type bearer",
+      "log: inherited token inherited-token",
+      "log: new type apikey",
+      "log: new key X-Api-Key",
+      "log: new value key-42",
+      "log: current apikey"
+    ],
+    "request": [
+      "GET https://api.example.com/v1/orders?page=1",
+      "auth apikey"
+    ]
+  }
+}
