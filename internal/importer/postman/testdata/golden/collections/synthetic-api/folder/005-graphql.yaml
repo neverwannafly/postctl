@@ -1,0 +1,17 @@
+id: request-graphql
+name: GraphQL
+kind: http
+method: POST
+url:
+  raw: https://example.invalid/graphql
+body:
+  mode: graphql
+  graphql:
+    query: query Ping { ping }
+    variables: '{"id":1}'
+auth:
+  type: unsupported
+  originalType: oauth1
+  raw:
+    parameters:
+      consumerKey: synthetic

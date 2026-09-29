@@ -21,7 +21,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | v1 locked | main | 2026-09-29 |
 | WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
-| WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-30 00:10 IST |
+| WS1 Postman importer | GPT-5.6 Sol (medium) | Done, merged to main | ws/1-importer | 2026-09-29 23:55 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
@@ -154,3 +154,35 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Verified that `ws/0-scaffold` (WS0.1) touched only model/store/docs, then merged it into `main` (5c590dd). Build, race tests and lint are green.
 - Decisions: Accepted WS0.1's unrequested safeguard: saves never delete files that failed a lenient load. WS2 and WS5 branched before this merge. When they merge, swap WS2's local copy helper for `Request.Clone` and WS5's `Load` adapter for `LoadLenient`, and wire `store.WithWorkspace` into `--workspace`.
 - Next: Keep waiting on WS1, WS2, WS2b, WS3 and WS5.
+
+### 2026-09-29 23:38 IST · WS1 · GPT-5.6 Sol · STARTED
+- Branch/worktree: ws/1-importer
+- Did: Read the authoritative WS1 brief, binding plan decisions, ledger process, agent instructions, and the model/storage contract.
+- Files: `docs/ledger.md`
+- Decisions: Import conversion will preserve unknown Postman fields in model extras, move configured literal credentials through secret collection variables by default, and restrict real-data diagnostics to names and counts.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Inspect model/store/local-extractor APIs and CLI scaffold, then implement the importer from synthetic fixtures.
+
+### 2026-09-29 23:44 IST · WS1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/1-importer
+- Did: Implemented v2.0/v2.1 collection, environment, and globals conversion; full request/body/auth/script/example/settings mapping; literal-secret extraction; script compatibility lint; stable-ID re-import with local-only item retention; privacy-safe text/JSON reports; synthetic fixtures and golden workspace coverage.
+- Files: `internal/importer/postman/`, `docs/ledger.md`
+- Decisions: When enabled and disabled Postman events share one script kind, enabled events form the runnable model script and disabled events are preserved in `Extra`; all-disabled event groups remain a disabled model script.
+- Tests: Importer and CLI package tests pass under the race detector; package lint findings were fixed.
+- Blockers / questions: None.
+- Next: Finish CLI/local-cache integration checks, exercise private staging if present, run the full repository build/race/lint suite, and harden any failures.
+
+### 2026-09-29 23:47 IST · WS1 · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/1-importer
+- Did: Completed exported-file and local-cache import paths, workspace discovery/creation, global and command-level workspace flags, dry-run re-import reporting, Keychain-backed secret migration, privacy-safe text/JSON output, and local-cache coverage warnings. The private staging acceptance case imports 2 collections, 23 requests, 17 pre-request scripts, and 3 environments, then reloads successfully.
+- Files: `internal/importer/postman/`, `cmd/postctl/{main.go,main_test.go,import.go,import_test.go}`, `docs/model.md`, `docs/ledger.md`
+- Decisions: Local-only workspace items are retained on re-import; source items moved between folders are replaced once by stable ID. Reports expose names, counts, compatibility categories, and cache gaps only.
+- Tests: `go build ./... && go test -race ./... && golangci-lint run` passed; `postctl import postman-local --dry-run --json` passed with expected privacy-safe coverage counts.
+- Blockers / questions: None.
+- Next: none
+
+### 2026-09-29 23:55 IST · WS1 · Orchestrator · PROGRESS
+- Did: Verified `ws/1-importer`. It stayed in scope; race tests and lint are green; no real data in committed fixtures. `TestPrivateStaging` ran (not skipped) and passed. A `postman-local --dry-run` against the real cache wrote nothing and reported 2 collections, 11 folders, 23 requests, 17 pre-request scripts, 3 environments, 0 script-lint warnings, and 1 warning for the 6 unresolved cache references. Merged into `main`.
+- Decisions: Did not run a non-dry import into a scratch workspace, to avoid orphaned Keychain entries. Secret migration is covered by WS1's synthetic tests. WS1's deviation is accepted: disabled Postman events are kept in `Extra`, and only enabled scripts run.
+- Next: Merge order continues with WS2, WS2b, WS3, WS5 as they finish.

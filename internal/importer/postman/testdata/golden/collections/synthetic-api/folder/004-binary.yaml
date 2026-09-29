@@ -1,0 +1,9 @@
+id: request-binary
+name: Binary
+kind: http
+method: PUT
+url:
+  raw: https://example.invalid/binary
+body:
+  mode: binary
+  file: /tmp/synthetic.bin

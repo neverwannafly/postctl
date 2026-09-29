@@ -1,0 +1,16 @@
+id: request-form
+name: Multipart
+kind: http
+method: POST
+url:
+  raw: https://example.invalid/upload
+body:
+  mode: formdata
+  formData:
+    - key: label
+      type: text
+      value: demo
+    - key: file
+      type: file
+      src: /tmp/synthetic.txt
+      contentType: text/plain

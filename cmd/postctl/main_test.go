@@ -37,7 +37,7 @@ func TestHelp(t *testing.T) {
 }
 
 func TestStubsExitThree(t *testing.T) {
-	for _, c := range []string{"import", "ls", "send", "run", "env"} {
+	for _, c := range []string{"ls", "send", "run", "env"} {
 		code, out, errOut := runCLI(c, "x")
 		if code != 3 || out != "" || !strings.Contains(errOut, "not implemented yet") {
 			t.Errorf("%s: code=%d out=%q err=%q", c, code, out, errOut)

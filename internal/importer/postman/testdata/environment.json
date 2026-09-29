@@ -1,0 +1,10 @@
+{
+  "id": "environment-1",
+  "name": "Synthetic",
+  "values": [
+    {"key": "plain", "value": "one", "type": "default", "enabled": true},
+    {"key": "secret", "value": "synthetic-secret", "type": "secret", "enabled": false}
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_using": "synthetic fixture"
+}
