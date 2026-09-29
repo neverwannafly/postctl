@@ -253,8 +253,31 @@ func compileError(u unit, err error) *ScriptError {
 		se.Message = ce.Error()
 	}
 	se.Message = strings.TrimPrefix(se.Message, "SyntaxError: ")
-	se.Line, se.Column = firstFrame(se.Message, u.file)
+	se.Line, se.Column = syntaxPosition(se.Message)
 	return se
+}
+
+// syntaxErrorPattern matches the "Line 2:11" position goja's compiler writes
+// into its message.
+var syntaxErrorPattern = regexp.MustCompile(`Line (\d+):(\d+)`)
+
+func syntaxPosition(message string) (line, column int) {
+	m := syntaxErrorPattern.FindStringSubmatch(message)
+	if m == nil {
+		return 0, 0
+	}
+	l, err1 := strconv.Atoi(m[1])
+	c, err2 := strconv.Atoi(m[2])
+	if err1 != nil || err2 != nil {
+		return 0, 0
+	}
+	if l == 1 {
+		c -= len(scriptPrefix)
+		if c < 1 {
+			c = 1
+		}
+	}
+	return l, c
 }
 
 func runtimeError(u unit, err error) *ScriptError {
