@@ -1,0 +1,13 @@
+schemaVersion: 1
+id: environment-1
+name: Synthetic
+variables:
+  - key: plain
+    value: one
+  - key: secret
+    type: secret
+    disabled: true
+    secretRef: env/environment-1/secret
+extra:
+  _postman_exported_using: synthetic fixture
+  _postman_variable_scope: environment

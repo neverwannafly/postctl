@@ -1,0 +1,37 @@
+schemaVersion: 1
+id: collection-1
+name: Synthetic API
+description: Synthetic collection
+version: 1.2.3
+auth:
+  type: bearer
+  bearer:
+    token: '{{bearer_token}}'
+  raw:
+    vendor: kept
+variables:
+  - key: base
+    value: example.invalid
+    dataType: string
+    description: host
+  - key: bearer_token
+    type: secret
+    secretRef: collection/collection-1/bearer_token
+  - key: basic_password
+    type: secret
+    secretRef: collection/collection-1/basic_password
+  - key: apikey_value
+    type: secret
+    secretRef: collection/collection-1/apikey_value
+scripts:
+  preRequest:
+    file: pre.js
+    id: script-c
+extra:
+  info:
+    x-info: kept
+  x-top:
+    kept: true
+order:
+  - folder
+  - empty

@@ -63,7 +63,7 @@ Variable ── key, value, type (default|secret), dataType, description, disabl
 | any other auth type (oauth1, edgegrid, jwt, asap, akamai...) | `AuthUnsupported` + `OriginalType` + `Raw` |
 | no `auth` on a request/folder | `Auth == nil` (inherit) |
 | `oauth2.grant_type` authorization_code / authorization_code_with_pkce / client_credentials / password_credentials / implicit | `GrantAuthorizationCode` / `GrantAuthorizationCodePKCE` / `GrantClientCredentials` / `GrantPassword` / `GrantImplicit`; an imported `accessToken` goes into `OAuth2Config.Token.AccessToken` (the store moves it to Keychain) |
-| `event[]` `listen: prerequest|test` `script.exec` | `Scripts.PreRequest` / `Scripts.Test` via `ScriptFromExec`; `script.id/name/src`, `event.disabled` map to `Script.ID/Name/Src/Disabled` |
+| `event[]` `listen: prerequest|test` `script.exec` | `Scripts.PreRequest` / `Scripts.Test` via `ScriptFromExec`; `script.id/name/src`, `event.disabled` map to `Script.ID/Name/Src/Disabled`. Multiple enabled events concatenate in order. If enabled and disabled events share a kind, disabled events are preserved under the container's `Extra.disabledEvents` so they are not executed; an all-disabled group concatenates into one disabled script. |
 | `variable[]` (`key`, `value`, `type`, `disabled`, `description`) | `Variable` (`type` string/number/boolean/any → `DataType`) |
 | `protocolProfileBehavior` | `RequestSettings` (known keys) and `RequestSettings.Extra` |
 | `request.proxy`, `request.certificate` | `Request.Extra` |

@@ -1,0 +1,77 @@
+id: request-raw
+name: Raw request
+description: Raw body
+kind: http
+method: POST
+url:
+  raw: https://{{base}}/v1/:id?enabled=yes
+  query:
+    - key: enabled
+      value: "yes"
+    - key: disabled
+      value: "no"
+      disabled: true
+  pathVariables:
+    - key: id
+      value: "42"
+headers:
+  - key: X-Dupe
+    value: one
+  - key: X-Dupe
+    value: two
+    description: second
+    disabled: true
+body:
+  mode: raw
+  raw: '{"ok":true}'
+  language: json
+  extra:
+    vendorBody: kept
+auth:
+  type: basic
+  basic:
+    username: demo
+    password: '{{basic_password}}'
+scripts:
+  preRequest:
+    file: 001-raw-request.pre.js
+  test:
+    file: 001-raw-request.test.js
+settings:
+  followRedirects: false
+  maxRedirects: 4
+  verifyTLS: true
+  timeout: 1.5s
+  extra:
+    vendorSetting: kept
+examples:
+  - id: example-1
+    name: Created
+    originalRequest:
+      name: ""
+      kind: http
+      method: POST
+      url:
+        raw: https://example.invalid/v1
+    status: Created
+    code: 201
+    headers:
+      - key: Content-Type
+        value: application/json
+    cookies:
+      - name: session
+        value: synthetic
+        httpOnly: true
+    body: '{"id":1}'
+    previewLanguage: json
+extra:
+  disabledEvents:
+    - disabled: true
+      listen: test
+      script:
+        exec:
+          - tests['legacy'] = true;
+  proxy:
+    match: synthetic
+  url:
+    vendorUrl: true

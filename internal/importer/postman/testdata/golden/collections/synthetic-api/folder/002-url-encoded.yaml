@@ -1,0 +1,18 @@
+id: request-url
+name: URL encoded
+kind: http
+method: POST
+url:
+  raw: https://example.invalid/form
+body:
+  mode: urlencoded
+  urlencoded:
+    - key: a
+      value: b
+      disabled: true
+auth:
+  type: apikey
+  apikey:
+    key: X-Key
+    value: '{{apikey_value}}'
+    in: header

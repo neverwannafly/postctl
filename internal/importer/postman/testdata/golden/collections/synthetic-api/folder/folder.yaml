@@ -1,0 +1,19 @@
+id: folder-1
+name: Folder
+description: Nested folder
+auth:
+  type: none
+variables:
+  - key: folderVar
+    value: one
+    dataType: number
+scripts:
+  test:
+    file: test.js
+    disabled: true
+order:
+  - 001-raw-request
+  - 002-url-encoded
+  - 003-multipart
+  - 004-binary
+  - 005-graphql

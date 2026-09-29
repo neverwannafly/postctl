@@ -1,0 +1,5 @@
+schemaVersion: 1
+id: workspace-golden
+name: Imported
+collections:
+  - synthetic-api

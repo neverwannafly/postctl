@@ -1,0 +1,171 @@
+{
+  "info": {
+    "_postman_id": "collection-1",
+    "name": "Synthetic API",
+    "description": {"content": "Synthetic collection", "type": "text/markdown"},
+    "version": {"major": 1, "minor": 2, "patch": 3},
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "x-info": "kept"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {"key": "token", "value": "synthetic-token", "type": "string"},
+      {"key": "vendor", "value": "kept"}
+    ]
+  },
+  "variable": [
+    {"key": "base", "value": "example.invalid", "type": "string", "description": "host"}
+  ],
+  "event": [
+    {"listen": "prerequest", "script": {"id": "script-c", "exec": ["pm.variables.set('x', 'y');"]}}
+  ],
+  "item": [
+    {
+      "id": "folder-1",
+      "name": "Folder",
+      "description": "Nested folder",
+      "auth": {"type": "noauth"},
+      "variable": [{"key": "folderVar", "value": "one", "type": "number"}],
+      "event": [
+        {"listen": "test", "disabled": true, "script": {"exec": ["pm.test('disabled', function () {});"]}}
+      ],
+      "item": [
+        {
+          "id": "request-raw",
+          "name": "Raw request",
+          "event": [
+            {"listen": "prerequest", "script": {"exec": ["pm.visualizer.set('<b>x</b>');"]}},
+            {"listen": "prerequest", "script": {"exec": ["require('left-pad');"]}},
+            {"listen": "test", "disabled": true, "script": {"exec": ["tests['legacy'] = true;"]}},
+            {"listen": "test", "script": {"exec": ["pm.test('ok', function () {});"]}}
+          ],
+          "request": {
+            "description": {"content": "Raw body", "type": "text/plain"},
+            "method": "post",
+            "header": [
+              {"key": "X-Dupe", "value": "one"},
+              {"key": "X-Dupe", "value": "two", "disabled": true, "description": "second"}
+            ],
+            "url": {
+              "raw": "https://{{base}}/v1/:id?enabled=yes",
+              "protocol": "https",
+              "host": ["{{base}}"],
+              "path": ["v1", ":id"],
+              "query": [
+                {"key": "enabled", "value": "yes"},
+                {"key": "disabled", "value": "no", "disabled": true}
+              ],
+              "variable": [{"key": "id", "value": "42"}],
+              "vendorUrl": true
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ok\":true}",
+              "options": {"raw": {"language": "json"}},
+              "vendorBody": "kept"
+            },
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {"key": "username", "value": "demo"},
+                {"key": "password", "value": "synthetic-password"}
+              ]
+            },
+            "protocolProfileBehavior": {
+              "followRedirects": false,
+              "maxRedirects": 4,
+              "requestTimeout": 1500,
+              "strictSSL": true,
+              "vendorSetting": "kept"
+            },
+            "proxy": {"match": "synthetic"}
+          },
+          "response": [
+            {
+              "id": "example-1",
+              "name": "Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "cookie": [{"name": "session", "value": "synthetic", "httpOnly": true}],
+              "body": "{\"id\":1}",
+              "_postman_previewlanguage": "json",
+              "originalRequest": {
+                "method": "POST",
+                "url": "https://example.invalid/v1",
+                "header": []
+              }
+            }
+          ]
+        },
+        {
+          "id": "request-url",
+          "name": "URL encoded",
+          "request": {
+            "method": "POST",
+            "url": "https://example.invalid/form",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [{"key": "a", "value": "b", "disabled": true}]
+            },
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {"key": "key", "value": "X-Key"},
+                {"key": "value", "value": "synthetic-key"},
+                {"key": "in", "value": "header"}
+              ]
+            }
+          }
+        },
+        {
+          "id": "request-form",
+          "name": "Multipart",
+          "request": {
+            "method": "POST",
+            "url": "https://example.invalid/upload",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "label", "type": "text", "value": "demo"},
+                {"key": "file", "type": "file", "src": ["/tmp/synthetic.txt"], "contentType": "text/plain"}
+              ]
+            }
+          }
+        },
+        {
+          "id": "request-binary",
+          "name": "Binary",
+          "request": {
+            "method": "PUT",
+            "url": "https://example.invalid/binary",
+            "body": {"mode": "file", "file": {"src": "/tmp/synthetic.bin"}}
+          }
+        },
+        {
+          "id": "request-graphql",
+          "name": "GraphQL",
+          "request": {
+            "method": "POST",
+            "url": "https://example.invalid/graphql",
+            "body": {
+              "mode": "graphql",
+              "graphql": {"query": "query Ping { ping }", "variables": {"id": 1}}
+            },
+            "auth": {
+              "type": "oauth1",
+              "oauth1": [{"key": "consumerKey", "value": "synthetic"}]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "empty-folder",
+      "name": "Empty",
+      "item": []
+    }
+  ],
+  "x-top": {"kept": true}
+}

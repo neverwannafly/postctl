@@ -82,6 +82,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		usage(stdout)
 		return exitOK
 	}
+	if rest[0] == "import" {
+		return runImport(rest[1:], stdout, stderr)
+	}
 	for _, c := range commands {
 		if c.name == rest[0] {
 			if hasHelpFlag(rest[1:]) {

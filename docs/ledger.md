@@ -21,7 +21,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | --- | --- | --- | --- | --- |
 | Plan | Orchestrator | v1 locked | main | 2026-09-29 |
 | WS0 scaffold/model/store | Sonnet 5.5 (high) | Done, merged to main | ws/0-scaffold | 2026-09-29 23:58 IST |
-| WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-30 00:10 IST |
+| WS1 Postman importer | GPT-5.6 Sol (medium) | Running | ws/1-importer | 2026-09-29 23:44 IST |
 | WS1b local Postman extractor | GPT-5.6 Sol (medium) | Done, merged to main | ws/1b-postman-local | 2026-09-29 23:55 IST |
 | WS2 vars + httpx | GPT-5.6 Sol (medium) | Running | ws/2-vars-httpx | 2026-09-30 00:10 IST |
 | WS2b OAuth2 | Grok 4.7 (high, fast) | Running | ws/2b-oauth2 | 2026-09-30 00:10 IST |
@@ -131,3 +131,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 ### 2026-09-30 00:10 IST · Wave 2 · Orchestrator · HANDOFF
 - Did: Wrote briefs `docs/briefs/WS1-*.md`, `WS2-*.md`, `WS2b-*.md`, `WS3-*.md`, `WS5-*.md`; created a worktree per workstream from `main`.
 - Next: Merge order as agents finish: WS0.1 → WS2 → WS2b → WS3 → WS1 → WS5 (roughly, so contracts settle first). Then write the WS4 engine brief against the real WS2/WS3 APIs.
+
+### 2026-09-29 23:38 IST · WS1 · GPT-5.6 Sol · STARTED
+- Branch/worktree: ws/1-importer
+- Did: Read the authoritative WS1 brief, binding plan decisions, ledger process, agent instructions, and the model/storage contract.
+- Files: `docs/ledger.md`
+- Decisions: Import conversion will preserve unknown Postman fields in model extras, move configured literal credentials through secret collection variables by default, and restrict real-data diagnostics to names and counts.
+- Tests: Not run yet.
+- Blockers / questions: None.
+- Next: Inspect model/store/local-extractor APIs and CLI scaffold, then implement the importer from synthetic fixtures.
+
+### 2026-09-29 23:44 IST · WS1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/1-importer
+- Did: Implemented v2.0/v2.1 collection, environment, and globals conversion; full request/body/auth/script/example/settings mapping; literal-secret extraction; script compatibility lint; stable-ID re-import with local-only item retention; privacy-safe text/JSON reports; synthetic fixtures and golden workspace coverage.
+- Files: `internal/importer/postman/`, `docs/ledger.md`
+- Decisions: When enabled and disabled Postman events share one script kind, enabled events form the runnable model script and disabled events are preserved in `Extra`; all-disabled event groups remain a disabled model script.
+- Tests: Importer and CLI package tests pass under the race detector; package lint findings were fixed.
+- Blockers / questions: None.
+- Next: Finish CLI/local-cache integration checks, exercise private staging if present, run the full repository build/race/lint suite, and harden any failures.
