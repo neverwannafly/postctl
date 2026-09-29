@@ -686,6 +686,12 @@ func (m *Model) reportMask() func(string) string {
 		}
 		for _, coll := range ws.Collections {
 			add(coll.Variables)
+			_ = coll.Walk(func(it model.Item, _ model.Container, _ int) error {
+				if folder, ok := it.(*model.Folder); ok {
+					add(folder.Variables)
+				}
+				return nil
+			})
 		}
 	}
 	redactor := history.NewRedactor(values)

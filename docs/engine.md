@@ -111,6 +111,13 @@ From lowest to highest, a `{{name}}` resolves to the first scope below that
 defines it: **global < collection < folder < environment < data < local**
 (`pm.variables.set`, `--var`).
 
+`--var k=v` on `postctl send` and `postctl run` is the **local** layer
+(`SendInput.Locals`, `RunInput.Locals`), the same layer as `pm.variables.set`,
+so it beats folder, collection, environment and iteration-data values of the
+same name. On `run` it is re-seeded at the start of every iteration.
+`TestLocalVarsBeatFolderVariables` pins this. `--var` values are not written to
+disk.
+
 Folder variables (`folder.yaml`, Postman v2.1 `item[].variable` on a folder) are
 part of the collection tier, as in Postman: they beat collection variables and
 lose to the environment. With nested folders the inner one wins. Only the

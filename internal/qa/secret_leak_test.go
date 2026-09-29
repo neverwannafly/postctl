@@ -28,11 +28,15 @@ import (
 
 func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	sentinel := "postctl-leak-sentinel-" + model.NewID().String()
+	// folderSentinel is the value of a secret variable defined on a folder, so
+	// the folder-variable path (hydration, resolution, masking) is swept too.
+	folderSentinel := "postctl-folder-sentinel-" + model.NewID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Set-Cookie", "session="+sentinel+"; Max-Age=0; Path=/")
 		_ = json.NewEncoder(w).Encode(map[string]string{
 			"jwt": sentinel, "requestPath": r.URL.Path, "queryEcho": r.URL.RawQuery,
+			"folderHeader": r.Header.Get("X-Folder"),
 		})
 	}))
 	t.Cleanup(server.Close)
@@ -63,8 +67,20 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		GrantType: model.GrantClientCredentials,
 		Token:     &model.OAuth2Token{AccessToken: sentinel, TokenType: "Bearer"},
 	}}
+	folderRequest := model.NewRequest("Folder request", http.MethodPost,
+		"{{baseUrl}}/folder/{{folderToken}}?token={{folderToken}}")
+	folderRequest.Headers = []model.KV{{Key: "X-Folder", Value: "{{folderToken}}"}}
+	folderRequest.Body = model.Body{Mode: model.BodyRaw, Raw: `{"token":"{{folderToken}}"}`}
+	folderRequest.Scripts.PreRequest = &model.Script{Source: `console.log(pm.variables.get("folderToken"));`}
+	folderRequest.Scripts.Test = &model.Script{Source: `
+		pm.test("folder secret must not surface", () => {
+			pm.expect("wrong").to.eql(pm.variables.get("folderToken"));
+		});`}
+	folder := model.NewFolder("Folder secrets")
+	folder.Variables = []model.Variable{{Key: "folderToken", Value: folderSentinel, Type: model.VarSecret}}
+	folder.Items = []model.Item{folderRequest}
 	coll := model.NewCollection("Secrets")
-	coll.Items = []model.Item{bearer, oauth}
+	coll.Items = []model.Item{bearer, oauth, folder}
 	ws.Collections = []*model.Collection{coll}
 	ws.Environments = []*model.Environment{env}
 	if err := st.Save(context.Background(), ws); err != nil {
@@ -75,7 +91,7 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		t.Fatal(err)
 	}
 	coll, env = ws.Collections[0], ws.Environments[0]
-	bearer, oauth = coll.Requests()[0], coll.Requests()[1]
+	bearer, oauth, folderRequest = coll.Requests()[0], coll.Requests()[1], coll.Requests()[2]
 
 	log, err := history.Open(filepath.Join(st.StateDir(), "history"), history.Options{})
 	if err != nil {
@@ -103,6 +119,19 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		t.Fatal("server did not echo the OAuth credential in the exempt in-memory response body")
 	}
 
+	folderOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: folderRequest, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if folderOutcome.Response == nil || !bytes.Contains(folderOutcome.Response.Body, []byte(folderSentinel)) {
+		t.Fatal("folder secret variable was not resolved on the wire")
+	}
+	if folderOutcome.Redactor == nil {
+		t.Fatal("outcome has no redactor")
+	}
+
 	var events []engine.RunEvent
 	runEvents, err := eng.RunAsync(context.Background(), engine.RunInput{
 		Collection: coll, Environment: env, Iterations: 1,
@@ -114,16 +143,19 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		events = append(events, ev)
 	}
 
+	// The folder value is masked by the engine's own redactor (built from the
+	// hydrated folder variables), not by a list the test hands over.
 	redactor := history.NewRedactor([]string{sentinel})
+	mask := func(text string) string { return folderOutcome.Redactor.Text(redactor.Text(text)) }
 	var jsonReport, junitReport bytes.Buffer
-	if err := report.Write(report.NewJSON(&jsonReport, report.Options{Mask: redactor.Text}), events); err != nil {
+	if err := report.Write(report.NewJSON(&jsonReport, report.Options{Mask: mask}), events); err != nil {
 		t.Fatal(err)
 	}
-	if err := report.Write(report.NewJUnit(&junitReport, report.Options{Mask: redactor.Text}), events); err != nil {
+	if err := report.Write(report.NewJUnit(&junitReport, report.Options{Mask: mask}), events); err != nil {
 		t.Fatal(err)
 	}
 
-	entries, err := log.List(history.Filter{Limit: 20})
+	entries, err := log.List(history.Filter{Limit: 50})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,17 +170,44 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Every history entry, not only the newest, and each one as masked curl.
+	var historyDump, curlDump strings.Builder
+	for _, summary := range entries {
+		full, err := log.Get(summary.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw, err := json.Marshal(full)
+		if err != nil {
+			t.Fatal(err)
+		}
+		historyDump.Write(raw)
+		masked, err := tuihistory.DefaultCurl(context.Background(), full)
+		if err != nil {
+			t.Fatal(err)
+		}
+		curlDump.WriteString(masked)
+	}
 
 	frames := renderLeakSweepFrames(t, ws, env, coll, oauth, bearerOutcome, log)
-	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
-	assertAbsent(t, sentinel, "JSON report", jsonReport.Bytes())
-	assertAbsent(t, sentinel, "JUnit report", junitReport.Bytes())
-	assertAbsent(t, sentinel, "masked curl", []byte(curl))
-	assertAbsent(t, sentinel, "pager output", pager)
-	for name, frame := range frames {
-		assertAbsent(t, sentinel, name+" frame", []byte(frame))
+	for name, frame := range renderLeakSweepFrames(t, ws, env, coll, folderRequest, folderOutcome, log) {
+		frames["folder "+name] = frame
 	}
-	assertWorkspaceFilesClean(t, root, sentinel)
+	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
+	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
+	for _, secret := range []string{sentinel, folderSentinel} {
+		assertAbsent(t, secret, "JSON report", jsonReport.Bytes())
+		assertAbsent(t, secret, "JUnit report", junitReport.Bytes())
+		assertAbsent(t, secret, "masked curl", []byte(curl))
+		assertAbsent(t, secret, "masked curl (all entries)", []byte(curlDump.String()))
+		assertAbsent(t, secret, "history entries", []byte(historyDump.String()))
+		assertAbsent(t, secret, "pager output", pager)
+		assertAbsent(t, secret, "folder pager output", folderPager)
+		for name, frame := range frames {
+			assertAbsent(t, secret, name+" frame", []byte(frame))
+		}
+		assertWorkspaceFilesClean(t, root, secret)
+	}
 }
 
 func renderLeakSweepFrames(

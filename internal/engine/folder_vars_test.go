@@ -73,6 +73,52 @@ func TestFolderVariablesResolveOnSend(t *testing.T) {
 	}
 }
 
+// `--var` (SendInput.Locals / RunInput.Locals) is the Local layer, the top of
+// global < collection < folder < environment < data < local, so it beats the
+// folder and environment layers on both send and run, and data sits under it.
+func TestLocalVarsBeatFolderVariables(t *testing.T) {
+	srv := newServer(t, jsonHandler(`{}`))
+	f, _ := folderFixture(t, srv)
+	f.save()
+	locals := map[string]any{"where": "local", "layer": "local"}
+
+	out, err := f.eng.Send(context.Background(), SendInput{
+		Collection: f.col, Request: f.findRequest("R"), Environment: f.env,
+		Data: map[string]any{"where": "data", "outerOnly": "data"}, Locals: locals,
+	}, nil)
+	if err != nil || out.Err != nil {
+		t.Fatalf("send: %v %v", err, out.Err)
+	}
+	h := srv.hdrs[0]
+	if got := srv.hits()[0]; got != "/local" {
+		t.Errorf("send path = %q, want the local value over folder and data", got)
+	}
+	if got := h.Get("X-Layer"); got != "local" {
+		t.Errorf("send X-Layer = %q, want local over environment", got)
+	}
+	if got := h.Get("X-Outer"); got != "data" {
+		t.Errorf("send X-Outer = %q, want data over the folder value", got)
+	}
+	if got := h.Get("X-Inner"); got != "i" {
+		t.Errorf("send X-Inner = %q, want the folder value (nothing overrides it)", got)
+	}
+
+	sum, _ := f.run(RunInput{Locals: locals})
+	if sum == nil || sum.Requests != 1 {
+		t.Fatalf("run summary: %+v", sum)
+	}
+	if got := srv.hits()[1]; got != "/local" {
+		t.Errorf("run path = %q, want the local value over the folder value", got)
+	}
+	h = srv.hdrs[1]
+	if got := h.Get("X-Layer"); got != "local" {
+		t.Errorf("run X-Layer = %q, want local over environment", got)
+	}
+	if got := h.Get("X-Inner"); got != "i" {
+		t.Errorf("run X-Inner = %q, want the folder value", got)
+	}
+}
+
 // Sending a request outside the folders must not see their variables.
 func TestFolderVariablesAreScopedToTheirFolder(t *testing.T) {
 	srv := newServer(t, jsonHandler(`{}`))
