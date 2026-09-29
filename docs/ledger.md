@@ -19,9 +19,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 
 | WS | Owner (model) | Status | Branch | Last update |
 | --- | --- | --- | --- | --- |
-| Plan | Orchestrator | Draft v0, awaiting user answers | — | 2026-09-29 |
-| WS0 scaffold/model/store | — | Not started | — | — |
-| WS1 Postman importer | — | Not started | — | — |
+| Plan | Orchestrator | v1 locked | main | 2026-09-29 |
+| WS0 scaffold/model/store | Sonnet 5.5 (high) | Running | ws/0-scaffold | 2026-09-29 |
+| WS1 Postman importer | — | Not started (Wave 2) | — | — |
+| WS1b local Postman extractor | GPT-5.6 Sol (medium) | Running (Phase A spike) | ws/1b-postman-local | 2026-09-29 |
 | WS2 vars + httpx | — | Not started | — | — |
 | WS3 script runtime | — | Not started | — | — |
 | WS4 engine/runner | — | Not started | — | — |
@@ -29,6 +30,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS6 editor + response viewer | — | Not started | — | — |
 | WS7 CLI | — | Not started | — | — |
 | WS8 docs/release | — | Not started | — | — |
+| WS9 WebSocket requests | — | Not started (Wave 5; gRPC deferred to v1.1) | — | — |
 
 ## Entries
 
@@ -45,3 +47,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: WS1b outputs standard v2.1 JSON so the importer (WS1) stays format-stable. Private extracted data goes to gitignored `testdata/private/`.
 - Blockers / questions: Round-2 questions (gRPC/OAuth2 depth, launch approval).
 - Next: Write briefs for WS0 and WS1b, then launch Wave 1.
+
+### 2026-09-29 23:10 IST · Plan · Orchestrator · HANDOFF
+- Did: Recorded round-2 answers (R1–R4) in plan §0. Ran `git init` and made the first commit on `main`. Created worktrees `~/work/postctl-wt/ws0-scaffold` and `~/work/postctl-wt/ws1b-postman-local`. Launched WS0 (Sonnet 5.5) and WS1b (GPT-5.6 Sol).
+- Files: `docs/plan.md`, `docs/briefs/WS0-*.md`, `docs/briefs/WS1b-*.md`, `.gitignore`, `go.mod`
+- Next: When Wave 1 finishes, review and merge `ws/0-scaffold` first, then write the WS1/WS2/WS5 briefs against the real `model` API and launch Wave 2.
