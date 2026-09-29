@@ -25,6 +25,10 @@ type bridge struct {
 	loop *eventloop.EventLoop
 	now  func() time.Time
 
+	// finishFn is the sandbox's wrap-up function, captured at start-up and
+	// removed from the global object so scripts cannot reach or replace it.
+	finishFn goja.Callable
+
 	// mu guards res, the Vars mutations and abandoned. It is
 	// uncontended while the VM runs (one goroutine), and exists so that a
 	// run the caller has given up on (see [bridge.abandon]) can no longer

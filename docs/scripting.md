@@ -273,6 +273,14 @@ process environment, no `child_process`, and the only network access is
 `pm.sendRequest`, which goes through the sender the caller supplies and is
 subject to the same proxy, TLS and redirect settings as a normal send.
 
+The Go bridge (`host`) is a variable inside the sandbox's function scope, not a
+global, and the bootstrap entry points (`__postctl_init`, `__postctl_run`,
+`__postctl_finish`) are captured by the runner and deleted from the global
+object before any user code is compiled, so a script can neither call nor
+replace them. `TestSandboxHostGlobalIsNotScriptVisible` checks that
+`typeof host === 'undefined'` and that no bridge function is reachable by
+walking `globalThis`.
+
 ## Performance
 
 Warm runs on an Apple M3 Pro, one script, whole `Run` including VM setup:

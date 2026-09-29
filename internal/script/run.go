@@ -278,6 +278,17 @@ func start(vm *goja.Runtime, boot *goja.Program, br *bridge, units []unit) error
 		return fmt.Errorf("%w: %w", ErrNoRuntime, err)
 	}
 
+	// The bootstrap publishes its entry points on the global object because
+	// that is the only place an IIFE can put them. Capture them and delete
+	// the globals before any user code is compiled, so a script can neither
+	// call nor replace them (the bridge itself, `host`, is a variable inside
+	// the sandbox's function scope and was never a global).
+	entry, err := takeEntryPoints(vm)
+	if err != nil {
+		return err
+	}
+	br.finishFn = entry.finish
+
 	hostObj, err := br.object(vm)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrNoRuntime, err)
@@ -287,11 +298,7 @@ func start(vm *goja.Runtime, boot *goja.Program, br *bridge, units []unit) error
 		return fmt.Errorf("%w: %w", ErrNoRuntime, err)
 	}
 
-	initFn, ok := goja.AssertFunction(vm.Get("__postctl_init"))
-	if !ok {
-		return fmt.Errorf("%w: __postctl_init missing", ErrNoRuntime)
-	}
-	if _, err := initFn(goja.Undefined(), hostObj, vm.ToValue(ctxJSON)); err != nil {
+	if _, err := entry.init(goja.Undefined(), hostObj, vm.ToValue(ctxJSON)); err != nil {
 		return fmt.Errorf("%w: %w", ErrNoRuntime, err)
 	}
 
@@ -310,11 +317,7 @@ func start(vm *goja.Runtime, boot *goja.Program, br *bridge, units []unit) error
 		fns = append(fns, v)
 	}
 
-	runFn, ok := goja.AssertFunction(vm.Get("__postctl_run"))
-	if !ok {
-		return fmt.Errorf("%w: __postctl_run missing", ErrNoRuntime)
-	}
-	if _, err := runFn(goja.Undefined(), vm.ToValue(fns)); err != nil {
+	if _, err := entry.run(goja.Undefined(), vm.ToValue(fns)); err != nil {
 		if isInterrupt(err) {
 			return nil
 		}
@@ -330,6 +333,36 @@ func start(vm *goja.Runtime, boot *goja.Program, br *bridge, units []unit) error
 		return fmt.Errorf("%w: %w", ErrNoRuntime, err)
 	}
 	return nil
+}
+
+// entryPoints are the sandbox bootstrap functions the runner calls.
+type entryPoints struct {
+	init, run, finish goja.Callable
+}
+
+// takeEntryPoints moves the sandbox's bootstrap functions off the global
+// object and returns them.
+func takeEntryPoints(vm *goja.Runtime) (entryPoints, error) {
+	var out entryPoints
+	global := vm.GlobalObject()
+	for _, e := range []struct {
+		name string
+		dst  *goja.Callable
+	}{
+		{"__postctl_init", &out.init},
+		{"__postctl_run", &out.run},
+		{"__postctl_finish", &out.finish},
+	} {
+		fn, ok := goja.AssertFunction(global.Get(e.name))
+		if !ok {
+			return out, fmt.Errorf("%w: %s missing", ErrNoRuntime, e.name)
+		}
+		*e.dst = fn
+		if err := global.Delete(e.name); err != nil {
+			return out, fmt.Errorf("%w: %w", ErrNoRuntime, err)
+		}
+	}
+	return out, nil
 }
 
 // stackOverflowError describes a call that nested deeper than maxCallDepth.
@@ -358,7 +391,7 @@ func stackOverflowError(units []unit, err error) *ScriptError {
 // script's asynchronous work is already accounted for.
 func finish(vm *goja.Runtime, br *bridge, units []unit, in Input) {
 	var payload string
-	if fn, ok := goja.AssertFunction(vm.Get("__postctl_finish")); ok {
+	if fn := br.finishFn; fn != nil {
 		if v, err := fn(goja.Undefined()); err == nil {
 			payload = v.String()
 		}
