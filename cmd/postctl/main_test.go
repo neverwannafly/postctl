@@ -49,6 +49,16 @@ func TestCommandHelp(t *testing.T) {
 	}
 }
 
+func TestImportWorkspaceFlagMayFollowSubcommand(t *testing.T) {
+	args, workspace, err := extractImportWorkspace([]string{"--workspace", "/tmp/work", "postman", "collection.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if workspace != "/tmp/work" || len(args) != 2 || args[0] != "postman" {
+		t.Fatalf("workspace=%q args=%v", workspace, args)
+	}
+}
+
 func TestNoArgsAndUnknown(t *testing.T) {
 	launchUI = func(tui.Options) error { return nil }
 	if code, _, errOut := runCLI(); code != 0 || errOut != "" {

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -28,9 +29,15 @@ func phaseBar(t ui.Theme, label string, d, total time.Duration, barW int) string
 }
 
 // RenderTimeline draws timing bars, redirects, TLS and the sent request.
-func RenderTimeline(t ui.Theme, resp *httpx.Response, w int, reveal bool) string {
+func RenderTimeline(t ui.Theme, resp *httpx.Response, w int, reveal bool, redactor *history.Redactor) string {
 	if resp == nil {
-		return t.EmptyState("No timing data", "Send a request to see DNS, TLS and download phases.", "", w)
+		return t.EmptyState("No timing data", "Send a request to see DNS, TLS and download phases.", "Send with Ctrl-S.", w)
+	}
+	if redactor == nil {
+		redactor = history.NewRedactor(nil)
+	}
+	mask := func(text string) string {
+		return strings.ReplaceAll(text, history.Mask, t.Glyphs.Mask)
 	}
 	tm := resp.Timings
 	total := tm.Total
@@ -56,18 +63,25 @@ func RenderTimeline(t ui.Theme, resp *httpx.Response, w int, reveal bool) string
 	if len(resp.Redirects) > 0 {
 		lines = append(lines, "", t.Bold().Render("Redirects"))
 		for _, r := range resp.Redirects {
-			lines = append(lines, t.Render(ui.TextSecondary, fmt.Sprintf("%d %s", r.StatusCode, t.Truncate(r.Location, w-6))))
+			location := r.Location
+			if !reveal {
+				location = mask(redactor.URL(location))
+			}
+			lines = append(lines, t.Render(ui.TextSecondary, fmt.Sprintf("%d %s", r.StatusCode, t.Truncate(location, w-6))))
 		}
 	}
 
 	sent := resp.Sent
+	sentURL := sent.URL
+	headers := sent.Headers
+	if !reveal {
+		sentURL = mask(redactor.URL(sentURL))
+		headers = redactor.Headers(headers)
+	}
 	lines = append(lines, "", t.Bold().Render("Request sent"))
-	lines = append(lines, t.MethodBadge(sent.Method, 7)+" "+t.Render(ui.TextPrimary, t.Truncate(sent.URL, max(1, w-8))))
-	for _, h := range sent.Headers {
-		val := h.Value
-		if SecretHeader(h.Key) && !reveal {
-			val = t.Glyphs.Mask
-		}
+	lines = append(lines, t.MethodBadge(sent.Method, 7)+" "+t.Render(ui.TextPrimary, t.Truncate(sentURL, max(1, w-8))))
+	for _, h := range headers {
+		val := mask(h.Value)
 		lines = append(lines, t.Render(ui.TextSecondary, t.Truncate(h.Key+": "+val, w)))
 	}
 	return strings.Join(lines, "\n")

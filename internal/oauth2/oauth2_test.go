@@ -228,6 +228,7 @@ func TestRefresh(t *testing.T) {
 }
 
 func TestAuthorizationCodeAndPKCE(t *testing.T) {
+	states := map[string]bool{}
 	for _, tc := range []struct {
 		name   string
 		grant  model.OAuth2Grant
@@ -320,9 +321,14 @@ func TestAuthorizationCodeAndPKCE(t *testing.T) {
 				t.Fatal("callback page is missing its confirmation")
 			}
 			auth := as.authQuery()
-			if auth.Get("response_type") != "code" || auth.Get("state") != "fixed-state" || auth.Get("client_id") != "cid" {
+			if auth.Get("response_type") != "code" || auth.Get("state") == "" ||
+				auth.Get("state") == "fixed-state" || auth.Get("client_id") != "cid" {
 				t.Fatal("authorize query is missing required fields")
 			}
+			if states[auth.Get("state")] {
+				t.Fatal("OAuth state was reused across flows")
+			}
+			states[auth.Get("state")] = true
 			if auth.Get("redirect_uri") != redirect || auth.Get("prompt") != "consent" || auth.Get("nope") != "" || auth.Get("grant_extra") != "x" {
 				t.Fatal("redirect URI or auth extra params were wrong")
 			}
@@ -421,7 +427,7 @@ func TestImplicit(t *testing.T) {
 		t.Fatal("implicit page echoed the token or skipped the fragment script")
 	}
 	auth := as.authQuery()
-	if auth.Get("response_type") != "token" || auth.Get("state") != "fixed-state" {
+	if auth.Get("response_type") != "token" || auth.Get("state") == "" || auth.Get("state") == "fixed-state" {
 		t.Fatal("implicit authorize query was wrong")
 	}
 	dialClosed(t, hostport(auth.Get("redirect_uri")))

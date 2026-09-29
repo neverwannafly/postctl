@@ -30,7 +30,10 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	sentinel := "postctl-leak-sentinel-" + model.NewID().String()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"authorization": r.Header.Get("Authorization")})
+		w.Header().Set("Set-Cookie", "session="+sentinel+"; Max-Age=0; Path=/")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"jwt": sentinel, "requestPath": r.URL.Path, "queryEcho": r.URL.RawQuery,
+		})
 	}))
 	t.Cleanup(server.Close)
 
@@ -52,8 +55,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 			{Key: "accessToken", Value: sentinel, Type: model.VarSecret},
 		},
 	}
-	bearer := model.NewRequest("Bearer request", http.MethodGet, "{{baseUrl}}/bearer")
+	bearer := model.NewRequest("Bearer request", http.MethodGet, "{{baseUrl}}/bearer/{{accessToken}}?api_key={{accessToken}}")
 	bearer.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: "{{accessToken}}"}}
+	bearer.Scripts.Test = &model.Script{Source: `console.log(pm.environment.get("accessToken"));`}
 	oauth := model.NewRequest("OAuth request", http.MethodGet, "{{baseUrl}}/oauth")
 	oauth.Auth = &model.Auth{Type: model.AuthOAuth2, OAuth2: &model.OAuth2Config{
 		GrantType: model.GrantClientCredentials,
@@ -87,8 +91,16 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bearerOutcome.Response == nil || !bytes.Contains(bearerOutcome.Response.Body, []byte(sentinel)) {
-		t.Fatal("server did not echo the resolved bearer credential in memory")
+	oauthForSend := oauth.Clone()
+	oauthForSend.URL = model.ParseURL(server.URL + "/oauth/" + sentinel)
+	oauthOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: oauthForSend, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if oauthOutcome.Response == nil || !bytes.Contains(oauthOutcome.Response.Body, []byte(sentinel)) {
+		t.Fatal("server did not echo the OAuth credential in the exempt in-memory response body")
 	}
 
 	var events []engine.RunEvent
@@ -128,9 +140,11 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	}
 
 	frames := renderLeakSweepFrames(t, ws, env, coll, oauth, bearerOutcome, log)
+	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	assertAbsent(t, sentinel, "JSON report", jsonReport.Bytes())
 	assertAbsent(t, sentinel, "JUnit report", junitReport.Bytes())
 	assertAbsent(t, sentinel, "masked curl", []byte(curl))
+	assertAbsent(t, sentinel, "pager output", pager)
 	for name, frame := range frames {
 		assertAbsent(t, sentinel, name+" frame", []byte(frame))
 	}
@@ -167,9 +181,14 @@ func renderLeakSweepFrames(
 	}})
 	_, _ = responsePane.Update(tui.SendResultMsg{Result: tuiengine.OutcomeToResult(out)})
 	_ = responsePane.Focus()
-	for range 5 {
+	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight}) // Headers
+	headersFrame := responsePane.View()
+	for range 3 {
 		_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	}
+	consoleFrame := responsePane.View()
+	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	timelineFrame := responsePane.View()
 
 	historyScreen := tuihistory.New(tui.ScreenEnv{
 		PaneEnv: paneEnv, Workspace: ws, ActiveEnv: env.ID,
@@ -186,9 +205,11 @@ func renderLeakSweepFrames(
 	}
 
 	return map[string]string{
-		"request":  requestPane.View(),
-		"response": responsePane.View(),
-		"history":  historyScreen.View(),
+		"request":           requestPane.View(),
+		"response headers":  headersFrame,
+		"response console":  consoleFrame,
+		"response timeline": timelineFrame,
+		"history":           historyScreen.View(),
 	}
 }
 

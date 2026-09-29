@@ -314,16 +314,16 @@ func (p *Pane) onOAuthEvents(m oauthEventsMsg) tea.Cmd {
 func oauthMessage(err error) string {
 	switch {
 	case errors.Is(err, oauth2.ErrTimeout):
-		return "Timed out waiting for the browser"
+		return "Timed out waiting for the browser. Check the sign-in page, then press g to try again."
 	case errors.Is(err, context.Canceled):
-		return "Cancelled"
+		return "Sign-in was cancelled. Press g to try again."
 	}
 	msg := err.Error()
 	msg = strings.TrimPrefix(msg, "oauth2: ")
 	if len(msg) > 140 {
 		msg = msg[:140]
 	}
-	return "Could not get a token: " + msg
+	return "Could not get a token: " + msg + ". Check the OAuth settings, then press g to try again."
 }
 
 func (p *Pane) onOAuthSaved(m oauthSavedMsg) tea.Cmd {

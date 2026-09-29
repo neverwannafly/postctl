@@ -66,6 +66,10 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 		return p.redoStep()
 	case "ctrl+o":
 		return p.openEditor()
+	case "e":
+		if !p.Editing() {
+			return p.openEditor()
+		}
 	case "ctrl+l":
 		p.stopViews()
 		p.setZone(zBar)

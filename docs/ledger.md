@@ -35,7 +35,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | WS8 docs/release | Gemini 3.8 Flash (high) | Done, merged to main | ws/8-docs | 2026-09-30 03:34 IST |
 | WS9 WebSocket requests | Sonnet 5.5 (high) | Done, merged to main (gRPC deferred to v1.1) | ws/9-websocket | 2026-09-30 03:15 IST |
 | WS6c runner + history TUI | Composer 2.5 (fast) | Done, merged to main | ws/6c-runner-history | 2026-09-30 03:20 IST |
-| QA/INT4 final integration | GPT-5.6 Sol | In progress | fix/security | 2026-09-30 03:31 IST |
+| QA/INT4 final integration | GPT-5.6 Sol | Fixes done, ready to merge | fix/security | 2026-09-30 03:45 IST |
 | QA-fixes | GPT-5.6 Sol (medium) | Done | qa/fixes | 2026-09-30 03:29 IST |
 
 ## Entries
@@ -591,3 +591,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: After each merge, `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed. Generator and TUI key tests passed after regeneration.
 - Blockers / questions: none.
 - Next: Create `fix/security` and verify each assigned review finding with a failing regression test before fixing it.
+
+### 2026-09-30 03:43 IST · INT4 · gpt-5.6 · PROGRESS
+- Branch/worktree: `fix/security` (`/Users/shubham/work/postctl-wt/fix-security`)
+- Did: Reproduced and fixed review findings #1, #2, #4, #5, #10, #11, and #12. Engine outcomes now carry the immutable history redactor; OAuth token fields hydrated from the in-memory secret store join its value set; response headers, Timeline, pager, console, tests, script failures, runner details, and summaries use that shared mask. The pager receives masked stdin and rejects shell/interpreter executables. Wired request-pane `e`, made the cited empty/error states actionable, and made OAuth state random for every browser flow. Added subcommand `--workspace`/`-w`, repeatable `run --var`, and explicit `env get` documentation.
+- Files: `internal/{engine,oauth2,qa,tui}/**`, `internal/cli/**`, `cmd/{postctl,genkeys}/**`, `README.md`, `docs/{cli,keys,ledger}.md`
+- Decisions: The live response body remains unmodified in memory; every requested external/rendered path uses `history.Redactor`. Configured OAuth state remains in the model for compatibility but is ignored for CSRF protection.
+- Tests: Confirmed failures first in `TestTimelineMasksCredentialURLsAndHeaders`, `TestResponseHeadersMaskSetCookie`, `TestHistoryMasksKeychainOAuthTokensByValue`, `TestPagerDoesNotCreateResponseTempFile`, `TestEditorShortcutEOpensCurrentRequestTab`, `TestOAuthErrorStatesNextAction`, and the authorization-flow state assertions. Added TUI output, pager stdin, CLI workspace/run-variable, and expanded repository leak-sweep regressions. `go test ./...` now passes.
+- Blockers / questions: none.
+- Next: Run the full build, race, and lint gate; commit and merge to main.
+
+### 2026-09-30 03:45 IST · INT4 · gpt-5.6 · DONE
+- Branch/worktree: `fix/security` (`/Users/shubham/work/postctl-wt/fix-security`, not pushed)
+- Did: Completed all assigned security, TUI consistency, and CLI/doc fixes. Expanded the repository leak sweep across query parameters, response cookies, OAuth token echoes in body/path history, script console, Timeline, and pager output. Regenerated the key reference after wiring `e`.
+- Files: see the preceding PROGRESS entry.
+- Decisions: All seven assigned review findings were real and fixed; none were skipped. Pager executables are restricted to known pager programs and receive masked content over stdin.
+- Tests: `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed. The generated-key consistency tests and expanded `internal/qa` leak sweep passed.
+- Blockers / questions: none.
+- Next: Merge `fix/security` into `main` with `--no-ff`, gate main, and remove this worktree.

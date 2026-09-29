@@ -2,23 +2,15 @@ package response
 
 import (
 	"strings"
+
+	"github.com/shubham/postctl/internal/history"
 )
 
-var secretHeaderNames = map[string]struct{}{
-	"authorization":       {},
-	"proxy-authorization": {},
-	"cookie":              {},
-	"x-api-key":           {},
-	"x-auth-token":        {},
-	"x-access-token":      {},
-	"api-key":             {},
-	"apikey":              {},
-}
+var headerRedactor = history.NewRedactor(nil)
 
 // SecretHeader reports whether a header name should be masked in the timeline.
 func SecretHeader(name string) bool {
-	_, ok := secretHeaderNames[strings.ToLower(strings.TrimSpace(name))]
-	return ok
+	return headerRedactor.Sensitive(name)
 }
 
 // SessionCookie reports whether a cookie value should be masked until revealed.

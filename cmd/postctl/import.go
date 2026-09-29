@@ -37,11 +37,23 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 		}
 		return exitOK
 	}
+	args, commandWorkspace, err := extractImportWorkspace(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v. Run: postctl import --help\n", err)
+		return exitUsage
+	}
+	if len(args) == 0 {
+		fmt.Fprintln(stderr, "Missing import source. Use postman or postman-local.")
+		return exitUsage
+	}
 	source := args[0]
 	options, err := parseImportOptions(args[1:])
 	if err != nil {
 		fmt.Fprintf(stderr, "%v. Run: postctl import --help\n", err)
 		return exitUsage
+	}
+	if commandWorkspace != "" {
+		options.workspace = commandWorkspace
 	}
 	switch source {
 	case "postman":
@@ -56,6 +68,35 @@ func runImport(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "Unknown import source %q. Use postman or postman-local.\n", source)
 		return exitUsage
 	}
+}
+
+func extractImportWorkspace(args []string) ([]string, string, error) {
+	out := make([]string, 0, len(args))
+	var workspace string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--workspace" || arg == "-w":
+			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+				return nil, "", fmt.Errorf("%s requires a value", arg)
+			}
+			i++
+			workspace = args[i]
+		case strings.HasPrefix(arg, "--workspace="):
+			workspace = strings.TrimPrefix(arg, "--workspace=")
+			if strings.TrimSpace(workspace) == "" {
+				return nil, "", fmt.Errorf("--workspace requires a value")
+			}
+		case strings.HasPrefix(arg, "-w="):
+			workspace = strings.TrimPrefix(arg, "-w=")
+			if strings.TrimSpace(workspace) == "" {
+				return nil, "", fmt.Errorf("-w requires a value")
+			}
+		default:
+			out = append(out, arg)
+		}
+	}
+	return out, workspace, nil
 }
 
 func parseImportOptions(args []string) (importOptions, error) {
@@ -85,6 +126,8 @@ func parseImportOptions(args []string) (importOptions, error) {
 			result.keepLiteralSecrets = true
 		case arg == "--workspace" || strings.HasPrefix(arg, "--workspace="):
 			result.workspace, err = takeValue(&index, arg, "--workspace")
+		case arg == "-w" || strings.HasPrefix(arg, "-w="):
+			result.workspace, err = takeValue(&index, arg, "-w")
 		case arg == "--partition" || strings.HasPrefix(arg, "--partition="):
 			result.partition, err = takeValue(&index, arg, "--partition")
 		case arg == "--env" || strings.HasPrefix(arg, "--env="):

@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -63,6 +64,25 @@ func TestPathResolution(t *testing.T) {
 	}
 	if _, err := resolvePath(ws, "nope"); err == nil || !strings.Contains(err.Error(), "Nothing matches") {
 		t.Fatalf("missing: %v", err)
+	}
+}
+
+func TestSubcommandWorkspaceFlags(t *testing.T) {
+	for _, args := range [][]string{
+		{"Payments", "--workspace", "/tmp/long"},
+		{"-w", "/tmp/short", "Payments"},
+		{"Payments", "--workspace=/tmp/equal"},
+	} {
+		got, rest, err := extractWorkspace(args)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got == "" || len(rest) != 1 || rest[0] != "Payments" {
+			t.Fatalf("extractWorkspace(%v) = %q, %v", args, got, rest)
+		}
+	}
+	if _, _, err := extractWorkspace([]string{"Payments", "-w"}); err == nil {
+		t.Fatal("missing -w value was accepted")
 	}
 }
 
@@ -182,6 +202,32 @@ func TestSendAndExitCodes(t *testing.T) {
 	code, _, errOut = exec(st, "send", "Payments")
 	if code != ExitUsage || !strings.Contains(errOut, "takes a request") {
 		t.Fatalf("collection send: %d %q", code, errOut)
+	}
+}
+
+func TestRunAcceptsRepeatableVarOverrides(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	t.Cleanup(srv.Close)
+	st := demoWorkspace(t, srv)
+	ws, err := st.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := ws.Collections[0].Requests()[0]
+	req.URL = model.ParseURL("{{baseUrl}}/charges/{{suffix}}/{{second}}")
+	if err := st.SaveCollection(context.Background(), ws.Collections[0]); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errOut := exec(st, "run", "Payments", "--var", "suffix=one", "--var", "second=two")
+	if code != ExitOK || errOut != "" {
+		t.Fatalf("run --var: code=%d err=%q", code, errOut)
+	}
+	if !slices.Contains(paths, "/charges/one/two") {
+		t.Fatalf("run did not apply local overrides: %q", paths)
 	}
 }
 

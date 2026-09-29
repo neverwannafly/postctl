@@ -228,6 +228,13 @@ func TestOAuthWaitingStateShowsLinkAndCancels(t *testing.T) {
 	close(block)
 }
 
+func TestOAuthErrorStatesNextAction(t *testing.T) {
+	got := oauthMessage(errors.New("oauth2: provider rejected the request"))
+	if !strings.Contains(got, "Try") && !strings.Contains(got, "Check") {
+		t.Fatalf("OAuth error has no next action: %q", got)
+	}
+}
+
 func TestOAuthFailureIsShownCalmly(t *testing.T) {
 	fetch := func(context.Context, *model.OAuth2Config, oauth2.FetchOptions) (*model.OAuth2Token, error) {
 		return nil, oauth2.ErrTimeout
