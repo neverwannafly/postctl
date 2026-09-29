@@ -1,0 +1,40 @@
+ postctl  payments-api                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Collections  11 requests    │ › 2 Request    3 Response                                                             
+   ▾ Payments                8 │ DELETE  {{baseUrl}}/v1/charges/{{chargeId}}                                           
+     ▾ Charges               4 │ Payments › Charges › Refund charge                                                    
+         GET   List charges    │                                                                                       
+         POST  Create charge   │ Nothing else set on this request.                                                     
+ ›       DEL   Refund charge   │                                                                                       
+         PATCH Update charge   │                                                                                       
+     ▾ Customers             3 │                                                                                       
+         POST  Create customer │                                                                                       
+         GET   Get customer    │                                                                                       
+         PUT   Replace custom… │                                                                                       
+       GET   Health            │                                                                                       
+   ▾ Internal admin          3 │                                                                                       
+       GET   List users        │                                                                                       
+       POST  Ban user          │                                                                                       
+       OPT   Preflight         │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Tab Next pane   ? Help   Ctrl-P Palette   E Environments   q Quit

@@ -1,0 +1,24 @@
+ postctl  payments-api                                                env  none
+ ──────────────────────────────────────────────────────────────────────────────
+ Welcome to postctl.                                                           
+                                                                               
+ There is no workspace in /tmp/postctl-test/payments-api yet. Creating your    
+ first request sets one up there. You can also bring in your Postman data:     
+                                                                               
+ › Create a request              Enter                                         
+   Import from the Postman app   postctl import postman-local                  
+   Import a Postman export       postctl import postman <file.json>            
+                                                                               
+ Everything is stored as plain files in /tmp/postctl-test/payments-api, so it  
+ works with git.                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+                                                                               
+ ──────────────────────────────────────────────────────────────────────────────
+ 
+ Enter Choose   ↑↓ Move   n New   Ctrl-P Palette   ? Help   q Quit

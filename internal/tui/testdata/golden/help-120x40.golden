@@ -1,0 +1,40 @@
+ postctl  payments-api                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Help                                                                                                         Esc Close
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Everywhere                                                   Collections                                            
+   Ctrl-P       Command palette                                 ↑            Move up                                   
+   E            Environments                                    ↓            Move down                                 
+   /            Filter requests                                 →            Unfold folder                             
+   Tab          Next pane                                       ←            Fold folder or go to parent               
+   Shift-Tab    Previous pane                                   Enter        Open request or toggle folder             
+   1 2 3        Jump to Collections, Request, Response          PgUp PgDn    Page up or down                           
+   Ctrl-B       Show or hide collections                        Home         First row                                 
+   Ctrl-R       Reload from disk                                n            New request, folder or collection         
+   ?            Help                                            r            Rename                                    
+   q            Quit                                            D            Duplicate                                 
+                                                                m            Move to another folder                    
+   Request and response                                         d            Delete                                    
+   Ctrl-Enter   Send request (also Ctrl-S)                      Alt-↑ Alt-↓  Move up or down in its folder             
+   e            Edit in $EDITOR                                                                                        
+                                                                Lists and dialogs                                      
+   Collections (focused)                                        Enter        Choose                                    
+   Enter        Fold                                            Esc          Close or cancel                           
+   n            New                                             ↑ ↓          Move                                      
+   r            Rename                                                                                                 
+   d            Delete                                                                                                 
+   m            Move                                                                                                   
+   D            Duplicate                                                                                              
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+                                                                                                                       
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Esc Close help   ↑↓ Scroll

@@ -1,0 +1,40 @@
+ postctl  payments-api                                                                                        env  none
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ › Collections  11 requests    │   2 Request    3 Response                                                             
+ › ▾ Payments                8 │ Payments                                                                              
+     ▾ Charges               4 │ A folder or collection. Enter folds or unfolds it.                                    
+         GET   List charges    │                                                                                       
+         POST  Create charge   │                                                                                       
+         DEL   Refund charge   │                                                                                       
+         PATCH Update charge   │                                                                                       
+     ▾ Customers             3 │                                                                                       
+         POST  Create customer │                                                                                       
+         GET   Get customer    │                                                                                       
+         PUT   Replace custom… │                                                                                       
+       GET   Health            │                                                                                       
+   ▾ Internal admin          3 │                                                                                       
+       GET   List users        │                                                                                       
+       POST  Ban user          │                                                                                       
+       OPT   Preflight         │                                                                                       
+   ! Problems (1)              │                                                                                       
+   × …ents/charges/create.yaml │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+                               │                                                                                       
+ ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ 
+ Enter Fold   n New   / Filter   r Rename   d Delete   m Move   D Duplicate   ? Help   Ctrl-P Palette   E Environments

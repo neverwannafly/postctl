@@ -1,0 +1,24 @@
+ postctl  payments-api                                                env  none
+ ──────────────────────────────────────────────────────────────────────────────
+ Help                                                                 Esc Close
+ ──────────────────────────────────────────────────────────────────────────────
+   Everywhere                                                                  
+   Ctrl-P       Command palette                                                
+   E            Environments                                                   
+   /            Filter requests                                                
+   Tab          Next pane                                                      
+   Shift-Tab    Previous pane                                                  
+   1 2 3        Jump to Collections, Request, Response                         
+   Ctrl-B       Show or hide collections                                       
+   Ctrl-R       Reload from disk                                               
+   ?            Help                                                           
+   q            Quit                                                           
+                                                                               
+   Collections                                                                 
+   ↑            Move up                                                        
+   ↓            Move down                                                      
+   →            Unfold folder                                                  
+   1-16 of 45 lines, scroll for more                                           
+ ──────────────────────────────────────────────────────────────────────────────
+ 
+ Esc Close help   ↑↓ Scroll
