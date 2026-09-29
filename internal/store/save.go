@@ -837,6 +837,32 @@ func collectionRefs(c *model.Collection) []model.SecretRef {
 	return refs
 }
 
+// DeleteRemovedSecrets deletes from the SecretStore the secrets that old (a
+// collection as it was loaded before a replacement such as a re-import)
+// referenced and the collection as it is now on disk no longer does: the OAuth
+// 2.0 tokens and secret variables of requests, folders and variables that were
+// dropped. Call it after saving. Nothing is deleted when the saved collection
+// cannot be read back; delete failures are ignored.
+func (s *Store) DeleteRemovedSecrets(ctx context.Context, old *model.Collection) {
+	if old == nil {
+		return
+	}
+	unlock, err := s.lock()
+	if err != nil {
+		return
+	}
+	defer unlock()
+	current, err := s.LoadCollection(old.ID)
+	if err != nil {
+		return
+	}
+	keep := map[model.SecretRef]bool{}
+	for _, ref := range collectionRefs(current) {
+		keep[ref] = true
+	}
+	s.deleteRefs(ctx, collectionRefs(old), keep)
+}
+
 // deleteRefs removes refs from the SecretStore except those in keep.
 func (s *Store) deleteRefs(ctx context.Context, refs []model.SecretRef, keep map[model.SecretRef]bool) {
 	if s.secrets == nil {

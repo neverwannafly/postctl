@@ -116,11 +116,8 @@ func (r Report) WriteText(w io.Writer) {
 		r.Counts.PreScripts, r.Counts.TestScripts, r.Counts.Examples)
 	fmt.Fprintf(w, "Secrets %d %s · %d OAuth tokens %s\n",
 		r.Counts.SecretsMoved, moved, r.Counts.OAuthTokens, kept)
-	fmt.Fprintf(w, "● %d added · %d changed · %d kept (not in source)\n",
-		len(r.Changes.Added), len(r.Changes.Changed), len(r.Changes.Kept))
-	if len(r.Changes.Removed) > 0 {
-		fmt.Fprintf(w, "× %d removed\n", len(r.Changes.Removed))
-	}
+	fmt.Fprintf(w, "● %d added · %d changed · %d removed · %d kept (not in source)\n",
+		len(r.Changes.Added), len(r.Changes.Changed), len(r.Changes.Removed), len(r.Changes.Kept))
 	if len(r.Warnings) > 0 {
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "Warnings")

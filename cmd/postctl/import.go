@@ -105,6 +105,10 @@ func parseImportOptions(args []string) (importOptions, error) {
 	return result, nil
 }
 
+// importSecrets returns the secret store imports write to: the Keychain.
+// Tests replace it so they never touch the real one.
+var importSecrets = func() store.SecretStore { return store.NewKeychain("") }
+
 func importPostmanFiles(options importOptions, stdout, stderr io.Writer) int {
 	paths := append([]string{}, options.paths...)
 	paths = append(paths, options.envPaths...)
@@ -193,11 +197,12 @@ func finishImport(options importOptions, documents []*postman.Document, report p
 		fmt.Fprintln(stderr, "Could not open the target workspace")
 		return exitUsage
 	}
+	replaced := collectionsBeingReplaced(workspace, documents)
 	postman.MergeDocuments(workspace, documents, &report)
 	if !options.dryRun {
 		if workspaceStore == nil {
 			workspaceStore, err = store.Init(root, filepath.Base(root),
-				store.WithSecretStore(store.NewKeychain("")))
+				store.WithSecretStore(importSecrets()))
 			if err != nil {
 				fmt.Fprintln(stderr, "Could not create the target workspace")
 				return exitUsage
@@ -207,12 +212,35 @@ func finishImport(options importOptions, documents []*postman.Document, report p
 			fmt.Fprintln(stderr, "Import could not be saved")
 			return exitPartial
 		}
+		// Items the export dropped are gone from disk; drop their Keychain
+		// secrets too, so nothing credential-shaped outlives its node.
+		for _, old := range replaced {
+			workspaceStore.DeleteRemovedSecrets(context.Background(), old)
+		}
 	}
 	writeImportReport(report, options.json, stdout)
 	if len(report.Failures) > 0 {
 		return exitPartial
 	}
 	return exitOK
+}
+
+// collectionsBeingReplaced returns copies of the workspace's collections that a
+// document is about to overwrite, taken before the merge.
+func collectionsBeingReplaced(workspace *model.Workspace, documents []*postman.Document) []*model.Collection {
+	incoming := map[model.ID]bool{}
+	for _, document := range documents {
+		if document.Kind == postman.KindCollection {
+			incoming[document.Collection.ID] = true
+		}
+	}
+	var out []*model.Collection
+	for _, collection := range workspace.Collections {
+		if incoming[collection.ID] {
+			out = append(out, collection.Clone())
+		}
+	}
+	return out
 }
 
 func openImportWorkspace(explicit string) (*model.Workspace, *store.Store, string, error) {
@@ -243,7 +271,7 @@ func openImportWorkspace(explicit string) (*model.Workspace, *store.Store, strin
 	if !initialized {
 		return &model.Workspace{ID: model.NewID(), Name: filepath.Base(root)}, nil, root, nil
 	}
-	workspaceStore, err := store.Open(root, store.WithSecretStore(store.NewKeychain("")))
+	workspaceStore, err := store.Open(root, store.WithSecretStore(importSecrets()))
 	if err != nil {
 		return nil, nil, "", err
 	}
