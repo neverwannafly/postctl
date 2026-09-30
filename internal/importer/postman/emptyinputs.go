@@ -240,10 +240,11 @@ func (s *inputScan) refs(text string) {
 
 // shellWord quotes s for a shell only when it needs it.
 func shellWord(s string) string {
-	if s != "" && strings.IndexFunc(s, func(r rune) bool {
-		return !(r == '-' || r == '_' || r == '.' || r == '/' || r == ':' ||
-			(r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z'))
-	}) < 0 {
+	safe := func(r rune) bool {
+		return r == '-' || r == '_' || r == '.' || r == '/' || r == ':' ||
+			(r >= '0' && r <= '9') || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+	}
+	if s != "" && strings.IndexFunc(s, func(r rune) bool { return !safe(r) }) < 0 {
 		return s
 	}
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
