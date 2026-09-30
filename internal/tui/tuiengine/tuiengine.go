@@ -1,6 +1,7 @@
 // Package tuiengine adapts the engine to the TUI's [tui.Sender] contract. The
-// shell (cmd/postctl) builds one with [New] and hands it to the TUI; the TUI
-// never imports the engine itself.
+// shell (cmd/postctl) builds one with [New] and hands it to the TUI. The send
+// path (tui.Sender) never imports the engine; only the runner types
+// (internal/tui/runner.go, internal/tui/runner) use engine run events.
 package tuiengine
 
 import (

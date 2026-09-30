@@ -15,7 +15,8 @@ sum, err := eng.Run(ctx, engine.RunInput{Collection: c, Environment: env, Iterat
 `HTTP` (`httpx.NewClient(Version)`), `Cookies` (`httpx.NewCookieJar(root)`),
 `OAuth2` (an `oauth2.Source` over `Secrets`), `History` (a log under
 `.postctl/history`; `DisableHistory` turns it off), `Version`, `Clock`,
-`ScriptTimeout`, `MaxBodyBytes`, `Defaults` (workspace request settings).
+`ScriptTimeout`, `ScriptMemoryLimit` (zero means `script.DefaultMemoryLimit`,
+negative disables), `MaxBodyBytes`, `Defaults` (workspace request settings).
 
 An `Engine` is safe for concurrent use. Any number of sends and runs may
 overlap; see [Persistence](#persistence).
@@ -55,7 +56,7 @@ sequenceDiagram
         Note over E: an error keeps response, tests so far and variables
     end
     E-->>C: "Saving variables" (only if something changed)
-    E->>D: SaveEnvironment / SaveCollectionVariables / SaveGlobals
+    E->>D: Update{Environment,Collection,Globals}Variables (re-read under the store lock)
     E->>D: history.Append (redacted)
     E-->>C: Outcome
 ```
@@ -99,8 +100,10 @@ Details that matter:
 | `ScriptError` | the failure that ended the pipeline (pre-request) or was recorded (test): event, origin, text, `TimedOut` |
 | `Skipped`, `NextRequest` | from `skipRequest` / `setNextRequest` (`""` means `null`) |
 | `Warnings` | unresolved variables, missing secrets, a failed save or history write; never secret values |
+| `Redactor` | `*history.Redactor` holding this send's known secret values and credential names; clients mask every visible output with it |
+| `SkipReason` | why a request was skipped (empty for a script-requested skip); safe to show |
 | `Persisted` | scopes written: `environment`, `collection`, `globals` |
-| `HistoryID`, `Err`, `Duration`, `Path` | |
+| `RequestID`, `RequestName`, `Path`, `Iteration`, `Started`, `Duration`, `HistoryID`, `Err` | identity, timing, the history entry, and the resolution, transport, OAuth 2.0 or cancellation error |
 
 `Outcome.Failed()` is true for a transport error, a script error or a failing
 test.

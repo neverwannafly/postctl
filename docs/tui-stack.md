@@ -12,7 +12,7 @@ This document records the implementation stack for the macOS-first Go TUI descri
 | TUI runtime | Bubble Tea v2 (`charm.land/bubbletea/v2`) | Event loop and model/update/view architecture. Model user-visible states explicitly and run HTTP, scripts, disk, and Keychain work as asynchronous commands that return typed messages. | v1 |
 | UI components | Bubbles v2 (`charm.land/bubbles/v2`) | List, table, viewport, spinner, text input, textarea, help, key bindings. Use components where their interaction model fits; keep domain state in our feature models. | v1 |
 | Styling/layout | Lip Gloss v2 (`charm.land/lipgloss/v2`) | Terminal-cell-aware layout, padding, borders, alignment, styling, color-profile downsampling, light/dark-aware colors. Semantic styles live in one theme package (`internal/ui`). | v1 |
-| Forms | Huh v2 (`charm.land/huh/v2`) | Focused inputs, selection, confirmation, validation, accessible mode. Used for settings and confirmations, not for navigation. | When forms are needed |
+| Forms | none yet (Huh v2, `charm.land/huh/v2`, was considered) | Not a dependency today: settings and confirmations are built from Bubbles and our own dialogs. Add Huh only with a reason recorded here. | Not used |
 | HTTP | Go `net/http`, `net/http/httptrace`, `net/url`, `crypto/tls` | Custom transport for DNS/connect/TLS/TTFB timings, cookie jar, proxy, client certificates, redirect control, request contexts and timeouts. Views never call HTTP directly. | v1 |
 | HTTP compression | `github.com/andybalholm/brotli` | Small, pure-Go Brotli decoder used alongside the standard library's gzip and deflate support. | v1 |
 | Cookie policy | `golang.org/x/net/publicsuffix` | Mozilla public-suffix data for rejecting unsafe cross-site cookie domains in the persistent workspace jar. | v1 |
@@ -21,7 +21,7 @@ This document records the implementation stack for the macOS-first Go TUI descri
 | JSON query | [`github.com/tidwall/gjson`](https://github.com/tidwall/gjson) | Path filter in the response viewer (`data.items.#.id`) without unmarshalling into Go structures; tolerant of large bodies and fast on partial reads. Read-only, so it cannot mutate responses. | Viewer workstream |
 | Storage | YAML files via `go.yaml.in/yaml/v3` | One YAML file per request, scripts as real `.js` files, deterministic output, strict decoding. See [model.md](model.md). | v1 |
 | Secret store | macOS Keychain behind the `store.SecretStore` interface | `/usr/bin/security` invoked through `os/exec` without a shell; secrets go over stdin (`security -i`), base64-encoded, never argv. `store.MemorySecrets` is the test fake. | v1 |
-| Logging | Go `log/slog` to a file outside the TUI renderer | Structured diagnostics with redaction. Never log secret values, tokens, header values, request/response bodies, or query strings. | v1 |
+| Logging | none yet (Go `log/slog` to a file outside the renderer is the intended design) | No diagnostics log exists today; nothing in the code imports `log/slog`. If one is added: structured, redacted, never secret values, tokens, header values, bodies or query strings. | Not built |
 | WebSocket | `github.com/coder/websocket` (v1.8.14) | Pure-Go, context-aware client with a small API: `Dial` with headers, an `http.Client` (cookie jar, TLS settings, proxy), subprotocols, ping/pong hooks, close codes, and a read limit. `internal/wsx` wraps it; nothing else imports it. The standard library has no WebSocket client, and `golang.org/x/net/websocket` is deprecated and lacks context support, close codes and ping hooks. | v1 (WS9) |
 | Test support | Go `testing`, `net/http/httptest`, fakes behind narrow interfaces | Verify pipeline ordering, auth application, script semantics, and storage round trips without the network or Keychain. | v1 |
 
@@ -109,7 +109,7 @@ Cookie manager: `↑` `↓` `PgUp` `PgDn` `Home` `End` move, `r` reveal value, `
 
 ## Versioning and dependency policy
 
-- Use the stable v2 module paths: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, `charm.land/lipgloss/v2`, and `charm.land/huh/v2`.
+- Use the stable v2 module paths: `charm.land/bubbletea/v2`, `charm.land/bubbles/v2`, and `charm.land/lipgloss/v2` (`charm.land/huh/v2` if Huh is ever adopted).
 - Pin compatible releases together in `go.mod`; update them as a set after reviewing each upstream upgrade guide. Bubble Tea v2, Bubbles v2, and Lip Gloss v2 introduced coordinated import/API changes. See the [Bubbles v2 upgrade guide](https://github.com/charmbracelet/bubbles/blob/main/UPGRADE_GUIDE_V2.md) and [Lip Gloss v2 upgrade guide](https://github.com/charmbracelet/lipgloss/blob/main/UPGRADE_GUIDE_V2.md).
 - Prefer the Go standard library until a real requirement justifies a third-party dependency. Each new dependency needs a reason in this document (what it does, why not stdlib, why this library).
 - Third-party dependencies must be pure Go (no cgo) so `CGO_ENABLED=0` builds keep working.

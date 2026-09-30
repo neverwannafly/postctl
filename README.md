@@ -185,7 +185,7 @@ pm.execution.setNextRequest("Next Request Name");
 ```
 
 - **Supported scopes:** `pm.environment`, `pm.collectionVariables`, `pm.globals`, `pm.variables`, `pm.iterationData`.
-- **Bundled npm libraries:** `lodash` (4.17.21), `moment` (2.30.1), `crypto-js` (4.2.0), `uuid` (v4), `chai` (4.3.10), `ajv` (6.12.6), `xml2js` (0.6.2).
+- **Bundled npm libraries:** `lodash` (4.17.21), `moment` (2.30.1), `crypto-js` (4.2.0), `uuid` (8.3.2), `chai` (4.4.1), `ajv` (6.12.6), `xml2js` (0.6.2).
 - **Flow control:** `pm.execution.skipRequest()` and `pm.execution.setNextRequest(name | null)`.
 
 See [`docs/scripting.md`](docs/scripting.md) for the complete API contract.
@@ -215,7 +215,7 @@ See [`docs/scripting.md`](docs/scripting.md) for the complete API contract.
 
 ## Development
 
-`postctl` is written in Go 1.26 using Charm v2 modules (`charm.land/bubbletea/v2`, `lipgloss/v2`, `bubbles/v2`, `huh/v2`).
+`postctl` is written in Go 1.26 using Charm v2 modules (`charm.land/bubbletea/v2`, `lipgloss/v2`, `bubbles/v2`).
 
 New contributors should start with [`CONTRIBUTING.md`](CONTRIBUTING.md), follow
 the guided first hour in [`docs/onboarding.md`](docs/onboarding.md), and use the

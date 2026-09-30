@@ -1,0 +1,14 @@
+---
+description: Importer - JSON-shaped values across boundaries, real-path tests
+globs: internal/importer/**,cmd/postctl/import*.go
+alwaysApply: false
+---
+
+# Importer rules
+
+Full guide: [internal/importer/AGENTS.md](mdc:internal/importer/AGENTS.md).
+
+- Values crossing the `postmanlocal` to `postman` boundary are JSON-shaped (`map[string]any`, `[]any`, `string`, `float64`/`json.Number`, `bool`, `nil`) or normalized at the boundary. A Go `[]string` once made `import postman-local` drop every script.
+- Never treat an unknown dynamic type as empty; report it (path and code, no values).
+- Test the path users run: `postmanlocal` output through `ConvertObject`, asserting non-zero counts; also the JSON-file path.
+- Reports and errors: counts, names, paths only. Literal credentials go through `moveAuthSecrets` (plan D2). Re-import overwrites by stable ID.

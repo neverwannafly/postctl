@@ -1,0 +1,16 @@
+---
+description: TUI work - pure View, design language, key reference regeneration
+globs: internal/tui/**,internal/ui/**
+alwaysApply: false
+---
+
+# TUI rules
+
+Full guide: [internal/tui/AGENTS.md](mdc:internal/tui/AGENTS.md), [docs/design-language.md](mdc:docs/design-language.md).
+
+- `View` renders state only: no I/O, no mutation (not even scroll offsets). Effects are `tea.Cmd`s returning typed messages. Add a purity test for new panes.
+- Semantic tokens from `internal/ui` only. Never color alone: pair with text, prefix or glyph. `NO_COLOR`, `--ascii`, `--accessible` must work; usable at 80x24.
+- Every empty, error and waiting state says what happened and the next action. Standard keys, no vim. Never advertise a key that is not wired.
+- Changed a key? Edit `KeyCatalog` in `cmd/genkeys/main.go`, then `task keys` and commit `docs/keys.md`.
+- Masked secrets (`••••`, ASCII `****`) in every frame; extend the `internal/qa` leak sweep for new views.
+- Goldens: `go test <pkg> -update`, then read the diff (3 sizes, 3 looks). `task tui:smoke` for an offline pty check.

@@ -34,6 +34,24 @@ tasks:
     cmds:
       - golangci-lint run
 
+  agents:check:
+    desc: Full definition-of-done gate (build, race tests, lint); run before every merge
+    cmds:
+      - go build ./...
+      - go test -race ./...
+      - golangci-lint run --allow-parallel-runners
+
+  keys:
+    desc: Regenerate docs/keys.md from the key catalog in cmd/genkeys
+    cmds:
+      - go generate ./cmd/genkeys
+
+  tui:smoke:
+    desc: Drive the built TUI through a pty with the fake sender (offline, no network)
+    deps: [build]
+    cmds:
+      - python3 scripts/tui_smoke.py {{.BIN}}
+
   fmt:
     desc: Format Go code
     cmds:

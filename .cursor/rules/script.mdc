@@ -1,0 +1,14 @@
+---
+description: goja script sandbox - limits, no new globals, guard tests
+globs: internal/script/**
+alwaysApply: false
+---
+
+# Script sandbox rules
+
+Full guide: [internal/script/AGENTS.md](mdc:internal/script/AGENTS.md), contract: [docs/scripting.md](mdc:docs/scripting.md).
+
+- Do not add globals or host functions to the sandbox. New bridge functions must be listed in `bridgeFunctionNames` (`sandbox_globals_test.go`); `TestSandboxHostGlobalIsNotScriptVisible` must pass.
+- Keep every limit (5 s timeout, 1.5 s abandon grace, 500 ms wrap-up, 1 s regexp match, 10 000 call depth, 256 MiB heap growth, 8 and 256 `pm.sendRequest`). A new blocking or allocating native call needs its own bound and a test like `TestInfiniteLoopVariantsTerminate`.
+- `pm.*` lives in `assets/sandbox/NN-*.js` (filename order is load order). Add a corpus case and run `go test ./internal/script -run TestCorpus -update`; update the table in `docs/scripting.md`.
+- Script console and error text may contain secrets: never log it; presenters mask it.

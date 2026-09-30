@@ -1,0 +1,16 @@
+---
+description: Test conventions - synthetic data, in-memory secrets, leak sweep, goldens
+globs: **/*_test.go
+alwaysApply: false
+---
+
+# Test rules
+
+See the Testing patterns section of [AGENTS.md](mdc:AGENTS.md).
+
+- Synthetic data only (`example.test` hosts, invented tokens). Failure messages must not echo document, header or secret content.
+- Secrets: `store.NewMemorySecrets()`. Never the real Keychain; never set `POSTCTL_KEYCHAIN_TESTS`.
+- HTTP: `httptest` servers, never the public network. Files: `t.TempDir()`.
+- New output path (screen, report, export, error text)? Extend `internal/qa/secret_leak_test.go`.
+- Real-data tests use gitignored `testdata/private/`, skip when absent, print counts only, and run the same path users run.
+- Goldens: use the package's flag (`-update`, or `UPDATE_GOLDEN=1` for `internal/importer/postman` and `internal/tui/runner`) and review the diff. Keep `-race` clean.
