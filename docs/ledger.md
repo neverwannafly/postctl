@@ -43,6 +43,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | FIX-SEC security fixes | GPT-5.6 Sol | Done, merged to main | fix/security | 2026-09-30 03:45 IST |
 | FIX-A data-integrity fixes | Sonnet 5.5 | Done, merged to main (INT5) | fix/data | 2026-09-30 04:00 IST |
 | INT5 integration (fix/data, sandbox `host`, real-data check) | Sonnet 5.5 | Done, on main | main | 2026-09-30 04:08 IST |
+| DOC-ARCH architecture/onboarding | GPT-5.6 Sol | In progress | docs/arch | 2026-09-30 13:29 IST |
 
 ## Entries
 
@@ -666,3 +667,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` passed after the merge, after the sandbox change and on the final tree.
 - Blockers / questions: none.
 - Next: none. Follow-up: `tuiengine` shows a memory-limit stop as a plain script error (FIX-A note).
+
+### 2026-09-30 13:29 IST · DOC-ARCH · gpt-5.6 · STARTED
+- Branch/worktree: `docs/arch` (`/Users/shubham/work/postctl-wt/doc-arch`)
+- Did: Traced startup, send, scripts, runner, importer, storage, TUI, OAuth/secrets, CLI and report paths from their real entry points. Drafted the architecture, flow, onboarding and contributor documentation and added a parser-backed Go path/symbol reference test.
+- Files: `CONTRIBUTING.md`, `README.md`, `docs/{README,architecture,onboarding}.md`, `docs/flows/*.md`, `internal/qa/docs_refs_test.go`, `docs/ledger.md`
+- Decisions: Document the actual dependency graph, including deliberate shared-contract edges; no import-direction violations found. Local IndexedDB extraction is described as normalizing decoded data to JSON-shaped values before stable conversion.
+- Tests: `go list` direct-import audit passed; `TestArchitectureDocsReferencesExist` passed.
+- Blockers / questions: none.
+- Next: Run documented commands and gates, incorporate DOC-AGENTS/FIX-IMP changes if merged, commit, merge and gate main.
+
+### 2026-09-30 13:29 IST · DOC-ARCH · gpt-5.6 · PROGRESS
+- Branch/worktree: `docs/arch` (`/Users/shubham/work/postctl-wt/doc-arch`)
+- Did: Completed the first documentation pass and verified all backticked Go file/symbol references. Audited direct imports with `go list`; the engine remains independent of TUI/Charm and no forbidden direction was found.
+- Files: same as the STARTED entry.
+- Decisions: Keep each flow below 250 lines (current maximum 110). Explain secrets at both hydration and masking boundaries in the relevant flows.
+- Tests: `task build`, `go build ./...`, `go test -race ./...`, `golangci-lint run`, storage and script golden update checks, `go generate ./cmd/genkeys` with a clean generated diff, explicit-workspace `postctl ls`, and a pseudo-terminal `POSTCTL_FAKE_SENDER=1` TUI launch all passed.
+- Blockers / questions: FIX-IMP and DOC-AGENTS are not merged yet.
+- Next: Commit this branch, then reconcile and merge after the concurrent owners finish.
