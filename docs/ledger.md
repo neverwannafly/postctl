@@ -43,6 +43,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | FIX-SEC security fixes | GPT-5.6 Sol | Done, merged to main | fix/security | 2026-09-30 03:45 IST |
 | FIX-A data-integrity fixes | Sonnet 5.5 | Done, merged to main (INT5) | fix/data | 2026-09-30 04:00 IST |
 | INT5 integration (fix/data, sandbox `host`, real-data check) | Sonnet 5.5 | Done, on main | main | 2026-09-30 04:08 IST |
+| FIX-IMP import fixes (script loss, secret-by-name, empty-input warnings, `env set --secret` stdin) | Sonnet 5.5 | In progress | fix/import | 2026-09-30 13:23 IST |
 
 ## Entries
 
@@ -666,3 +667,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` passed after the merge, after the sandbox change and on the final tree.
 - Blockers / questions: none.
 - Next: none. Follow-up: `tuiengine` shows a memory-limit stop as a plain script error (FIX-A note).
+
+### 2026-09-30 13:23 IST · FIX-IMP · sonnet-5.5 · STARTED
+- Branch/worktree: fix/import (`~/work/postctl-wt/fix-import`, from `main` at 40661a8)
+- Did: Read AGENTS.md, plan §0 (Q3, D2, R3, R4), model.md, postman-local-format.md and the ledger tail. Traced Bug 1 to the code: `postmanlocal.copyEvents` emits `exec` as a Go `[]string`, and `postman.array` accepts only `[]any`, so `combineScripts` joins nothing for the in-memory path. The existing `TestBuildResultPreservesTreeAndScripts` asserted `[]string`, which pinned the bug. The V8 decoder also emits `int64`, `uint64`, `time.Time` and `[]byte`, which are not JSON-shaped either.
+- Files: `docs/ledger.md`
+- Decisions: fix both sides (extractor emits JSON-shaped values only; `ConvertObject` normalizes through a JSON round-trip). The name heuristic lives in the importer; `--no-mark-secrets` opts out. `charmbracelet/x/term` (already in go.mod as an indirect dependency of Bubble Tea) is promoted to a direct dependency for the no-echo prompt, so no new module is added.
+- Tests: n/a yet
+- Blockers / questions: none
+- Next: Bug 1, then features 2, 3 and fix 4, then the private in-memory test, docs, gates, merge.
