@@ -59,7 +59,7 @@ task tui:smoke                          # build, then drive the TUI through a pt
   The CLI has no fake sender: `postctl send` goes to the network, so point `--var baseUrl=http://127.0.0.1:PORT` at a local `httptest`-style server. TUI checks without a human: golden tests, or `task tui:smoke` (`scripts/tui_smoke.py` copies a synthetic workspace, opens a request, presses Ctrl-S, prints PASS or FAIL only).
 - **Private-data tests** read the gitignored `testdata/private/staging` at the repo root (and `internal/importer/postmanlocal/testdata/private`). They skip when it is absent (`TestPrivateCollections`, `TestPrivateStaging`, `TestPrivateIndexedDB`); `TestPrivateStagingLs` in `internal/cli` reads a hard-coded main-checkout path. Worktrees do not have the data. To run them there, `cp -R` the directory in; a symlink works too (both are ignored). Output must stay counts and names only.
 - `POSTCTL_KEYCHAIN_TESTS=1` enables a test against the **real** Keychain (`internal/store`). Do not set it.
-- `task assets` rebuilds embedded JS bundles (needs a modern node, per the ledger node 22 via nvm; not re-run when this guide was written). Editing `internal/script/assets/sandbox/*.js` does not need it.
+- `task assets` rebuilds embedded JS bundles and needs node 22: the default node on the dev machine is older, so run `nvm use 22` first. The output is reproducible (no diff against the committed bundles). Editing `internal/script/assets/sandbox/*.js` does not need it.
 
 ## Definition of done
 
