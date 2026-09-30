@@ -1,0 +1,16 @@
+---
+description: postctl core rules - read AGENTS.md; never leak secrets; definition of done
+alwaysApply: true
+---
+
+# postctl core
+
+Read [AGENTS.md](mdc:AGENTS.md) before changing code (repo map, commands, invariants, pitfalls, checklists). `docs/plan.md` §0 decisions are binding; changing one needs the user.
+
+Top rules:
+
+- **Never** print, log, commit, or put in the ledger/chat/tests/goldens: variable values, tokens, header values, request or response bodies, cookies, or URLs with query strings. Counts, key names and structure only.
+- Fixtures are synthetic. `testdata/private/` is gitignored real data; tests using it must skip when absent. Never touch the real Keychain in tests (use `store.MemorySecrets`).
+- `internal/engine` never imports TUI or Charm packages. `View` is pure. The store is the only writer of workspace files.
+- Mask every output path with `history.Redactor`; extend `internal/qa/secret_leak_test.go` when you add one.
+- Gate before done: `task agents:check` (`go build ./...`, `go test -race ./...`, `golangci-lint run`). Do not push. Append to `docs/ledger.md`.

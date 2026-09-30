@@ -2,7 +2,7 @@
 /dist/
 /postctl
 .postctl/
-testdata/private/
+**/testdata/private
 *.test
 *.out
 .DS_Store
