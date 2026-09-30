@@ -217,6 +217,11 @@ See [`docs/scripting.md`](docs/scripting.md) for the complete API contract.
 
 `postctl` is written in Go 1.26 using Charm v2 modules (`charm.land/bubbletea/v2`, `lipgloss/v2`, `bubbles/v2`, `huh/v2`).
 
+New contributors should start with [`CONTRIBUTING.md`](CONTRIBUTING.md), follow
+the guided first hour in [`docs/onboarding.md`](docs/onboarding.md), and use the
+[`architecture guide`](docs/architecture.md) plus its end-to-end flow
+walkthroughs. The complete documentation index is [`docs/README.md`](docs/README.md).
+
 ```sh
 # Run tests and linter
 go build ./...

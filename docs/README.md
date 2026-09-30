@@ -1,23 +1,48 @@
-# postctl Documentation Index
+# postctl documentation
 
-This directory contains technical specifications, architecture decisions, user guides, and reference material for `postctl`.
+## Users
 
-## Binding References for Contributors
+- [README](../README.md) — install, quick start and common commands.
+- [CLI reference](cli.md) — flags, output, reporters and exit codes.
+- [Keyboard reference](keys.md) — generated shortcuts for every screen.
+- [Scripting reference](scripting.md) — supported Postman `pm.*` behavior.
+- [Migrate from Postman](migrating-from-postman.md) — imports and compatibility.
+- [Data model](model.md) — workspace files and domain concepts.
 
-The following documents establish binding contracts for design, domain models, dependencies, architecture, and engineering process. All pull requests and code modifications must conform to them:
+## Contributors
 
-- **[`plan.md`](plan.md)**: Architectural blueprint, scope, goals, and non-goals. **Section §0 (Decisions locked) is strictly binding** over all other design decisions.
-- **[`model.md`](model.md)**: The domain model schema and on-disk YAML/JS file layout (`internal/model`, `internal/store`). Struct tags and file formats are binding contracts.
-- **[`design-language.md`](design-language.md)**: Clear Signal design system tokens, responsive layout rules, semantic color mappings, and accessibility constraints. Binding for all UI and visual work.
-- **[`tui-stack.md`](tui-stack.md)**: Technology stack, approved dependencies, Charm v2 library pinning, and Go stdlib-first architecture boundaries.
-- **[`scripting.md`](scripting.md)**: The behavioral contract for the ECMAScript `pm.*` sandbox, Chai assertions, and bundled npm packages.
-- **[`ledger.md`](ledger.md)**: Append-only ledger recording workstream status, progress milestones, and design deviations. Binding work tracking protocol.
-- **[`briefs/`](briefs/)**: Workstream briefs defining file ownership boundaries, milestones, and acceptance criteria for contributors.
+Start with [CONTRIBUTING](../CONTRIBUTING.md), then spend an hour with
+[onboarding](onboarding.md). [Architecture](architecture.md) explains package
+boundaries, contracts, wiring, concurrency, errors, and state.
 
-## Guides and Reference Manuals
+End-to-end walkthroughs:
 
-- **[`keys.md`](keys.md)**: Complete keyboard shortcut reference across all contexts (global, tree, request pane, response viewer, environment editor, cookies, runner, history). Generated and verified against the codebase.
-- **[`cli.md`](cli.md)**: Reference manual for linear commands (`ls`, `send`, `run`, `env`, `curl`), reporter configurations (CLI, NDJSON, JUnit), and process exit codes.
-- **[`migrating-from-postman.md`](migrating-from-postman.md)**: Migration guide from Postman and Newman, concept mappings, automated secrets extraction to Keychain (D2), and feature compatibility.
-- **[`engine.md`](engine.md)**: Internal execution pipeline sequence, script step progression, variable persistence semantics, and runner lifecycle.
-- **[`postman-local-format.md`](postman-local-format.md)**: Technical breakdown of Chromium IndexedDB LevelDB extraction from Postman Desktop on macOS.
+- [Startup](flows/startup.md)
+- [Send a request](flows/send-request.md)
+- [Run scripts](flows/scripts.md)
+- [Run a collection](flows/collection-run.md)
+- [Import](flows/import.md)
+- [Storage and reload](flows/storage.md)
+- [TUI](flows/tui.md)
+- [Authentication and secrets](flows/auth-and-secrets.md)
+
+Binding and deep references:
+
+- [Plan](plan.md) — §0 decisions override other design text.
+- [Engine](engine.md) — detailed send/runner contract.
+- [Domain model](model.md) — schema and storage contract.
+- [TUI stack](tui-stack.md) and [design language](design-language.md).
+- [Postman local format](postman-local-format.md).
+- [Ledger](ledger.md) — append-only implementation history.
+
+## Agents
+
+- [AGENTS.md](../AGENTS.md) — repository-wide operating rules.
+- [CLAUDE.md](../CLAUDE.md) — agent entry guidance.
+- Nested `internal/**/AGENTS.md` files — package-local constraints.
+- `.cursor/rules/` — scoped Cursor rules.
+- [Workstream briefs](briefs/) — historical ownership and acceptance criteria.
+
+Agents follow the same contributor path and must verify paths, symbols,
+commands, privacy boundaries and generated files rather than relying only on
+existing prose.
