@@ -21,7 +21,14 @@ const (
 
 // Options controls conversion.
 type Options struct {
+	// KeepLiteralSecrets leaves literal credentials in auth fields as they
+	// are (plan D2), and keeps a variable that has a value plain even when
+	// its name looks secret.
 	KeepLiteralSecrets bool
+	// NoMarkSecrets turns off marking variables secret by their key name
+	// (see [LooksSecretName]). Variables Postman itself types `secret` are
+	// still secret.
+	NoMarkSecrets bool
 }
 
 // DocumentKind identifies a supported Postman export.
@@ -108,20 +115,24 @@ func convertDocument(raw map[string]any, options Options) (*Document, Report, er
 		if !options.KeepLiteralSecrets {
 			moveCollectionSecrets(collection, &report)
 		}
+		document := &Document{Kind: KindCollection, Collection: collection}
+		markSecretsByName(document, options, &report)
 		report.Counts.Collections = 1
 		report.Counts.OAuthTokens = countOAuthTokens(collection)
 		report.sort()
-		return &Document{Kind: KindCollection, Collection: collection}, report, nil
+		return document, report, nil
 	}
 	switch text(raw["_postman_variable_scope"]) {
 	case "environment":
-		env := convertEnvironment(raw)
-		return &Document{Kind: KindEnvironment, Environment: env},
-			Report{Counts: Counts{Environments: 1}}, nil
+		document := &Document{Kind: KindEnvironment, Environment: convertEnvironment(raw)}
+		report := Report{Counts: Counts{Environments: 1}}
+		markSecretsByName(document, options, &report)
+		return document, report, nil
 	case "globals", "global":
-		globals := convertGlobals(raw)
-		return &Document{Kind: KindGlobals, Globals: globals},
-			Report{Counts: Counts{Globals: 1}}, nil
+		document := &Document{Kind: KindGlobals, Globals: convertGlobals(raw)}
+		report := Report{Counts: Counts{Globals: 1}}
+		markSecretsByName(document, options, &report)
+		return document, report, nil
 	default:
 		return nil, Report{}, errors.New("unknown Postman document format")
 	}

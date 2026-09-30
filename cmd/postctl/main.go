@@ -38,7 +38,7 @@ type command struct {
 
 // commands is the subcommand table; behavior lands in later workstreams.
 var commands = []command{
-	{"import", "import postman <files...> [--workspace DIR|-w DIR] [--env FILE...] [--globals FILE] [--dry-run]", "Import Postman collections, environments and globals."},
+	{"import", "import postman <files...> [--workspace DIR|-w DIR] [--env FILE...] [--globals FILE] [--dry-run] [--keep-literal-secrets] [--no-mark-secrets]", "Import Postman collections, environments and globals."},
 	{"ls", "ls [path] [--workspace DIR|-w DIR] [--flat] [--json]", "List collections, folders and requests."},
 	{"send", "send <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests."},
 	{"run", "run <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--json]", "Run a collection or folder, like newman."},

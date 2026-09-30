@@ -24,9 +24,18 @@ type importOptions struct {
 	dryRun             bool
 	json               bool
 	keepLiteralSecrets bool
+	noMarkSecrets      bool
 	paths              []string
 	envPaths           []string
 	globalsPath        string
+}
+
+// convertOptions maps the command-line flags to importer options.
+func (o importOptions) convertOptions() postman.Options {
+	return postman.Options{
+		KeepLiteralSecrets: o.keepLiteralSecrets,
+		NoMarkSecrets:      o.noMarkSecrets,
+	}
 }
 
 func runImport(args []string, stdout, stderr io.Writer) int {
@@ -124,6 +133,8 @@ func parseImportOptions(args []string) (importOptions, error) {
 			result.json = true
 		case arg == "--keep-literal-secrets":
 			result.keepLiteralSecrets = true
+		case arg == "--no-mark-secrets":
+			result.noMarkSecrets = true
 		case arg == "--workspace" || strings.HasPrefix(arg, "--workspace="):
 			result.workspace, err = takeValue(&index, arg, "--workspace")
 		case arg == "-w" || strings.HasPrefix(arg, "-w="):
@@ -174,9 +185,7 @@ func importPostmanFiles(options importOptions, stdout, stderr io.Writer) int {
 			report.AddFailure(filepath.Base(path), "could not read input")
 			continue
 		}
-		document, converted, err := postman.Convert(data, postman.Options{
-			KeepLiteralSecrets: options.keepLiteralSecrets,
-		})
+		document, converted, err := postman.Convert(data, options.convertOptions())
 		if err != nil {
 			report.AddFailure(filepath.Base(path), err.Error())
 			continue
@@ -203,9 +212,7 @@ func importPostmanLocal(options importOptions, stdout, stderr io.Writer) int {
 	report := postman.Report{DryRun: options.dryRun}
 	var documents []*postman.Document
 	add := func(raw postmanlocal.Document, label string) {
-		document, converted, convertErr := postman.ConvertObject(map[string]any(raw), postman.Options{
-			KeepLiteralSecrets: options.keepLiteralSecrets,
-		})
+		document, converted, convertErr := postman.ConvertObject(map[string]any(raw), options.convertOptions())
 		if convertErr != nil {
 			report.AddFailure(label, convertErr.Error())
 			return
@@ -379,6 +386,11 @@ func collectJSONFiles(paths []string) ([]string, []inputFailure) {
 func importUsage(output io.Writer) {
 	fmt.Fprintln(output, "Usage:")
 	fmt.Fprintln(output, "  postctl import postman <files or dirs...> [--workspace DIR] [--env FILE] [--globals FILE]")
-	fmt.Fprintln(output, "                         [--dry-run] [--json] [--keep-literal-secrets]")
+	fmt.Fprintln(output, "                         [--dry-run] [--json] [--keep-literal-secrets] [--no-mark-secrets]")
 	fmt.Fprintln(output, "  postctl import postman-local [--partition ID] [--workspace DIR] [--dry-run] [--json]")
+	fmt.Fprintln(output, "                               [--keep-literal-secrets] [--no-mark-secrets]")
+	fmt.Fprintln(output)
+	fmt.Fprintln(output, "Variables whose key looks like a credential (token, secret, password, apikey, cookie,")
+	fmt.Fprintln(output, "session, jwt, bearer, credential, private key, ...) are marked secret. A value they have")
+	fmt.Fprintln(output, "goes to the Keychain, not the YAML. --no-mark-secrets turns that off.")
 }
