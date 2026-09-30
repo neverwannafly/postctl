@@ -143,6 +143,16 @@ func buildResult(records, environmentRecords, sessions []map[string]any) *Result
 		result.Coverage.Globals = 1
 		break
 	}
+	// Whatever the builders above copied from V8 values (int64, time.Time,
+	// []byte, ...) or built in Go, hand out only JSON shapes, so an in-memory
+	// document converts exactly like the same document loaded from a file.
+	for i, document := range result.Collections {
+		result.Collections[i] = shapeDocument(document)
+	}
+	for i, document := range result.Environments {
+		result.Environments[i] = shapeDocument(document)
+	}
+	result.Globals = shapeDocument(result.Globals)
 	return result
 }
 
@@ -271,13 +281,24 @@ func copyEvents(target Document, source map[string]any) {
 			"listen": listen,
 			"script": map[string]any{
 				"type": "text/javascript",
-				"exec": strings.Split(code, "\n"),
+				"exec": execLines(code),
 			},
 		})
 	}
 	if len(events) > 0 {
 		target["event"] = events
 	}
+}
+
+// execLines splits script code into Postman's `exec` lines. It returns []any
+// (not []string) because the importer reads documents through JSON shapes.
+func execLines(code string) []any {
+	lines := strings.Split(code, "\n")
+	result := make([]any, len(lines))
+	for i, line := range lines {
+		result[i] = line
+	}
+	return result
 }
 
 func requestScriptKinds(source map[string]any) (preRequest, test bool) {
@@ -293,7 +314,7 @@ func requestScriptKinds(source map[string]any) (preRequest, test bool) {
 }
 
 func headers(value any) []any {
-	var result []any
+	result := []any{}
 	for _, raw := range array(value) {
 		header := object(raw)
 		out := map[string]any{"key": text(header["key"]), "value": text(header["value"])}

@@ -54,14 +54,50 @@ func Convert(data []byte, options Options) (*Document, Report, error) {
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return nil, Report{}, errors.New("JSON document contains trailing data")
 	}
-	return ConvertObject(raw, options)
+	if raw == nil {
+		return nil, Report{}, errors.New("document must be a JSON object")
+	}
+	return convertDocument(raw, options)
 }
 
 // ConvertObject converts an already-decoded Postman document.
+//
+// The converter reads documents through the shapes encoding/json produces
+// ([]any, map[string]any, string, number, bool, nil). ConvertObject first
+// normalizes raw through a JSON round-trip, so a document built in Go (for
+// example by the local Postman extractor, with a []string or []map[string]any
+// where the file form has a []any) converts exactly like the same document
+// read from a file. A value JSON cannot represent (NaN, a channel) is an
+// error rather than silently dropped data.
 func ConvertObject(raw map[string]any, options Options) (*Document, Report, error) {
 	if raw == nil {
 		return nil, Report{}, errors.New("document must be a JSON object")
 	}
+	normalized, err := normalizeObject(raw)
+	if err != nil {
+		return nil, Report{}, errors.New("document cannot be represented as JSON")
+	}
+	return convertDocument(normalized, options)
+}
+
+// normalizeObject round-trips raw through encoding/json with the same
+// decoder settings Convert uses, so both entry points see identical types.
+func normalizeObject(raw map[string]any) (map[string]any, error) {
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(bytes.NewReader(encoded))
+	dec.UseNumber()
+	var out map[string]any
+	if err := dec.Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// convertDocument converts a document already in JSON shapes.
+func convertDocument(raw map[string]any, options Options) (*Document, Report, error) {
 	if info := object(raw["info"]); info != nil {
 		schema := text(info["schema"])
 		if schema != schemaV21 && schema != schemaV20 {
