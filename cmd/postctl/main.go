@@ -42,7 +42,7 @@ var commands = []command{
 	{"ls", "ls [path] [--workspace DIR|-w DIR] [--flat] [--json]", "List collections, folders and requests."},
 	{"send", "send <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests."},
 	{"run", "run <path> [--workspace DIR|-w DIR] [-e env] [--var k=v] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--json]", "Run a collection or folder, like newman."},
-	{"env", "env [--workspace DIR|-w DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments."},
+	{"env", "env [--workspace DIR|-w DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> [<value>] [--secret] | unset <name> <key>", "List, select and edit environments."},
 	{"curl", "curl <path> [--workspace DIR|-w DIR] [-e env] [--with-secrets]", "Print the resolved request as a curl command."},
 }
 
