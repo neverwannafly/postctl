@@ -43,7 +43,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | FIX-SEC security fixes | GPT-5.6 Sol | Done, merged to main | fix/security | 2026-09-30 03:45 IST |
 | FIX-A data-integrity fixes | Sonnet 5.5 | Done, merged to main (INT5) | fix/data | 2026-09-30 04:00 IST |
 | INT5 integration (fix/data, sandbox `host`, real-data check) | Sonnet 5.5 | Done, on main | main | 2026-09-30 04:08 IST |
-| DOC-ARCH architecture/onboarding | GPT-5.6 Sol | In progress | docs/arch | 2026-09-30 13:29 IST |
+| DOC-ARCH architecture/onboarding | GPT-5.6 Sol | Done, merged to main | docs/arch | 2026-09-30 13:32 IST |
 
 ## Entries
 
@@ -685,3 +685,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task build`, `go build ./...`, `go test -race ./...`, `golangci-lint run`, storage and script golden update checks, `go generate ./cmd/genkeys` with a clean generated diff, explicit-workspace `postctl ls`, and a pseudo-terminal `POSTCTL_FAKE_SENDER=1` TUI launch all passed.
 - Blockers / questions: FIX-IMP and DOC-AGENTS are not merged yet.
 - Next: Commit this branch, then reconcile and merge after the concurrent owners finish.
+
+### 2026-09-30 13:32 IST · DOC-ARCH · gpt-5.6 · DONE
+- Branch/worktree: `docs/arch` (`/Users/shubham/work/postctl-wt/doc-arch`, not pushed)
+- Did: Delivered the contributor guide, architecture map, first-hour onboarding, audience docs index and eight end-to-end flow walkthroughs. Added `TestArchitectureDocsReferencesExist`, which parses every documented backticked Go path and adjacent symbol in this documentation set. Merged the implementation commit to main with `--no-ff`.
+- Files: `CONTRIBUTING.md`, `README.md` (contributor links only), `docs/{README,architecture,onboarding}.md`, `docs/flows/{startup,send-request,scripts,collection-run,import,storage,tui,auth-and-secrets}.md`, `internal/qa/docs_refs_test.go`, `docs/ledger.md`
+- Decisions: No import-direction violations were found. Deliberate shared-contract imports are identified in the architecture guide. All flow documents are 110 lines or fewer.
+- Tests: On the branch and merged main: `go build ./...`, `go test -race ./...`, and `golangci-lint run` passed. Also passed `task build`, storage/script golden update checks with no diff, key generation with no diff, docs reference test, direct-import audit, explicit example-workspace listing, and fake-sender TUI launch.
+- Blockers / questions: DOC-AGENTS had no branch changes and FIX-IMP was not merged at DOC-ARCH completion; the import flow documents main's behavior and already states the JSON-shaped normalization boundary.
+- Next: Concurrent owners should rebase/merge main and preserve the docs index links; if FIX-IMP changes user-facing flags before its merge, update `docs/flows/import.md` with that merge.
