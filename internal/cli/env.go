@@ -7,7 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"github.com/charmbracelet/x/term"
 
 	"github.com/shubham/postctl/internal/model"
 )
@@ -48,11 +51,25 @@ func runEnv(ctx context.Context, a *app, args []string) int {
 		}
 		return envShow(ctx, a, positional[1], *reveal, *asJSON)
 	case "set":
-		if len(positional) != 4 {
-			fmt.Fprintln(a.err, "Usage: postctl env set <name> <key> <value> [--secret]")
+		switch {
+		case len(positional) == 4:
+			return envSet(ctx, a, positional[1], positional[2], positional[3], *secret)
+		case len(positional) == 3 && *secret:
+			// No value on the command line: it would end up in shell history.
+			value, err := readSecretValue(a, positional[1], positional[2])
+			if err != nil {
+				fmt.Fprintf(a.err, "Cannot read the value: %v\n", err)
+				return ExitUsage
+			}
+			return envSet(ctx, a, positional[1], positional[2], value, true)
+		case len(positional) == 3:
+			fmt.Fprintln(a.err, "Missing value. Pass <value>, or use --secret to be prompted for it.")
+			return ExitUsage
+		default:
+			fmt.Fprintln(a.err, "Usage: postctl env set <name> <key> [<value>] [--secret]")
+			fmt.Fprintln(a.err, "Without <value>, --secret prompts with no echo (or reads one line from stdin).")
 			return ExitUsage
 		}
-		return envSet(ctx, a, positional[1], positional[2], positional[3], *secret)
 	case "unset":
 		if len(positional) != 3 {
 			fmt.Fprintln(a.err, "Usage: postctl env unset <name> <key>")
@@ -203,6 +220,51 @@ func confirmReveal(a *app, name string) (bool, error) {
 	}
 	line = strings.TrimSpace(line)
 	return line == "y" || line == "Y" || strings.EqualFold(line, "yes"), nil
+}
+
+// maxSecretBytes bounds the line read from stdin for a secret value.
+const maxSecretBytes = 1 << 20
+
+// readSecretValue reads the value for env set --secret when it is not an
+// argument. On a terminal it prompts on stderr and reads with echo off;
+// otherwise it reads one line from stdin (for example `pass show x | postctl
+// env set staging token --secret`). The value is never printed.
+func readSecretValue(a *app, envName, key string) (string, error) {
+	var value string
+	if a.opts.tty(a.in) {
+		fmt.Fprintf(a.err, "Value for %s in %s (input hidden): ", key, envName)
+		raw, err := a.readPassword()
+		fmt.Fprintln(a.err)
+		if err != nil {
+			return "", errors.New("could not read from the terminal")
+		}
+		value = string(raw)
+	} else {
+		line, err := bufio.NewReader(io.LimitReader(a.in, maxSecretBytes)).ReadString('\n')
+		if err != nil && !errors.Is(err, io.EOF) {
+			return "", errors.New("could not read from stdin")
+		}
+		if line == "" && err != nil {
+			return "", errors.New("stdin is empty; pass the value on stdin or run in a terminal")
+		}
+		value = strings.TrimRight(line, "\r\n")
+	}
+	if value == "" {
+		return "", errors.New("the value is empty, nothing was saved")
+	}
+	return value, nil
+}
+
+// readPassword reads a line from the terminal with echo off.
+func (a *app) readPassword() ([]byte, error) {
+	if a.opts.ReadPassword != nil {
+		return a.opts.ReadPassword()
+	}
+	f, ok := a.in.(*os.File)
+	if !ok {
+		return nil, errors.New("stdin is not a terminal")
+	}
+	return term.ReadPassword(f.Fd())
 }
 
 func envSet(ctx context.Context, a *app, name, key, value string, secret bool) int {

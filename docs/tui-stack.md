@@ -115,6 +115,7 @@ Cookie manager: `↑` `↓` `PgUp` `PgDn` `Home` `End` move, `r` reveal value, `
 - Third-party dependencies must be pure Go (no cgo) so `CGO_ENABLED=0` builds keep working.
 - Keychain access uses `/usr/bin/security` via `os/exec` (argument-safe, no shell). `zalando/go-keyring` was considered; it passes secrets on the command line, which exposes them in the process list, so it is not used.
 - The YAML library is `go.yaml.in/yaml/v3` (the maintained fork of `gopkg.in/yaml.v3`).
+- `postctl env set <env> <key> --secret` without a value prompts with echo off through `github.com/charmbracelet/x/term` (`ReadPassword`). It is already in the module graph as a dependency of Bubble Tea and is pure Go, so it adds no module; it is a direct dependency now. The standard library cannot turn off terminal echo, and `golang.org/x/term` would be a second module for the same job.
 - File watching uses `github.com/fsnotify/fsnotify` (pure Go). It reloads the workspace when files change outside postctl (editor, `git pull`). The standard library has no change notification; polling every directory would cost battery and latency. The shell debounces events (250 ms), ignores dot directories and its own saves, and falls back to a 2 s polling watcher if the OS cannot watch the whole tree (kqueue holds one descriptor per file).
 
 ## Validation and build workflow

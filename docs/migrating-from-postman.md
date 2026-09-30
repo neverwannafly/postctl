@@ -40,6 +40,7 @@ postctl import postman-local
 ```
 
 **How it works & caveats:**
+- **Scripts included**: collection, folder and request pre-request and test scripts are imported as `.js` files, exactly as with an exported file.
 - **Read-only and safe**: Postman's active Chromium IndexedDB is copied to a temporary, mode-0700 directory before reading. Your Postman Desktop installation is never modified or locked.
 - **Cache-dependent**: Desktop IndexedDB contains data cached from Postman cloud sync. If a collection was not opened locally or its body was evicted, `postctl` reports missing items in the import summary.
 - **Fallback**: If collections are missing or partial, use Postman's **File → Export** to produce a Collection v2.1 JSON file.
@@ -105,11 +106,38 @@ In standard Postman exports, sensitive credentials (passwords, bearer tokens, AP
 4. **Environment Secrets**:
    Variables defined with `type: secret` in Postman environments are imported as `model.VarSecret`. Their values are stored directly in the Keychain, leaving the `environments/<env>.yaml` file safe to commit to version control.
 
-5. **Opt-Out**:
+5. **Secret-Looking Variable Names**:
+   Postman often types tokens as `default`, and it does not keep current values locally, so such variables import empty. So that a script's `pm.environment.set("krakenD_token", ...)` is never written to a plaintext YAML file, the importer marks environment, globals, collection and folder variables as `secret` when their key looks like a credential: it contains a word such as `token`, `secret`, `password`, `apikey` / `api_key`, `cookie`, `session`, `jwt`, `bearer`, `authorization`, `credential` or `private_key` (`authToken`, `CF_COOKIE_HEADER` and `client_secret` match; `token_url`, `auth_url`, `session_timeout` and `cookie_name` do not). The exact rule is documented in `internal/importer/postman/secretnames.go`. An empty variable just gets the type; a value it already has goes to the Keychain like any other secret. The report lists the key names it marked (never values):
+   ```text
+   Secrets · 3 marked secret by name
+     Environment › Preview: auth_token, krakenD_token
+   ```
+   Re-importing is idempotent: it reports 0 changes, and a value you stored stays in the Keychain.
+
+6. **Opt-Outs**:
    If you must preserve raw, plaintext credentials in your YAML files (for example, in an isolated offline testing fixture), pass:
    ```sh
    postctl import postman <file.json> --keep-literal-secrets
    ```
+   With it, a variable that already has a value stays plain even when its name looks secret; empty ones still get the type. To turn off name-based marking entirely (Postman's own `secret` type still applies), pass `--no-mark-secrets` to `import postman` or `import postman-local`.
+
+### Filling in empty variables
+
+Because current values are not stored locally, imported environments often have empty variables that your requests need. After an import, `postctl` warns about the ones that requests or scripts read, that no imported environment gives a value, and that no script sets:
+
+```text
+Warnings
+  ! auth_token is empty in Preview; set it with `postctl env set Preview auth_token --secret`
+```
+
+Set a secret without putting it in your shell history by leaving the value off the command line; `postctl` prompts with no echo, or reads one line from stdin:
+
+```sh
+postctl env set Preview auth_token --secret            # prompts; typing is hidden
+pass show api/preview-token | postctl env set Preview auth_token --secret
+```
+
+Variables a script sets (such as a token fetched by a login request) are not warned about; the script fills them in and, for a secret variable, the value goes to the Keychain.
 
 ---
 

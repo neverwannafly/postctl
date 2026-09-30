@@ -3,9 +3,14 @@ package postmanlocal
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math"
+	"math/big"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
+	"time"
 )
 
 func TestBuildResultPreservesTreeAndScripts(t *testing.T) {
@@ -51,7 +56,7 @@ func TestBuildResultPreservesTreeAndScripts(t *testing.T) {
 		t.Fatal(err)
 	}
 	event := array(result.Collections[0]["event"])
-	exec, _ := object(object(event[0])["script"])["exec"].([]string)
+	exec, _ := object(object(event[0])["script"])["exec"].([]any)
 	if len(exec) != 2 || exec[0] != "line one" || exec[1] != "line two" {
 		t.Fatalf("script lines were not preserved: %#v", exec)
 	}
@@ -124,4 +129,105 @@ func TestPrivateIndexedDB(t *testing.T) {
 
 func wrapped(value map[string]any) map[string]any {
 	return map[string]any{"id": value["id"], "value": value}
+}
+
+// assertJSONShaped fails the test for any value that encoding/json would not
+// produce when decoding into an any.
+func assertJSONShaped(t *testing.T, path string, value any) {
+	t.Helper()
+	switch typed := value.(type) {
+	case nil, string, bool, float64:
+	case []any:
+		for i, entry := range typed {
+			assertJSONShaped(t, fmt.Sprintf("%s[%d]", path, i), entry)
+		}
+	case map[string]any:
+		for key, entry := range typed {
+			assertJSONShaped(t, path+"."+key, entry)
+		}
+	case Document:
+		t.Errorf("%s is a Document, want map[string]any", path)
+	default:
+		t.Errorf("%s has non-JSON type %T", path, value)
+	}
+}
+
+func TestBuildResultEmitsOnlyJSONShapes(t *testing.T) {
+	// The V8 decoder yields int64, uint64, time.Time, []byte and NaN; extractor
+	// code adds Go slices of its own. None of them may reach a document.
+	records := []map[string]any{
+		wrapped(map[string]any{
+			"$kind": "collection", "id": "root", "name": "Synthetic",
+			"items":     []any{map[string]any{"$kind": "http-request", "id": "request"}},
+			"variables": []any{map[string]any{"key": "n", "value": int64(7), "enabled": true}},
+			"scripts":   []any{map[string]any{"type": "beforeRequest", "code": "a\nb"}},
+		}),
+		wrapped(map[string]any{
+			"$kind": "http-request", "id": "request", "name": "Request", "parentId": "root", "collectionId": "root",
+			"method": "GET", "url": "https://example.invalid",
+			"headers": []any{map[string]any{"key": "K", "value": uint64(9), "disabled": false, "$type": "header"}},
+			"body":    map[string]any{"type": "formdata", "content": []any{map[string]any{"key": "f", "value": []byte("xy"), "at": time.Unix(0, 0)}}},
+			"scripts": []any{map[string]any{"type": "afterResponse", "code": "pm.test('t', function () {});"}},
+			"auth": map[string]any{"type": "bearer", "credentials": []any{
+				map[string]any{"key": "token", "value": "synthetic", "extra": math.NaN()},
+			}},
+		}),
+	}
+	environments := []map[string]any{wrapped(map[string]any{
+		"id": "env", "name": "Env",
+		"values": []any{map[string]any{"key": "n", "value": int64(1), "big": big.NewInt(1 << 62).String()}},
+	})}
+	sessions := []map[string]any{{
+		"model": "globals", "modelId": "g", "values": []any{map[string]any{"key": "g", "value": uint64(2)}},
+	}}
+
+	result := buildResult(records, environments, sessions)
+	for i, document := range result.Collections {
+		assertJSONShaped(t, fmt.Sprintf("collection[%d]", i), map[string]any(document))
+	}
+	for i, document := range result.Environments {
+		assertJSONShaped(t, fmt.Sprintf("environment[%d]", i), map[string]any(document))
+	}
+	assertJSONShaped(t, "globals", map[string]any(result.Globals))
+	// It must also survive the JSON encoder the staging writer uses.
+	if _, err := json.Marshal(result.Collections); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestJSONShapeConversions(t *testing.T) {
+	got := jsonShape(map[string]any{
+		"i": int(1), "i64": int64(-2), "u": uint32(3), "f": float32(1.5),
+		"nan": math.NaN(), "inf": math.Inf(1),
+		"time":    time.Date(2026, 9, 30, 1, 2, 3, 0, time.UTC),
+		"bytes":   []byte("ab"),
+		"strings": []string{"a", "b"},
+		"maps":    []map[string]any{{"k": int8(1)}},
+		"typed":   map[string]string{"a": "b"},
+		"nilmap":  map[string]any(nil),
+		"nilarr":  []any(nil),
+		"ptr":     new(int),
+	})
+	want := map[string]any{
+		"i": float64(1), "i64": float64(-2), "u": float64(3), "f": 1.5,
+		"nan": nil, "inf": nil,
+		"time":    "2026-09-30T01:02:03Z",
+		"bytes":   "YWI=",
+		"strings": []any{"a", "b"},
+		"maps":    []any{map[string]any{"k": float64(1)}},
+		"typed":   map[string]any{"a": "b"},
+		"nilmap":  nil,
+		"nilarr":  nil,
+		"ptr":     float64(0),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("jsonShape mismatch:\n got %#v\nwant %#v", got, want)
+	}
+
+	// A self-referencing graph (V8 object references) must terminate.
+	cyclic := map[string]any{}
+	cyclic["self"] = cyclic
+	if jsonShape(cyclic) == nil {
+		t.Fatal("cyclic input lost its top level")
+	}
 }
