@@ -145,7 +145,7 @@ postctl run Payments --json
 postctl env ls
 postctl env use staging
 postctl env show staging --reveal
-postctl env set staging token "my-secret-key" --secret
+postctl env set staging token --secret   # prompts with no echo; keeps it out of shell history
 
 # Generate curl commands with masked or revealed credentials
 postctl curl Payments/List\ charges -e staging
