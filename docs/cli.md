@@ -74,10 +74,30 @@ postctl env show staging
 postctl env show staging --reveal
 postctl env get staging          # same as show
 postctl env set staging region us --secret
+postctl env set staging token --secret      # value not on argv: prompts with no echo
 postctl env unset staging region
 ```
 
-`ls` marks the active environment with `*` and a production environment with `! prod`. `use` writes `store.State.ActiveEnvironment`. `get` is an alias for `show`; both mask secret values. `--reveal` prints them; when stdin is a terminal it asks you to type `y` first. `set --secret` stores the value in the secret store and does not echo it. `--json` works on `ls`, `show`, and `get`.
+`ls` marks the active environment with `*` and a production environment with `! prod`. `use` writes `store.State.ActiveEnvironment`. `get` is an alias for `show`; both mask secret values. `--reveal` prints them; when stdin is a terminal it asks you to type `y` first. `set --secret` stores the value in the secret store and does not echo it. A value on the command line ends up in your shell history, so with `--secret` you can leave it off: when stdin is a terminal, `set` prompts (`Value for token in staging (input hidden):`) and reads it with echo off; otherwise it reads one line from stdin (`pass show x | postctl env set staging token --secret`). An empty value is refused and nothing is saved. Without `--secret` the value is required. `--json` works on `ls`, `show`, and `get`.
+
+## import
+
+```sh
+postctl import postman ~/Downloads/*.json --env Staging.postman_environment.json --workspace ./api --dry-run
+postctl import postman-local --dry-run
+postctl import postman-local
+postctl import postman-local --no-mark-secrets
+```
+
+`import postman <files or dirs...>` reads exported collections (v2.0/v2.1), environments (`--env FILE`, repeatable) and globals (`--globals FILE`). `import postman-local` extracts them from the local Postman desktop cache (read-only, from a temporary copy). Both overwrite by stable Postman ID, and `--dry-run` reports exactly what a real import would add, change and remove without writing. `--json` prints the report as one JSON document. Flags: `--workspace DIR` / `-w DIR`, `--partition ID` (`postman-local` only), `--dry-run`, `--json`, `--keep-literal-secrets`, `--no-mark-secrets`.
+
+Secrets:
+
+- Literal credentials in auth fields move to generated secret collection variables in the Keychain (`Secrets N moved to Keychain variables`). `--keep-literal-secrets` opts out, and also keeps a variable that has a value plain when its name looks secret.
+- Variables whose key looks like a credential are marked `secret` (`Secrets · N marked secret by name`, with the key names per environment, collection, folder or globals). The rule works on the words of the key, case-insensitively and across `snake_case` / `camelCase`: a word that is or ends with `token`, `secret`, `password`, `passwd`, `passphrase`, `cookie` or `credential`; the words `session`, `jwt`, `bearer`, `authorization`, `apikey`, `pwd`; or the pairs `api key`, `private key`, `secret key`, `signing key`, `encryption key`, `master key`, `auth key`. A key is not marked when a later word describes rather than holds the credential (`url`, `uri`, `endpoint`, `name`, `type`, `scope`, `prefix`, `expires`/`expiry`, `ttl`, `timeout`, `path`, ...), so `token_url`, `auth_url`, `session_timeout` and `cookie_name` stay plain. An empty variable only gets the type; a value it has goes to the Keychain. `--no-mark-secrets` turns this off. Re-importing is idempotent and keeps values you stored.
+- Values are never printed, only key names.
+
+After the summary, warnings list empty inputs, by key name only, per environment: a variable that requests or scripts read, that no imported environment, globals or collection gives a value, and that no script sets, for example ``auth_token is empty in Preview; set it with `postctl env set Preview auth_token --secret` ``.
 
 ## curl
 

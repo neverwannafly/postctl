@@ -37,7 +37,8 @@ type Options struct {
 	ASCII bool
 	// NoColor disables ANSI color (NO_COLOR, --accessible, or a non-terminal).
 	NoColor bool
-	// Stdin reads confirmations such as env show --reveal.
+	// Stdin reads confirmations such as env show --reveal, and the secret
+	// value of env set --secret when it is not on the command line.
 	Stdin io.Reader
 	// Stdout receives command output.
 	Stdout io.Writer
@@ -50,6 +51,11 @@ type Options struct {
 	// IsTTY reports whether v is an interactive terminal. Nil checks the
 	// file mode of an *os.File. v may be stdin or stdout.
 	IsTTY func(v any) bool
+	// ReadPassword reads one line from the terminal without echoing it, for
+	// env set --secret without a value. Nil reads from Stdin (an *os.File)
+	// with the terminal's echo turned off. It is called only when IsTTY
+	// reports that Stdin is a terminal.
+	ReadPassword func() ([]byte, error)
 }
 
 type command struct {
@@ -64,7 +70,7 @@ var commands = []command{
 	{"ls", "ls [path] [--workspace DIR] [--flat] [--json]", "List collections, folders and requests.", runLs},
 	{"send", "send <path> [--workspace DIR] [-e env] [--var k=v] [--json] [--include] [--verbose] [--no-scripts] [--no-history]", "Send one request and print the status, body and tests.", runSend},
 	{"run", "run <path> [--workspace DIR] [-e env] [--var k=v] [-d file] [-n N] [--delay 200ms] [--bail] [--reporter cli,json,junit] [--reporter-json-export FILE] [--reporter-junit-export FILE] [--timeout-request 30s] [--no-history] [--json]", "Run a collection or folder. --json streams NDJSON events.", runRun},
-	{"env", "env [--workspace DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> <value> [--secret] | unset <name> <key>", "List, select and edit environments. -e on send and run defaults to the active environment.", runEnv},
+	{"env", "env [--workspace DIR] ls | use <name> | show|get <name> [--reveal] | set <name> <key> [<value>] [--secret] | unset <name> <key>", "List, select and edit environments. -e on send and run defaults to the active environment.", runEnv},
 	{"curl", "curl <path> [--workspace DIR] [-e env] [--with-secrets]", "Print the resolved request as a curl command. Secrets are masked unless --with-secrets is set.", runCurl},
 }
 

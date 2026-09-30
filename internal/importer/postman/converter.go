@@ -21,7 +21,14 @@ const (
 
 // Options controls conversion.
 type Options struct {
+	// KeepLiteralSecrets leaves literal credentials in auth fields as they
+	// are (plan D2), and keeps a variable that has a value plain even when
+	// its name looks secret.
 	KeepLiteralSecrets bool
+	// NoMarkSecrets turns off marking variables secret by their key name
+	// (see [LooksSecretName]). Variables Postman itself types `secret` are
+	// still secret.
+	NoMarkSecrets bool
 }
 
 // DocumentKind identifies a supported Postman export.
@@ -54,14 +61,50 @@ func Convert(data []byte, options Options) (*Document, Report, error) {
 	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return nil, Report{}, errors.New("JSON document contains trailing data")
 	}
-	return ConvertObject(raw, options)
+	if raw == nil {
+		return nil, Report{}, errors.New("document must be a JSON object")
+	}
+	return convertDocument(raw, options)
 }
 
 // ConvertObject converts an already-decoded Postman document.
+//
+// The converter reads documents through the shapes encoding/json produces
+// ([]any, map[string]any, string, number, bool, nil). ConvertObject first
+// normalizes raw through a JSON round-trip, so a document built in Go (for
+// example by the local Postman extractor, with a []string or []map[string]any
+// where the file form has a []any) converts exactly like the same document
+// read from a file. A value JSON cannot represent (NaN, a channel) is an
+// error rather than silently dropped data.
 func ConvertObject(raw map[string]any, options Options) (*Document, Report, error) {
 	if raw == nil {
 		return nil, Report{}, errors.New("document must be a JSON object")
 	}
+	normalized, err := normalizeObject(raw)
+	if err != nil {
+		return nil, Report{}, errors.New("document cannot be represented as JSON")
+	}
+	return convertDocument(normalized, options)
+}
+
+// normalizeObject round-trips raw through encoding/json with the same
+// decoder settings Convert uses, so both entry points see identical types.
+func normalizeObject(raw map[string]any) (map[string]any, error) {
+	encoded, err := json.Marshal(raw)
+	if err != nil {
+		return nil, err
+	}
+	dec := json.NewDecoder(bytes.NewReader(encoded))
+	dec.UseNumber()
+	var out map[string]any
+	if err := dec.Decode(&out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// convertDocument converts a document already in JSON shapes.
+func convertDocument(raw map[string]any, options Options) (*Document, Report, error) {
 	if info := object(raw["info"]); info != nil {
 		schema := text(info["schema"])
 		if schema != schemaV21 && schema != schemaV20 {
@@ -72,20 +115,24 @@ func ConvertObject(raw map[string]any, options Options) (*Document, Report, erro
 		if !options.KeepLiteralSecrets {
 			moveCollectionSecrets(collection, &report)
 		}
+		document := &Document{Kind: KindCollection, Collection: collection}
+		markSecretsByName(document, options, &report)
 		report.Counts.Collections = 1
 		report.Counts.OAuthTokens = countOAuthTokens(collection)
 		report.sort()
-		return &Document{Kind: KindCollection, Collection: collection}, report, nil
+		return document, report, nil
 	}
 	switch text(raw["_postman_variable_scope"]) {
 	case "environment":
-		env := convertEnvironment(raw)
-		return &Document{Kind: KindEnvironment, Environment: env},
-			Report{Counts: Counts{Environments: 1}}, nil
+		document := &Document{Kind: KindEnvironment, Environment: convertEnvironment(raw)}
+		report := Report{Counts: Counts{Environments: 1}}
+		markSecretsByName(document, options, &report)
+		return document, report, nil
 	case "globals", "global":
-		globals := convertGlobals(raw)
-		return &Document{Kind: KindGlobals, Globals: globals},
-			Report{Counts: Counts{Globals: 1}}, nil
+		document := &Document{Kind: KindGlobals, Globals: convertGlobals(raw)}
+		report := Report{Counts: Counts{Globals: 1}}
+		markSecretsByName(document, options, &report)
+		return document, report, nil
 	default:
 		return nil, Report{}, errors.New("unknown Postman document format")
 	}

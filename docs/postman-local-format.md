@@ -146,6 +146,17 @@ form-data and URL-encoded body entries retain their arrays.
 Partial or missing referenced records are omitted and counted as unresolved.
 Partial examples are emitted only if the cache contains a decoded response.
 
+The documents the extractor returns are in-memory Go values, not files, and
+hold only JSON shapes (`nil`, `bool`, `float64`, `string`, `[]any`,
+`map[string]any`): V8 integers, dates, buffers and BigInts are converted, and
+`script.exec` is a `[]any` of lines. The importer reads documents through those
+shapes, so a Go-typed slice such as `[]string` would be read as empty and every
+script would be dropped (this happened once). `postman.ConvertObject` also
+normalizes its input through a JSON round-trip, so an in-memory document and its
+JSON file convert identically; the private test
+`TestPrivateLocalExtractInMemoryToStore` checks the real extract → convert →
+store path against the extractor's coverage counts.
+
 ## Known gaps
 
 - The cache can omit collections, request details, examples, test scripts, or

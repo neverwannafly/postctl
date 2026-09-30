@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 )
 
 // Counts summarizes converted Postman data.
@@ -27,6 +28,12 @@ type Counts struct {
 	// the store keeps in the Keychain on save. They are not variables and are
 	// not part of SecretsMoved.
 	OAuthTokens int `json:"oauthTokensInKeychain"`
+	// SecretsMarked counts variables marked secret because their key looks
+	// like a credential (see [LooksSecretName]); the names are in
+	// [Report.Marked]. SecretsMarkedWithValue is how many of them had a
+	// value, which the store moves to the Keychain on save.
+	SecretsMarked          int `json:"secretsMarkedByName"`
+	SecretsMarkedWithValue int `json:"secretsMarkedWithValue"`
 }
 
 // Warning describes a non-fatal compatibility or coverage issue.
@@ -54,11 +61,14 @@ type Changes struct {
 
 // Report is the complete privacy-safe import result.
 type Report struct {
-	DryRun   bool      `json:"dryRun"`
-	Counts   Counts    `json:"counts"`
-	Changes  Changes   `json:"changes"`
-	Warnings []Warning `json:"warnings,omitempty"`
-	Failures []Failure `json:"failures,omitempty"`
+	DryRun  bool    `json:"dryRun"`
+	Counts  Counts  `json:"counts"`
+	Changes Changes `json:"changes"`
+	// Marked lists, per scope, the variable keys marked secret by name.
+	// Names only, never values.
+	Marked   []MarkedScope `json:"markedSecret,omitempty"`
+	Warnings []Warning     `json:"warnings,omitempty"`
+	Failures []Failure     `json:"failures,omitempty"`
 }
 
 // AddWarning appends a warning without exposing source values.
@@ -83,6 +93,9 @@ func (r *Report) Merge(other Report) {
 	r.Counts.Globals += other.Counts.Globals
 	r.Counts.SecretsMoved += other.Counts.SecretsMoved
 	r.Counts.OAuthTokens += other.Counts.OAuthTokens
+	r.Counts.SecretsMarked += other.Counts.SecretsMarked
+	r.Counts.SecretsMarkedWithValue += other.Counts.SecretsMarkedWithValue
+	r.Marked = append(r.Marked, other.Marked...)
 	r.Changes.Added = append(r.Changes.Added, other.Changes.Added...)
 	r.Changes.Changed = append(r.Changes.Changed, other.Changes.Changed...)
 	r.Changes.Removed = append(r.Changes.Removed, other.Changes.Removed...)
@@ -116,6 +129,24 @@ func (r Report) WriteText(w io.Writer) {
 		r.Counts.PreScripts, r.Counts.TestScripts, r.Counts.Examples)
 	fmt.Fprintf(w, "Secrets %d %s · %d OAuth tokens %s\n",
 		r.Counts.SecretsMoved, moved, r.Counts.OAuthTokens, kept)
+	if r.Counts.SecretsMarked > 0 {
+		verb := "marked secret by name"
+		if r.DryRun {
+			verb = "would be marked secret by name"
+		}
+		fmt.Fprintf(w, "Secrets · %d %s", r.Counts.SecretsMarked, verb)
+		if r.Counts.SecretsMarkedWithValue > 0 {
+			stored := "moved to Keychain"
+			if r.DryRun {
+				stored = "would move to Keychain"
+			}
+			fmt.Fprintf(w, " (%d with a value, %s)", r.Counts.SecretsMarkedWithValue, stored)
+		}
+		fmt.Fprintln(w)
+		for _, scope := range r.Marked {
+			fmt.Fprintf(w, "  %s: %s\n", scope.Scope, strings.Join(scope.Keys, ", "))
+		}
+	}
 	fmt.Fprintf(w, "● %d added · %d changed · %d removed · %d kept (not in source)\n",
 		len(r.Changes.Added), len(r.Changes.Changed), len(r.Changes.Removed), len(r.Changes.Kept))
 	if len(r.Warnings) > 0 {
@@ -143,6 +174,7 @@ func (r *Report) sort() {
 	sort.Strings(r.Changes.Changed)
 	sort.Strings(r.Changes.Removed)
 	sort.Strings(r.Changes.Kept)
+	sortMarked(r.Marked)
 	sort.SliceStable(r.Warnings, func(i, j int) bool {
 		if r.Warnings[i].Path == r.Warnings[j].Path {
 			return r.Warnings[i].Code < r.Warnings[j].Code
