@@ -248,6 +248,7 @@ func finishImport(options importOptions, documents []*postman.Document, report p
 		return exitUsage
 	}
 	replaced := collectionsBeingReplaced(workspace, documents)
+	postman.CheckEmptyInputs(documents, &report)
 	postman.MergeDocuments(workspace, documents, &report)
 	if !options.dryRun {
 		if workspaceStore == nil {

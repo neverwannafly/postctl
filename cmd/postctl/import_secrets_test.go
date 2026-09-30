@@ -108,3 +108,36 @@ func TestImportNoMarkSecretsFlag(t *testing.T) {
 		t.Fatalf("help must list --no-mark-secrets for both sources:\n%s", out)
 	}
 }
+
+func TestImportWarnsAboutEmptyInputs(t *testing.T) {
+	memory := store.NewMemorySecrets()
+	old := importSecrets
+	importSecrets = func() store.SecretStore { return memory }
+	t.Cleanup(func() { importSecrets = old })
+
+	dir := t.TempDir()
+	collection := writeFile(t, filepath.Join(dir, "c.json"), `{"info":{"_postman_id":"c1","name":"Shop","schema":"`+reimportSchema+`"},
+	 "event":[{"listen":"prerequest","script":{"exec":["pm.environment.set('krakenD_token', 'synthetic');"]}}],
+	 "item":[{"id":"r","name":"R","event":[{"listen":"prerequest","script":{"exec":["pm.environment.get('krakenD_token');"]}}],
+	  "request":{"method":"GET","url":"https://example.invalid/x","header":[{"key":"Authorization","value":"Bearer {{auth_token}}"}]}}]}`)
+	env := writeFile(t, filepath.Join(dir, "env.json"), synthEnvExport)
+	workspace := filepath.Join(dir, "ws")
+
+	for _, extra := range [][]string{{"--dry-run"}, {}} {
+		args := append([]string{"import", "postman", collection, env, "--workspace", workspace}, extra...)
+		code, out, errOut := runCLI(args...)
+		if code != exitOK || errOut != "" {
+			t.Fatalf("%v: code=%d stderr=%q", extra, code, errOut)
+		}
+		want := "auth_token is empty in Preview; set it with `postctl env set Preview auth_token --secret`"
+		if !strings.Contains(out, want) {
+			t.Errorf("%v: missing warning %q in:\n%s", extra, want, out)
+		}
+		if strings.Contains(out, "krakenD_token is empty") {
+			t.Errorf("%v: krakenD_token is set by a script and must not be warned about:\n%s", extra, out)
+		}
+		if strings.Contains(out, synthEnvSecretValue) {
+			t.Fatalf("%v: output printed a value", extra)
+		}
+	}
+}
