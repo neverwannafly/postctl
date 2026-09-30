@@ -37,12 +37,14 @@ Binding and deep references:
 
 ## Agents
 
-- [AGENTS.md](../AGENTS.md) — repository-wide operating rules.
-- [CLAUDE.md](../CLAUDE.md) — agent entry guidance.
-- Nested `internal/**/AGENTS.md` files — package-local constraints.
-- `.cursor/rules/` — scoped Cursor rules.
+- [AGENTS.md](../AGENTS.md) — repository-wide operating rules: map, commands, definition of done, invariants, security, testing, pitfalls, where to add things.
+- [CLAUDE.md](../CLAUDE.md) — Claude Code entry point (imports `AGENTS.md`).
+- Package guides, read before editing there: [TUI](../internal/tui/AGENTS.md), [script sandbox](../internal/script/AGENTS.md), [store](../internal/store/AGENTS.md), [engine](../internal/engine/AGENTS.md), [importer](../internal/importer/AGENTS.md).
+- `.cursor/rules/*.mdc` — Cursor rules: an always-on core rule plus scoped rules for the TUI, scripts, tests and the importer. Each points back to `AGENTS.md`.
+- `task agents:check` runs the definition-of-done gate; `task keys` regenerates [keys.md](keys.md); `task tui:smoke` drives the built TUI through a pty offline.
 - [Workstream briefs](briefs/) — historical ownership and acceptance criteria.
 
 Agents follow the same contributor path and must verify paths, symbols,
 commands, privacy boundaries and generated files rather than relying only on
-existing prose.
+existing prose. `internal/qa` tests keep the agent guides' paths, links, test
+names, environment variables and task names in sync with the repository.

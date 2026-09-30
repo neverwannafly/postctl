@@ -45,6 +45,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | INT5 integration (fix/data, sandbox `host`, real-data check) | Sonnet 5.5 | Done, on main | main | 2026-09-30 04:08 IST |
 | DOC-ARCH architecture/onboarding | GPT-5.6 Sol | Done, merged to main | docs/arch | 2026-09-30 13:32 IST |
 | FIX-IMP import fixes (script loss, secret-by-name, empty-input warnings, `env set --secret` stdin) | Sonnet 5.5 | Done, merged to main | fix/import | 2026-09-30 13:40 IST |
+| DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 
 ## Entries
 
@@ -718,3 +719,30 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...` and `golangci-lint run` green on the branch. Names: **importer** `TestConvertObjectKeepsScriptsFromGoTypedDocument` (collection/folder/request × prerequest/test), `TestConvertObjectMatchesJSONRoundTrip`, `TestConvertObjectGoTypedEnvironmentAndGlobals`, `TestConvertObjectRejectsValuesJSONCannotCarry` (fails without the fix, checked); **extractor** `TestBuildResultEmitsOnlyJSONShapes`, `TestJSONShapeConversions`; **secrets** `TestLooksSecretName`, `TestSplitKeyWords`, `TestImporterMarksSecretsByName`, `TestNoMarkSecretsOptOut`, `TestKeepLiteralSecretsKeepsValuedVariablesPlain`, `TestReportListsMarkedNamesNeverValues`, `TestMarkedSecretsNeverReachYAML`, `TestReimportOfMarkedSecretsIsIdempotent`; **CLI import** `TestImportMarksSecretsByNameEndToEnd`, `TestImportNoMarkSecretsFlag`, `TestImportWarnsAboutEmptyInputs`; **engine** `TestScriptWriteToEmptySecretVariableGoesToSecretStoreNotYAML`; **warnings** `TestCheckEmptyInputs`, `TestCheckEmptyInputsIgnoresUndeclaredAndDisabledScripts`, `TestEmptyInputWarningsNeverContainValues`; **env set** `TestEnvSetSecretReadsValueFromStdin`, `TestEnvSetSecretStdinErrorsSaveNothing`, `TestEnvSetSecretPromptsWithoutEcho`, `TestEnvSetArgvFormStillWorksAndValueIsRequiredWithoutSecret`. **Private (real data, temp dir, in-memory secrets), PASS not SKIP with `-v`:** `TestPrivateLocalExtractInMemoryToStore` (real `Extract` → `ConvertObject` → store): coverage 2 collections, 11 folders, 23 requests, 17 requests with pre-request scripts, 0 with test scripts, 3 environments; wrote 17 `.pre.js` + 0 `.test.js` request files (equals coverage) and 0 collection/folder scripts (equals what the extractor emitted); 17 scripts reloaded with source; no stored secret value in any file. `TestPrivateImportPostmanLocalCommand`: dry run wrote nothing, import wrote 17 `.js` files, re-import 0 added / 0 changed / 0 removed.
 - Blockers / questions: none.
 - Next: merge `fix/import` into main. The user re-imports (dry run first).
+
+### 2026-09-30 13:05 IST · DOC-AGENTS · sonnet-5.5 · STARTED
+- Branch/worktree: docs/agents (`~/work/postctl-wt/doc-agents`), not pushed.
+- Did: verified a baseline on main (build, race tests, lint, goldens) and ran the documented commands before writing them down; read plan §0, design language, engine, model and scripting docs.
+- Files: none yet.
+- Decisions: link to CONTRIBUTING, onboarding and architecture (DOC-ARCH) instead of duplicating them.
+- Tests: baseline green.
+- Blockers / questions: none.
+- Next: root AGENTS.md, nested guides, Cursor rules, path-check test.
+
+### 2026-09-30 13:35 IST · DOC-AGENTS · sonnet-5.5 · PROGRESS
+- Branch/worktree: docs/agents.
+- Did: wrote root `AGENTS.md`, five nested `AGENTS.md`, `CLAUDE.md` files, five `.cursor/rules/*.mdc`; added tasks `agents:check`, `keys`, `tui:smoke` and `scripts/tui_smoke.py`; fixed `.gitignore` (`testdata/private/` was root-anchored, so the nested `internal/importer/postmanlocal/testdata/private` and symlinks were not ignored; now `**/testdata/private`).
+- Files: `AGENTS.md`, `CLAUDE.md`, `internal/{tui,script,store,engine,importer}/{AGENTS,CLAUDE}.md`, `.cursor/rules/*.mdc`, `Taskfile.yml`, `scripts/tui_smoke.py`, `.gitignore`.
+- Decisions: the importer type-mismatch lesson (Go `[]string` vs JSON-shaped `[]any`; tests only covered the JSON-file path) is pitfall 1 in `AGENTS.md` and the headline of `internal/importer/AGENTS.md`.
+- Tests: `TestAgentDocsReferencesExist` (`internal/qa/docs_paths_test.go`) checks every backticked path, link, `@` import, test name, `POSTCTL_*` variable and `task` name in the agent guides; verified it fails on planted bad references.
+- Blockers / questions: none.
+- Next: merge main (FIX-IMP landed), update importer and env CLI mentions, fix doc errors, gate, merge.
+
+### 2026-09-30 14:00 IST · DOC-AGENTS · sonnet-5.5 · DONE
+- Branch/worktree: docs/agents, merged into main with `--no-ff` (hash in `git log`); worktree removed; not pushed.
+- Did: merged main into the branch after FIX-IMP landed and updated the importer guide (producer `shapeDocument` plus consumer normalization in `ConvertObject`, plan D11 name-based secrets, `env set --secret` prompt). Linked the guides from `docs/README.md`. Fixed factual errors in existing docs: README (chai 4.4.1, uuid 8.3.2 instead of 4.3.10 and "v4"; `huh/v2` is not a dependency), `docs/tui-stack.md` (Huh and `log/slog` rows described things that do not exist; versioning line), `docs/engine.md` (diagram persistence call names, `Config.ScriptMemoryLimit`, Outcome table fields), and the `tuiengine` package comment (the TUI runner types do import engine run events).
+- Files: see PROGRESS plus `docs/README.md`, `README.md`, `docs/tui-stack.md`, `docs/engine.md`, `internal/tui/tuiengine/tuiengine.go`, `internal/engine/doc.go`, `internal/qa/doc.go`, `internal/qa/docs_paths_test.go`.
+- Decisions: did not edit FIX-IMP's files (`docs/cli.md`, `docs/migrating-from-postman.md`, `docs/model.md`). `task assets` (needs node 22) is documented as unverified.
+- Tests: `go build ./...`, `go test -race ./...`, `golangci-lint run` green; `task tui:smoke` PASS.
+- Blockers / questions: none.
+- Next: none.

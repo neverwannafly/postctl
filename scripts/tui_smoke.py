@@ -38,6 +38,15 @@ def drain(fd, seconds):
     return ANSI.sub(b"", out).decode("utf8", "replace")
 
 
+def wait_for(fd, needle, timeout):
+    """Read until needle appears or timeout seconds pass (a fresh binary can
+    start slowly on a loaded machine). Returns everything read."""
+    seen, end = "", time.time() + timeout
+    while needle not in seen and time.time() < end:
+        seen += drain(fd, 0.3)
+    return seen
+
+
 def main():
     binary = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "bin/postctl")
     source = sys.argv[2] if len(sys.argv) > 2 else "internal/tui/testdata/demo"
@@ -54,12 +63,12 @@ def main():
         os.execve(binary, [binary, "--workspace", workspace], env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
     try:
-        first = drain(fd, 1.5)
+        first = wait_for(fd, "postctl", 15)
         for key in (DOWN, DOWN, ENTER):  # select a request and open it
             os.write(fd, key)
             drain(fd, 0.4)
         os.write(fd, CTRL_S)
-        after = drain(fd, 2.0)
+        after = wait_for(fd, "200", 8)
         ok_start = "postctl" in first
         ok_send = "200" in after
         print(("PASS" if ok_start else "FAIL") + " first frame shows the header")
