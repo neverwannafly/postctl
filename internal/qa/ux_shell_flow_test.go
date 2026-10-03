@@ -39,8 +39,7 @@ func TestSecretDoesNotLeakThroughUXFlows(t *testing.T) {
 func (r *uxRig) must(marker, what string) {
 	r.t.Helper()
 	if !strings.Contains(r.screen(), marker) {
-		r.t.Logf("screen after %q:\n%s", what, r.screen())
-		r.t.Fatalf("step %q did not reach its view (no %q on screen)", what, marker)
+		r.t.Fatalf("step %q did not reach its view (no %q on a frame of %s)", what, marker, frameShape(r.screen()))
 	}
 }
 
@@ -78,8 +77,7 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.begin("send")
 	r.keys("ctrl+s")
 	if !r.waitFor("200", 8*time.Second) {
-		t.Logf("%s", r.screen())
-		t.Fatal("the send did not produce a 200 response")
+		t.Fatalf("the send did not produce a 200 response (frame: %s)", frameShape(r.screen()))
 	}
 	r.snap("sent")
 	r.keys("ctrl+s") // a second send gives the diff something to compare

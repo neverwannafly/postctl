@@ -1,6 +1,7 @@
 package qa_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -15,5 +16,23 @@ func TestLeakCheckFindsSentinelAfterANSIStripWhenRawIsSplit(t *testing.T) {
 	}
 	if !strings.Contains(ansi.Strip(raw), sentinel) {
 		t.Fatal("stripped text must contain the sentinel")
+	}
+}
+
+// frameShape describes a frame by size only. Failure messages use it instead
+// of printing the frame, which could hold a leaked secret.
+func frameShape(frame string) string {
+	lines := strings.Split(frame, "\n")
+	w := 0
+	for _, l := range lines {
+		w = max(w, ansi.StringWidth(l))
+	}
+	return fmt.Sprintf("%d lines, widest %d cells", len(lines), w)
+}
+
+func TestFrameShapeReportsSizeNotContent(t *testing.T) {
+	got := frameShape("secret-one\nsecret-two-longer")
+	if strings.Contains(got, "secret") || !strings.Contains(got, "2 lines") {
+		t.Fatalf("frameShape = %q", got)
 	}
 }
