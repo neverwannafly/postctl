@@ -147,13 +147,6 @@ func (r *shellRig) mustHave(s string) {
 	}
 }
 
-func (r *shellRig) mustNotHave(s string) {
-	r.t.Helper()
-	if strings.Contains(r.screen(), s) {
-		r.t.Fatalf("screen shows %q:\n%s", s, r.screen())
-	}
-}
-
 // open selects the request in the tree, delivers a response for it, and puts
 // the keyboard in the Body tab.
 func (r *shellRig) open() {
