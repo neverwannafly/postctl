@@ -232,3 +232,39 @@ func TestKeyHintWithoutLabelRendersTheKeyOnly(t *testing.T) {
 		t.Fatalf("hints = %q", got)
 	}
 }
+
+func TestTabRangesAndTabAt(t *testing.T) {
+	th := NewTheme(true, false, false)
+	tabs := []Tab{
+		{Label: "Params"},
+		{Label: "Headers", Count: 3},
+		{Label: "Auth", Dot: true},
+	}
+	ranges := th.TabRanges(80, tabs)
+	if len(ranges) != 3 {
+		t.Fatalf("got %d ranges, want 3", len(ranges))
+	}
+	// First tab: "Params" -> length 6
+	if ranges[0].Start != 0 || ranges[0].End != 6 || ranges[0].Index != 0 {
+		t.Errorf("ranges[0] = %+v, want Start 0, End 6", ranges[0])
+	}
+	// Check TabAt hit testing
+	if hit := th.TabAt(80, tabs, 3); hit != 0 {
+		t.Errorf("TabAt(3) = %d, want 0", hit)
+	}
+	// In the gap between tab 0 and tab 1 (columns 6 and 7):
+	if hit := th.TabAt(80, tabs, 6); hit != -1 {
+		t.Errorf("TabAt(6) in gap = %d, want -1", hit)
+	}
+	// Second tab: starts at 6 + 2 = 8, label "Headers(3)" len 10 -> [8, 18)
+	if hit := th.TabAt(80, tabs, 10); hit != 1 {
+		t.Errorf("TabAt(10) = %d, want 1", hit)
+	}
+	// Beyond visible width
+	if hit := th.TabAt(80, tabs, 200); hit != -1 {
+		t.Errorf("TabAt(200) = %d, want -1", hit)
+	}
+	if hit := th.TabAt(80, tabs, -1); hit != -1 {
+		t.Errorf("TabAt(-1) = %d, want -1", hit)
+	}
+}

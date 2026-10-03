@@ -53,7 +53,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
-| UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
+| UX-M1 mouse | Gemini 3.8 Flash (high) | Done, ready to merge | ws/ux-m1-mouse | 2026-10-03 20:45 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
 
 ## Entries
@@ -934,3 +934,31 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: phase 1 merged except H1 (Q, V0, V1 on main). Wrote phase 2 briefs `UX-V2a-request-vim`, `UX-V2b-screens-vim`, `UX-M1-mouse`, `UX-T-terminal`; created their worktrees.
 - Decisions: key forwarding from text fields in normal mode uses new `ForwardKeyMsg`/`ForwardSeqMsg` (owned by V2a); "always" keys work in panes and non-modal overlays only; H1 final fix round reassigned to GPT-5.6 Sol.
 - Next: V3 brief once H1 merges; M2 and QA after phase 2.
+
+### 2026-10-03 20:10 IST · UX-M1 · Gemini 3.8 Flash (high) · STARTED
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Read UX-M1 brief, related docs, Bubble Tea v2 mouse API. Starting implementation of mouse support: cell-motion mode on pure tea.View, hit-testing in Update/SetSize, click focus, tree select/double-click/fold, tab clicks, wheel routing, overlay rules, --no-mouse flag and POSTCTL_NO_MOUSE.
+- Files: `docs/ledger.md`
+- Decisions: Follow plan §0 U3 and brief specifications.
+- Tests: Starting work.
+- Blockers / questions: none.
+- Next: Inspect existing layout/panemove geometry and wire mouse options and hit testing.
+
+### 2026-10-03 20:45 IST · UX-M1 · Gemini 3.8 Flash (high) · DONE
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Implemented mouse support per brief UX-M1:
+  - Enabled mouse by default (`tea.MouseModeCellMotion` set on pure `tea.View` in `View()`); `--no-mouse` CLI flag and `POSTCTL_NO_MOUSE=1` env var to disable (`tea.MouseModeNone`).
+  - Derived hit regions in `Update`/`SetSize` from layout geometry (`a.geo()`); `View()` remains strictly pure.
+  - Left click focuses panes and delegates to active pane. In TwoPane/SinglePane, clicking switcher headers switches active panes.
+  - Tree mouse interaction: single click selects row, double-click (<=400 ms with injectable `a.now`) or click on selected row opens, click on fold glyph toggles fold, wheel scrolls tree offset.
+  - Pane wheel scrolling routes to the hovered pane without changing focus.
+  - Added `MouseHandler` interface in `internal/tui/pane.go` and implemented delegation in `internal/tui/kindrouter.go`.
+  - Added new `mouse.go` files in `internal/tui/request`, `internal/tui/response`, and `internal/tui/wspane` implementing tab bar clicks and wheel scrolling without editing any existing files in those packages.
+  - Overlay rules: clicks inside forward to overlay; outside clicks on modal dialogs are ignored; outside clicks on non-modal overlays dismiss the overlay.
+  - Added tab hit-testing helpers in `internal/ui/header.go` (`TabRanges`, `TabAt`).
+  - Updated docs: `--no-mouse` in `docs/cli.md` and `README.md`; `## Mouse` section in `cmd/genkeys/main.go` and regenerated `docs/keys.md` via `task keys` (documented Shift-drag / Option-drag selection).
+- Files: `internal/ui/header.go`, `internal/ui/components_test.go`, `internal/tui/pane.go`, `internal/tui/kindrouter.go`, `internal/tui/tree.go`, `internal/tui/mouse.go`, `internal/tui/mouse_test.go`, `internal/tui/request/mouse.go`, `internal/tui/request/mouse_test.go`, `internal/tui/response/mouse.go`, `internal/tui/response/mouse_test.go`, `internal/tui/wspane/mouse.go`, `internal/tui/wspane/mouse_test.go`, `internal/tui/app.go`, `internal/tui/layout.go`, `internal/tui/run.go`, `cmd/postctl/main.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/cli.md`, `README.md`, `docs/ledger.md`.
+- Decisions: Tab hit-testing placed in `internal/ui/header.go` for single source of truth across all tab bars. Existing files in `request/`, `response/`, and `wspane/` left untouched to prevent conflicts with parallel workstreams.
+- Tests: `task agents:check` green (`go build ./...`, `go test -race ./...` with comprehensive hit-testing, focus, double-click, wheel, tab click, and overlay tests; `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` passed.
+- Blockers / questions: none.
+- Next: Ready for orchestrator review and merge.
