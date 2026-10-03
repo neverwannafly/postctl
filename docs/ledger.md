@@ -56,6 +56,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
+| UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Started | ws/ux-m2-editor-mouse | 2026-10-03 22:10 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Started | qa/ux | 2026-10-03 22:10 IST |
 
 ## Entries
 

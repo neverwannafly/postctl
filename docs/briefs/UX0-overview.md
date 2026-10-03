@@ -19,10 +19,10 @@ The user found the TUI slow to drive: pane keys were invisible, switching reques
 | 2 | V3 | `UX-V3-response.md` | `ws/ux-v3-response` | Sonnet 5.5 (high) | V0, V1, H1; step 4 after V2a |
 | 2 | M1 | `UX-M1-mouse.md` | `ws/ux-m1-mouse` | Gemini 3.8 Flash (high) | V0 |
 | 2 | T | `UX-T-terminal.md` | `ws/ux-t-terminal` | Composer 2.5 | V0 |
-| 3 | M2 | mouse inside editors (click cursor, drag → visual) | `ws/ux-m2-editor-mouse` | Composer 2.5 | V2a, V2b, M1 |
-| 3 | QA | leak sweep (yank, clipboard, diff, completion, restore), smoke script, golden review, docs | `qa/ux` | Sonnet 5.5 | all |
+| 3 | M2 | `UX-M2-editor-mouse.md` | `ws/ux-m2-editor-mouse` | GPT-5.6 Sol (medium) | V2a, V2b, M1 |
+| 3 | QA | `UX-QA.md` | `qa/ux` | Sonnet 5.5 (high) | all |
 
-Phase 2 briefs V2a, V2b, M1, T written 2026-10-03 after V0, V1, Q merged; V3 waits for H1 (it reuses `internal/tui/diffview`). H1 merged 20:16; V3 brief written then, moved to Sonnet because its masking surface is wide. Reviews: two reviewer subagents per workstream; the H1 final round moved from Composer to GPT-5.6 Sol after two failed algorithm rounds.
+Phase 2 briefs V2a, V2b, M1, T written 2026-10-03 after V0, V1, Q merged; V3 waits for H1 (it reuses `internal/tui/diffview`). H1 merged 20:16; V3 brief written then, moved to Sonnet because its masking surface is wide. All phase 2 merged by 22:05; phase 3 briefs written then. M2 moved to GPT-5.6 Sol (it maps screen cells to vimtext positions; that model built vimtext). Review experiments use `git clone`, never `cp -R` of a worktree. Reviews: two reviewer subagents per workstream; the H1 final round moved from Composer to GPT-5.6 Sol after two failed algorithm rounds.
 
 ## File ownership (phase 1)
 
