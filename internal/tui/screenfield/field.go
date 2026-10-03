@@ -19,7 +19,14 @@ type Field struct {
 func New(th ui.Theme, value, placeholder string, masked bool) (*Field, tea.Cmd) {
 	opts := vimtext.Options{SingleLine: true, StartInsert: true, Placeholder: placeholder}
 	if masked {
-		opts.Redact = maskFn(th)
+		g := maskGlyph(th)
+		opts.Mask = g
+		opts.Redact = func(s string) string {
+			if s == "" {
+				return ""
+			}
+			return strings.Repeat(g, uniseg.StringWidth(s))
+		}
 	}
 	ed := vimtext.New(th, opts)
 	ed.SetValue(value)
@@ -39,17 +46,19 @@ func cursorEnd(ed *vimtext.Model) {
 	ed.SetCursor(0, n)
 }
 
-func maskFn(th ui.Theme) func(string) string {
-	return func(s string) string {
-		if s == "" {
-			return ""
-		}
-		if th.ASCII {
-			return "****"
-		}
-		return "••••"
+func maskGlyph(th ui.Theme) string {
+	if th.ASCII {
+		return "*"
 	}
+	cluster, _, _, _ := uniseg.FirstGraphemeClusterInString(th.Glyphs.Mask, -1)
+	if cluster == "" {
+		return "*"
+	}
+	return cluster
 }
+
+// Focus returns the field to insert mode.
+func (f *Field) Focus() tea.Cmd { return f.ed.Focus() }
 
 // SetWidth sets the render width in cells.
 func (f *Field) SetWidth(w int) { f.ed.SetSize(max(4, w), 1) }

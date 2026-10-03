@@ -268,6 +268,29 @@ func TestReadOnlyNeverChanges(t *testing.T) {
 	}
 }
 
+func TestMaskKeepsCursorColumnsAligned(t *testing.T) {
+	th := ui.NewTheme(true, true, false)
+	m := New(th, Options{SingleLine: true, Mask: th.Glyphs.Mask})
+	const secret = "abcdefghijklmnopqrstuvwxyz012345"
+	m.SetValue(secret)
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.SetCursor(0, 15)
+	view := m.View()
+	if strings.Contains(view, secret) {
+		t.Fatal("masked view shows secret")
+	}
+	if !strings.Contains(view, th.Glyphs.Mask) {
+		t.Fatal("masked view shows no mask glyph")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	_, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	vis := m.View()
+	if strings.Contains(vis, secret) {
+		t.Fatal("visual selection leaked secret")
+	}
+}
+
 func TestViewIsPureInEveryMode(t *testing.T) {
 	for _, mode := range []Mode{Normal, Insert, Visual, VisualLine} {
 		t.Run(mode.String(), func(t *testing.T) {

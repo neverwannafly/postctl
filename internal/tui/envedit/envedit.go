@@ -129,13 +129,15 @@ type Model struct {
 	confFn func() tea.Cmd
 
 	// variables table
-	cur, top int
-	edit     bool
-	col      int
-	in       *screenfield.Field
-	draft    bool
-	reveal   bool
-	listNav  listmotion.View
+	cur, top      int
+	edit          bool
+	col           int
+	in            *screenfield.Field
+	draft         bool
+	reveal        bool
+	editBaseline  string
+	editSkipValue bool
+	listNav       listmotion.View
 
 	seq    map[saveKey]uint64
 	dirty  map[saveKey]bool
@@ -176,7 +178,15 @@ func (m *Model) focusInitial() {
 }
 
 // SetSize implements tui.Screen.
-func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
+func (m *Model) SetSize(w, h int) {
+	m.w, m.h = w, h
+	if m.name != nil {
+		m.name.SetWidth(max(4, w-12))
+	}
+	if m.in != nil {
+		m.in.SetWidth(max(4, w-15))
+	}
+}
 
 // ---- what is being edited ------------------------------------------------------
 
@@ -527,6 +537,7 @@ func (m *Model) beginName(in nameIntent, initial string) {
 	m.intent = in
 	f, _ := screenfield.New(m.th, initial, "Environment name", false)
 	m.name = f
+	m.name.SetWidth(max(4, m.w-12))
 	m.nameEr = ""
 }
 

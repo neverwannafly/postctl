@@ -202,6 +202,23 @@ func (m *Model) beginEdit(col int) {
 	}
 	f, _ := screenfield.New(m.th, val, ph, masked)
 	m.in = f
+	m.in.SetWidth(max(4, m.w-15))
+	m.editBaseline = val
+	m.editSkipValue = col == 1 && v.IsSecret() && v.Value == "" && v.SecretRef != "" && !m.reveal
+}
+
+func (m *Model) applyTextIfChanged() tea.Cmd {
+	if m.in == nil {
+		return nil
+	}
+	t := m.in.Value()
+	if t == m.editBaseline {
+		return nil
+	}
+	if m.editSkipValue && t == "" {
+		return nil
+	}
+	return m.applyText()
 }
 
 func (m *Model) applyText() tea.Cmd {
@@ -249,15 +266,26 @@ func (m *Model) finish() tea.Cmd {
 
 func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 	s := k.String()
+	if s == "ctrl+r" {
+		l := m.list()
+		if l != nil && m.cur < len(*l) && m.col == 1 && (*l)[m.cur].IsSecret() {
+			m.reveal = !m.reveal
+			m.beginEdit(m.col)
+			if m.reveal {
+				return m.toggleRevealFromEdit()
+			}
+			return nil
+		}
+	}
 	submit, changed, cmd, leave, normal := m.in.UpdateEx(k)
 	if leave || (s == "esc" && normal) {
 		return tea.Batch(cmd, m.finish())
 	}
 	if submit || (s == "enter" && normal) {
-		return tea.Batch(cmd, m.applyText(), m.finish())
+		return tea.Batch(cmd, m.applyTextIfChanged(), m.finish())
 	}
 	if changed {
-		return tea.Batch(cmd, m.applyText())
+		return tea.Batch(cmd, m.applyTextIfChanged())
 	}
 	switch s {
 	case "tab":
@@ -296,19 +324,6 @@ func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 			m.cur = next
 			m.beginEdit(col)
 		}
-		return cmd
-	case "ctrl+r":
-		l := m.list()
-		if l == nil || m.cur >= len(*l) || !(*l)[m.cur].IsSecret() {
-			return cmd
-		}
-		m.reveal = !m.reveal
-		v := (*l)[m.cur]
-		m.beginEdit(m.col)
-		if m.reveal {
-			return tea.Batch(cmd, m.toggleRevealFromEdit())
-		}
-		_ = v
 		return cmd
 	}
 	return cmd

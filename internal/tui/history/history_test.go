@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
@@ -62,6 +63,44 @@ func TestHistoryListAndFilter(t *testing.T) {
 	out = ansi.Strip(m.View())
 	if strings.Contains(out, "OK") {
 		t.Fatalf("filter should hide 2xx:\n%s", out)
+	}
+}
+
+func TestViewIsPure(t *testing.T) {
+	m := New(tui.ScreenEnv{PaneEnv: tui.PaneEnv{Theme: ui.NewTheme(true, false, false)}}, Deps{})
+	m.SetSize(80, 24)
+	m.items = []history.Entry{{ID: "1", RequestName: "A"}}
+	m.cur = 1
+	before := m.cur
+	first, second := m.View(), m.View()
+	if first != second || m.cur != before {
+		t.Fatal("View mutated history list state")
+	}
+}
+
+func TestHistoryListVimNavigation(t *testing.T) {
+	m := New(tui.ScreenEnv{PaneEnv: tui.PaneEnv{Theme: ui.NewTheme(true, true, false)}}, Deps{})
+	m.items = make([]history.Entry, 4)
+	m.cur = 2
+	_, _ = m.Update(tea.KeyPressMsg{Text: "g"})
+	if m.cur != 2 {
+		t.Fatal("first g must wait for the second key")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Text: "g"})
+	if m.cur != 0 {
+		t.Fatal("gg must jump to the first entry")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Text: "j"})
+	if m.cur != 1 {
+		t.Fatal("j must move down")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Text: "k"})
+	if m.cur != 0 {
+		t.Fatal("k must move up")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Text: "G"})
+	if m.cur != len(m.items)-1 {
+		t.Fatal("G must jump to the last entry")
 	}
 }
 

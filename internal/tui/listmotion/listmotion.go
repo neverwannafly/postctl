@@ -26,8 +26,29 @@ type Result struct {
 // Key applies one key to v and returns whether the key was consumed and whether
 // the cursor moved. gg is two separate g presses; G jumps to the last item.
 func Key(k tea.KeyPressMsg, cfg Config, v *View) Result {
-	if cfg.Count <= 0 && k.String() != "g" {
-		return Result{}
+	if cfg.Count <= 0 {
+		switch k.String() {
+		case "j", "down", "k", "up", "ctrl+d", "pgdown", "ctrl+u", "pgup", "home", "end", "G", "g":
+			v.GWait = false
+			return Result{Handled: true}
+		default:
+			if k.String() != "g" {
+				return Result{}
+			}
+		}
+	}
+	if cfg.Count > 0 {
+		v.Cursor = min(v.Cursor, cfg.Count-1)
+		if v.Cursor < 0 {
+			v.Cursor = 0
+		}
+		page := max(1, cfg.Page)
+		if v.Top > v.Cursor {
+			v.Top = v.Cursor
+		}
+		if v.Top > max(0, cfg.Count-page) {
+			v.Top = max(0, cfg.Count-page)
+		}
 	}
 	page := max(1, cfg.Page)
 	half := max(1, page/2)

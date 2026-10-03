@@ -72,12 +72,8 @@ func (m *Model) View() string {
 
 func (m *Model) renderLine(row, width int) string {
 	line := m.lines[row]
-	if m.opts.SingleLine && line != "" && m.opts.Redact != nil {
-		if red := m.opts.Redact(line); red != line {
-			line = red
-		}
-	}
 	cs := clusters(line)
+	mask := m.opts.Mask
 	from := min(m.left, len(cs))
 	var b strings.Builder
 	used := 0
@@ -85,7 +81,9 @@ func (m *Model) renderLine(row, width int) string {
 	for i := from; i < len(cs); i++ {
 		source := cs[i]
 		cell := source
-		if source == "\t" {
+		if mask != "" && source != "\t" {
+			cell = mask
+		} else if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
 		}
 		cw := max(1, uniseg.StringWidth(cell))

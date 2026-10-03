@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -178,6 +179,29 @@ func (h *harness) typ(s string) {
 }
 
 func (h *harness) view() string { return ansi.Strip(h.m.View()) }
+
+func TestUnhydratedSecretEnterPreservesKeychain(t *testing.T) {
+	secrets := store.NewMemorySecrets()
+	ref := model.SecretRef("env/e-stg/token")
+	if err := secrets.Set(context.Background(), ref, "keep-secret"); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, 80, 24)
+	h.ws.Environments[0].Variables[1] = model.Variable{Key: "token", Type: model.VarSecret, SecretRef: ref}
+	h.scr.reveal = false
+	h.key("enter") // table
+	h.key("j")     // token row
+	h.key("enter") // value
+	h.key("enter") // submit unchanged
+	got, err := secrets.Get(context.Background(), ref)
+	if err != nil || got != "keep-secret" {
+		t.Fatalf("keychain value changed: err=%v", err)
+	}
+	v := h.ws.Environments[0].Variables[1]
+	if v.SecretRef != ref {
+		t.Fatal("secret ref cleared")
+	}
+}
 
 func TestViewIsPure(t *testing.T) {
 	h := newHarness(t, 80, 24)

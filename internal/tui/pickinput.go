@@ -79,7 +79,6 @@ func (p *pickInput) inserting() bool {
 }
 
 func (p *pickInput) view(th ui.Theme) string {
-	p.ed.SetSize(p.width, 1)
 	prefix := th.Render(ui.AccentPrimary, p.prompt)
 	body := p.ed.View()
 	// ed.View is width cells; prefix sits before it on the same line.
@@ -178,7 +177,6 @@ func (p *promptInput) update(msg tea.Msg) (tea.Cmd, pickNav) {
 }
 
 func (p *promptInput) view(th ui.Theme) string {
-	p.ed.SetSize(p.width, 1)
 	return p.ed.View()
 }
 

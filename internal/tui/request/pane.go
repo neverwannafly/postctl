@@ -186,8 +186,9 @@ type Pane struct {
 
 	confirm *importOffer
 
-	hist  map[model.ID]*history
-	saves map[model.ID]*saveState
+	hist    map[model.ID]*history
+	saves   map[model.ID]*saveState
+	pending map[model.ID]tui.ApplyRequestPatchMsg
 
 	send sendState
 
@@ -324,6 +325,8 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 			p.notice = ""
 		}
 		return p, nil
+	case tui.ApplyRequestPatchMsg:
+		return p, p.applyHistoryTemplate(m)
 	}
 	return p, nil
 }

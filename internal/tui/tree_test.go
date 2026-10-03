@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 )
 
@@ -183,6 +184,35 @@ func TestCreateRequestAfterSelectedRequest(t *testing.T) {
 	f := coll.Items[0].(*model.Folder)
 	if f.Items[2].ItemName() != "Right after" {
 		t.Fatalf("new request should follow the selected one: %v", itemNames(f.Items))
+	}
+}
+
+func TestCreateRequestFromHistoryUsesTreeCreatePath(t *testing.T) {
+	h := newHarness(t, demo(), 160, 30)
+	coll := h.a.ws.Collections[0]
+	folder := coll.Items[0].(*model.Folder)
+	before := len(folder.Items)
+	h.msg(CreateRequestFromHistoryMsg{
+		CollectionID: coll.ID,
+		ParentID:     folder.ID,
+		Name:         "Restored request",
+		Template: history.RequestTemplate{
+			Method: "PATCH",
+			URL:    "{{baseUrl}}/restored",
+		},
+	})
+	if len(folder.Items) != before+1 {
+		t.Fatal("restored request was not inserted")
+	}
+	req, ok := folder.Items[before].(*model.Request)
+	if !ok || req.Name != "Restored request" || req.Method != "PATCH" {
+		t.Fatal("restored request did not use normal request creation")
+	}
+	if h.a.tree.sel != req.ID || h.a.focus != SlotRequest {
+		t.Fatal("restored request was not selected and opened")
+	}
+	if len(h.be.saved) != 1 || h.be.saved[0] != coll.ID {
+		t.Fatal("restored request did not queue the normal collection save")
 	}
 }
 

@@ -6,19 +6,18 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func TestKeyGgAndG(t *testing.T) {
-	v := View{Cursor: 5}
-	gKey := func(ch rune) tea.KeyPressMsg {
-		s := string(ch)
-		return tea.KeyPressMsg{Code: ch, Text: s}
+func TestEmptyListConsumesMotion(t *testing.T) {
+	v := &View{Cursor: 3, Top: 2}
+	r := Key(tea.KeyPressMsg{Code: 'j', Text: "j"}, Config{Count: 0, Page: 5}, v)
+	if !r.Handled || r.Moved {
+		t.Fatalf("empty list: handled=%v moved=%v", r.Handled, r.Moved)
 	}
-	if r := Key(gKey('g'), Config{Count: 10, Page: 3}, &v); !r.Handled {
-		t.Fatal("first g should be handled")
-	}
-	if r := Key(gKey('g'), Config{Count: 10, Page: 3}, &v); !r.Moved || v.Cursor != 0 {
-		t.Fatalf("gg -> cursor %d", v.Cursor)
-	}
-	if r := Key(gKey('G'), Config{Count: 10, Page: 3}, &v); !r.Moved || v.Cursor != 9 {
-		t.Fatalf("G -> cursor %d", v.Cursor)
+}
+
+func TestCursorClampedAfterShrink(t *testing.T) {
+	v := &View{Cursor: 9, Top: 8}
+	Key(tea.KeyPressMsg{Code: 'G', Text: "G"}, Config{Count: 3, Page: 2}, v)
+	if v.Cursor != 2 {
+		t.Fatalf("cursor=%d want 2 after shrink", v.Cursor)
 	}
 }

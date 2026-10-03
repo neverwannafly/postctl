@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/ui"
@@ -364,6 +365,32 @@ type SaveDoneMsg struct {
 	ID model.ID
 	// Err is the failure, or nil.
 	Err error
+}
+
+// ApplyRequestPatchMsg asks the request pane to merge a redacted history
+// template into the saved request. The pane applies the change through its
+// normal edit path so undo reverts it and autosave persists it. Masked or
+// truncated template fields keep the current editor values; key names only
+// appear in the status notice.
+type ApplyRequestPatchMsg struct {
+	// RequestID is the open request to patch.
+	RequestID model.ID
+	// Template is the redacted unresolved snapshot from a history entry.
+	Template history.RequestTemplate
+}
+
+// CreateRequestFromHistoryMsg asks the shell to create a request through the
+// same tree edit path as an interactive new request, then apply a redacted
+// history template. ParentID may be a collection or folder ID.
+type CreateRequestFromHistoryMsg struct {
+	// CollectionID is the collection that receives the request.
+	CollectionID model.ID
+	// ParentID is the collection or folder that receives the request.
+	ParentID model.ID
+	// Name is the restored request name.
+	Name string
+	// Template is applied after the new request is selected.
+	Template history.RequestTemplate
 }
 
 // Optional Backend capabilities. The shell type-asserts for them, so a Backend

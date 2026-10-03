@@ -80,6 +80,8 @@ type Model struct {
 	scopeLabel string
 
 	field      int
+	setupNav   listmotion.View
+	failCur    int
 	envID      model.ID
 	iterations *screenfield.Field
 	dataPath   *screenfield.Field
@@ -148,7 +150,21 @@ func (m *Model) buildScopeLabel() string {
 }
 
 // SetSize implements tui.Screen.
-func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
+func (m *Model) SetSize(w, h int) {
+	m.w, m.h = w, h
+	if m.iterations != nil {
+		m.iterations.SetWidth(20)
+	}
+	if m.dataPath != nil {
+		m.dataPath.SetWidth(max(4, w-20))
+	}
+	if m.delayMS != nil {
+		m.delayMS.SetWidth(12)
+	}
+	if m.exportPath != nil {
+		m.exportPath.SetWidth(max(4, w-2))
+	}
+}
 
 // KeyHints implements tui.Screen.
 func (m *Model) KeyHints() []ui.Hint {
@@ -252,11 +268,22 @@ func (m *Model) VimMode() string {
 }
 
 func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	m.setupNav.Cursor = m.field
+	if r := listmotion.Key(k, listmotion.Config{Count: 7, Page: 7}, &m.setupNav); r.Handled {
+		if r.Moved {
+			m.field = m.setupNav.Cursor
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
-		if f := m.activeField(); f != nil && f.Inserting() {
-			_, _, cmd, _, _ := f.UpdateEx(k)
-			return m, cmd
+		if f := m.activeField(); f != nil {
+			if f.Inserting() {
+				_, _, cmd, _, _ := f.UpdateEx(k)
+				return m, cmd
+			}
+			f.Blur()
+			return m, nil
 		}
 		return nil, nil
 	case "tab":
@@ -277,6 +304,16 @@ func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 			return m, m.startRun()
 		}
 		if f := m.activeField(); f != nil {
+			if !f.Inserting() {
+				if f.VimMode() == "" {
+					return m, f.Focus()
+				}
+				_, _, cmd, leave, normal := f.UpdateEx(k)
+				if normal && !leave {
+					return m, tea.Batch(cmd, f.Focus())
+				}
+				return m, cmd
+			}
 			_, _, cmd, _, _ := f.UpdateEx(k)
 			return m, cmd
 		}
@@ -331,6 +368,17 @@ func (m *Model) liveKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 }
 
 func (m *Model) summaryKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	failN := 0
+	if m.summary != nil {
+		failN = len(m.summary.Failures)
+	}
+	m.listNav.Cursor = m.failCur
+	if r := listmotion.Key(k, listmotion.Config{Count: failN, Page: max(1, m.h-12)}, &m.listNav); r.Handled {
+		if r.Moved {
+			m.failCur = m.listNav.Cursor
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
@@ -347,12 +395,29 @@ func (m *Model) summaryKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 func (m *Model) exportKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc":
+		if m.exportPath.Inserting() {
+			_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
+			return m, cmd
+		}
+		if m.exportPath.VimMode() == "NORMAL" {
+			m.exportPath.Blur()
+			return m, nil
+		}
 		m.phase = phSummary
+	case "enter":
+		if !m.exportPath.Inserting() {
+			if m.exportPath.VimMode() == "" {
+				return m, m.exportPath.Focus()
+			}
+			if m.exportPath.VimMode() == "NORMAL" {
+				_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
+				return m, tea.Batch(cmd, m.exportPath.Focus())
+			}
+		}
+		return m, m.confirmExport()
 	case "tab":
 		m.exportXML = !m.exportXML
 		m.exportPath, _ = screenfield.New(m.th, swapExportExtension(m.exportPath.Value(), m.exportXML), "export path", false)
-	case "enter":
-		return m, m.confirmExport()
 	default:
 		_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
 		return m, cmd
@@ -1015,10 +1080,9 @@ func (m *Model) viewExport() string {
 	return body
 }
 
-func runnerField(f *screenfield.Field, w int) string {
+func runnerField(f *screenfield.Field, _ int) string {
 	if f == nil {
 		return ""
 	}
-	f.SetWidth(max(4, w))
 	return f.View()
 }

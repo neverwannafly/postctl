@@ -50,7 +50,12 @@ type Options struct {
 	Highlighter Highlighter
 	Completer   Completer
 	Clipboard   func(text string) tea.Cmd
-	Redact      func(text string) string
+	// Redact transforms text before it reaches Clipboard; nil means identity.
+	Redact func(text string) string
+	// Mask is a single display glyph repeated per grapheme cluster in the buffer.
+	// Cursor, scroll and selection use cluster indexes on the real buffer; only
+	// rendering is masked. Empty means show the buffer as stored.
+	Mask string
 }
 
 // EventKind identifies the result of an Update.
