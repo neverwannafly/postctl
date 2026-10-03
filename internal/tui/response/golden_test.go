@@ -30,44 +30,45 @@ func TestGoldenRenders(t *testing.T) {
 	scenes := []struct {
 		name  string
 		setup func(*Pane)
+		then  func(*testing.T, *Pane) // runs after SetSize
 	}{
-		{"empty", func(p *Pane) {
+		{name: "empty", setup: func(p *Pane) {
 			p.ref = tui.RequestRef{Request: &model.Request{ID: model.NewID()}}
 		}},
-		{"json-body", func(p *Pane) {
+		{name: "json-body", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
 		}},
-		{"tests-tab", func(p *Pane) {
+		{name: "tests-tab", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
 			p.tab = tabTests
 		}},
-		{"timeline-tab", func(p *Pane) {
+		{name: "timeline-tab", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
 			p.tab = tabTimeline
 		}},
-		{"history-tab", func(p *Pane) {
+		{name: "history-tab", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.deps = goldenDeps()
 			res := demoResult(id)
 			res.HistoryID = "e3"
 			p.applyResult(res)
-			p.hist = histState{loaded: true, items: goldenHistory(id), cur: 1}
+			p.hist = histState{loaded: true, items: goldenHistory(id), cur: 1, now: goldenDeps().now()}
 			p.tab = tabHistory
 		}},
-		{"history-empty", func(p *Pane) {
+		{name: "history-empty", setup: func(p *Pane) {
 			p.ref = tui.RequestRef{Request: &model.Request{ID: model.NewID()}}
 			p.deps = goldenDeps()
 			p.hist = histState{loaded: true}
 			p.tab = tabHistory
 		}},
-		{"diff-body", func(p *Pane) {
+		{name: "diff-body", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.deps = goldenDeps()
@@ -82,7 +83,7 @@ func TestGoldenRenders(t *testing.T) {
 			ready := buildDiff(1, p.th, 0, 0, "Previous", &prev, res)
 			p.diff = diffState{open: true, body: ready.body, headers: ready.headers, showBody: true}
 		}},
-		{"jq-output", func(p *Pane) {
+		{name: "jq-output", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
@@ -90,7 +91,7 @@ func TestGoldenRenders(t *testing.T) {
 				"{", `  "id": "ch_1",`, `  "amount": 1200`, "}",
 			}}
 		}},
-		{"jq-open", func(p *Pane) {
+		{name: "jq-open", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
@@ -98,14 +99,23 @@ func TestGoldenRenders(t *testing.T) {
 			p.newJQInput(".data.items[]")
 			p.jq.open = true
 		}},
-		{"sending", func(p *Pane) {
+		{name: "vim-body", setup: vimBodyScene, then: func(t *testing.T, p *Pane) {
+			vimKeys(t, p, "j", "j", "l", "l")
+		}},
+		{name: "vim-visual", setup: vimBodyScene, then: func(t *testing.T, p *Pane) {
+			vimKeys(t, p, "j", "V", "j")
+		}},
+		{name: "vim-search", setup: vimBodyScene, then: func(t *testing.T, p *Pane) {
+			vimKeys(t, p, "/", "i", "d", "enter")
+		}},
+		{name: "sending", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.sendingID = id
 			p.sendStep = "Waiting for response"
 			p.sendStarted = time.Now().Add(-2 * time.Second)
 		}},
-		{"transport-err", func(p *Pane) {
+		{name: "transport-err", setup: func(p *Pane) {
 			id := model.NewID()
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(tui.SendResult{RequestID: id, Err: httpxErr("connection refused to api.local:8443")})
@@ -121,6 +131,9 @@ func TestGoldenRenders(t *testing.T) {
 				p := &Pane{th: m.th, byID: map[model.ID]*storedResult{}, spin: m.th.NewSpinner()}
 				sc.setup(p)
 				p.SetSize(sz[0], sz[1]-3)
+				if sc.then != nil {
+					sc.then(t, p)
+				}
 				got := blockView(p.View(), sz[0], sz[1]-3)
 				file := filepath.Join(dir, sc.name+"-"+m.name+"-"+itoa(sz[0])+"x"+itoa(sz[1])+".golden")
 				if *update {

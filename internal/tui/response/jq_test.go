@@ -129,7 +129,7 @@ func v3JQPane(t *testing.T, body, contentType string) (*Pane, model.ID, *[]strin
 func v3ApplyFilter(t *testing.T, p *Pane, filter string) {
 	t.Helper()
 	v3RunAction(t, p, "response.jq")
-	if !p.Editing() {
+	if !p.jq.open {
 		t.Fatal("Space j did not open the filter input")
 	}
 	v3Type(t, p, filter)
@@ -139,7 +139,7 @@ func v3ApplyFilter(t *testing.T, p *Pane, filter string) {
 func TestJQFilterAppliesAndLabelsTab(t *testing.T) {
 	p, _, _ := v3JQPane(t, jqBody, "application/json")
 	v3ApplyFilter(t, p, ".items[].id")
-	if p.Editing() {
+	if p.jq.open {
 		t.Fatal("Enter should close the input")
 	}
 	out := v3Frame(p)
@@ -171,11 +171,11 @@ func TestJQInputEscLeavesInsertThenClears(t *testing.T) {
 		t.Fatalf("mode = %q, want INSERT", p.VimMode())
 	}
 	v3Pump(t, p, v3Key("esc"))
-	if p.VimMode() != "NORMAL" || !p.Editing() {
-		t.Fatalf("first Esc: mode %q editing %v, want NORMAL and still editing", p.VimMode(), p.Editing())
+	if p.VimMode() != "NORMAL" || !p.jq.open {
+		t.Fatalf("first Esc: mode %q editing %v, want NORMAL and still editing", p.VimMode(), p.jq.open)
 	}
 	v3Pump(t, p, v3Key("esc"))
-	if p.Editing() || p.jq.filter != "" {
+	if p.jq.open || p.jq.filter != "" {
 		t.Fatal("Esc in normal mode must clear the filter and close the input")
 	}
 }
@@ -188,7 +188,7 @@ func TestJQEmptyEnterClears(t *testing.T) {
 		v3Pump(t, p, tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	v3Pump(t, p, v3Key("enter"))
-	if p.jq.filter != "" || p.Editing() {
+	if p.jq.filter != "" || p.jq.open {
 		t.Fatal("an empty filter should clear jq")
 	}
 }
@@ -199,7 +199,7 @@ func TestJQRequiresJSONBody(t *testing.T) {
 	if toasts := v3Toasts(shell); len(toasts) != 1 || toasts[0] != "jq needs a JSON body." {
 		t.Fatalf("toasts = %q", toasts)
 	}
-	if p.Editing() {
+	if p.jq.open {
 		t.Fatal("the input opened on a non-JSON body")
 	}
 }
@@ -322,7 +322,7 @@ func TestJQEditingKeysStayInTheInput(t *testing.T) {
 	p, _, _ := v3JQPane(t, jqBody, "application/json")
 	v3RunAction(t, p, "response.jq")
 	v3Type(t, p, "q g [ ] u y ")
-	if !p.Editing() || p.jq.filter != "" {
+	if !p.jq.open || p.jq.filter != "" {
 		t.Fatal("typing in the input leaked into pane commands")
 	}
 	if got := p.jq.input.Value(); got != "q g [ ] u y " {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
@@ -48,7 +49,7 @@ func TestSendStateTransitions(t *testing.T) {
 	if p.sendingID != "" {
 		t.Fatal("send should finish")
 	}
-	view = p.View()
+	view = ansi.Strip(p.View()) // the highlighter styles each character on its own
 	if !contains(view, "200") {
 		t.Fatalf("expected result chip, got %q", view)
 	}

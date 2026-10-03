@@ -287,3 +287,21 @@ func TestHistoryTabViewIsPure(t *testing.T) {
 }
 
 func themeASCII() ui.Theme { return ui.NewTheme(true, true, true) }
+
+func TestHistoryTabViewDoesNotReadTheClock(t *testing.T) {
+	calls := 0
+	log := &fakeLog{}
+	p, id, _ := v3Pane(t, log, v3Theme())
+	p.deps.Now = func() time.Time { calls++; return v3Now }
+	log.entries = []history.Entry{v3Entry("e1", id, time.Minute, 200, "OK", `{}`)}
+	v3Pump(t, p, tui.FocusSectionMsg{Section: tui.SectionRespHistory})
+	if calls == 0 {
+		t.Fatal("Update should stamp the clock when it shows the History tab")
+	}
+	before := calls
+	_ = p.View()
+	_ = p.View()
+	if calls != before {
+		t.Fatalf("View read the clock %d times", calls-before)
+	}
+}

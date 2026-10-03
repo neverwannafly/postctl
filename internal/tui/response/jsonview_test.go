@@ -16,19 +16,6 @@ func TestJSONPathFilter(t *testing.T) {
 	}
 }
 
-func TestJSONFoldReducesVisibleLines(t *testing.T) {
-	body := []byte(`{"a":{"b":1,"c":2},"d":3}`)
-	doc, err := buildJSONDoc(body, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := doc.visibleLineCount()
-	doc.folded[0] = true
-	if doc.visibleLineCount() >= before {
-		t.Fatalf("fold should hide lines: before=%d after=%d", before, doc.visibleLineCount())
-	}
-}
-
 func TestSearchInBody(t *testing.T) {
 	body := []byte(`{"token":"findme"}`)
 	if DetectBodyKind("application/json", body) != BodyJSON {

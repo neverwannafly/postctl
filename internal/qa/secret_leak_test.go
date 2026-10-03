@@ -745,6 +745,12 @@ func renderResponseV3Frames(
 		}
 		driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape})
 
+		// Body buffer: every kind of yank must come out masked. The screen shows
+		// the body as the server sent it (that frame is exempt), copies do not.
+		for name, text := range yankBodyBuffer(t, pane, &clips) {
+			frames[prefix+"body yank "+name] = text
+		}
+
 		for i, filter := range []string{".", ".jwt, .queryEcho, .folderHeader, .requestPath"} {
 			runResponseAction(t, pane, "response.jq")
 			for _, r := range filter {
@@ -805,7 +811,7 @@ func runPaneCmd(t *testing.T, p tui.Pane, cmd tea.Cmd) {
 			continue
 		}
 		switch m := c().(type) {
-		case nil, tui.ToastMsg, tui.FocusPaneMsg, tui.OpenRequestHistoryMsg:
+		case nil, tui.ToastMsg, tui.FocusPaneMsg, tui.OpenRequestHistoryMsg, tui.ForwardKeyMsg, tui.ForwardSeqMsg:
 		case tea.BatchMsg:
 			queue = append(queue, m...)
 		default:
@@ -870,4 +876,56 @@ func runScreenCmds(t *testing.T, ps *tui.Screen, cmd tea.Cmd) {
 			queue = append(queue, cmd)
 		}
 	}
+}
+
+// yankBodyBuffer copies from the response pane's read-only body buffer in
+// every way a person can (whole buffer, each line, each line from its start to
+// its end, and word by word) and returns what reached the clipboard.
+func yankBodyBuffer(t *testing.T, pane tui.Pane, clips *[]string) map[string]string {
+	t.Helper()
+	press := func(keys ...string) {
+		for _, k := range keys {
+			driveResponsePane(t, pane, tea.KeyPressMsg{Code: []rune(k)[0], Text: k})
+		}
+	}
+	collect := func(f func()) string {
+		*clips = nil
+		f()
+		return strings.Join(*clips, "\n--\n")
+	}
+	const rows = 40
+	out := map[string]string{}
+	out["whole"] = collect(func() { press("g", "g", "V", "G", "y") })
+	out["lines"] = collect(func() {
+		press("g", "g")
+		for range rows {
+			press("y", "y", "j")
+		}
+	})
+	out["to line end"] = collect(func() {
+		press("g", "g")
+		for range rows {
+			press("0", "v", "$", "y", "j")
+		}
+	})
+	out["words"] = collect(func() {
+		press("g", "g")
+		for range rows {
+			press("0")
+			for range 10 {
+				press("v", "e", "y", "w")
+			}
+			press("j")
+		}
+	})
+	if !strings.Contains(out["whole"], history.Mask) {
+		t.Fatalf("the whole-buffer yank carries no mask: %d bytes copied", len(out["whole"]))
+	}
+	for name, text := range out {
+		if text == "" {
+			t.Fatalf("the %s yank copied nothing", name)
+		}
+	}
+	driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape})
+	return out
 }
