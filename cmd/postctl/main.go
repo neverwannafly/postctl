@@ -66,6 +66,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(workspace, "w", "", "workspace directory (shorthand)")
 	accessible := fs.Bool("accessible", false, "linear, screen-reader friendly presentation")
 	ascii := fs.Bool("ascii", false, "use ASCII instead of Unicode glyphs")
+	noMouse := fs.Bool("no-mouse", false, "disable mouse event capture")
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			usage(stdout)
@@ -91,7 +92,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	rest := fs.Args()
 	if len(rest) == 0 {
-		return openUI(*workspace, *accessible, *ascii, stderr)
+		return openUI(*workspace, *accessible, *ascii, *noMouse, stderr)
 	}
 	if rest[0] == "help" {
 		usage(stdout)
@@ -139,7 +140,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // openUI resolves the workspace and runs the interactive UI. NO_COLOR,
 // POSTCTL_ACCESSIBLE and POSTCTL_ASCII are honored by tui.Run.
-func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
+func openUI(workspace string, accessible, ascii, noMouse bool, stderr io.Writer) int {
 	cwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(stderr, "Cannot read the current directory: %v. Pass --workspace DIR.\n", err)
@@ -161,6 +162,7 @@ func openUI(workspace string, accessible, ascii bool, stderr io.Writer) int {
 		Backend:    tui.NewStoreBackend(root, store.WithSecretStore(store.NewKeychain(""))),
 		Accessible: accessible,
 		ASCII:      ascii,
+		NoMouse:    noMouse,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "Could not run the interactive UI: %v. It needs a terminal; for scripts use the subcommands (postctl --help).\n", err)
@@ -199,7 +201,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "postctl - a terminal API client for Postman collections")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  postctl [--workspace DIR] [--accessible] [--ascii]")
+	fmt.Fprintln(w, "  postctl [--workspace DIR] [--accessible] [--ascii] [--no-mouse]")
 	fmt.Fprintln(w, "      Open the interactive UI.")
 	for _, c := range commands {
 		fmt.Fprintf(w, "  postctl %s\n      %s\n", c.usage, c.summary)
@@ -213,6 +215,7 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "  -w DIR           Shorthand for --workspace")
 	fmt.Fprintln(w, "  --accessible     Linear presentation, no alternate screen or animation (or POSTCTL_ACCESSIBLE=1)")
 	fmt.Fprintln(w, "  --ascii          ASCII glyphs instead of Unicode (or POSTCTL_ASCII=1)")
+	fmt.Fprintln(w, "  --no-mouse       Disable mouse event capture (or POSTCTL_NO_MOUSE=1)")
 	fmt.Fprintln(w, "  NO_COLOR         Set to disable color")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Exit codes: 0 ok, 1 test failures, 2 request errors, 3 usage or configuration errors.")

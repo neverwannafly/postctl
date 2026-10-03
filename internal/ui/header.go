@@ -174,3 +174,48 @@ func (t Theme) Tabs(width int, tabs []Tab, active int, focused bool) string {
 	}
 	return labels.String() + "\n" + rule.String()
 }
+
+// TabLabel returns the text of a tab, including count or dot.
+func (t Theme) TabLabel(tb Tab) string {
+	return t.tabLabel(tb)
+}
+
+// TabRange describes the horizontal column span of a visible tab.
+type TabRange struct {
+	Index int
+	Start int // inclusive
+	End   int // exclusive
+}
+
+// TabRanges returns the column ranges [Start, End) for each tab that fits in width.
+func (t Theme) TabRanges(width int, tabs []Tab) []TabRange {
+	var ranges []TabRange
+	used := 0
+	for i, tb := range tabs {
+		text := t.tabLabel(tb)
+		w := Width(text)
+		gap := 0
+		if i > 0 {
+			gap = SpaceSM
+		}
+		if used+gap+w > width {
+			break
+		}
+		ranges = append(ranges, TabRange{Index: i, Start: used + gap, End: used + gap + w})
+		used += gap + w
+	}
+	return ranges
+}
+
+// TabAt returns the index of the tab at column x within width, or -1 if no tab was hit.
+func (t Theme) TabAt(width int, tabs []Tab, x int) int {
+	if x < 0 || x >= width {
+		return -1
+	}
+	for _, r := range t.TabRanges(width, tabs) {
+		if x >= r.Start && x < r.End {
+			return r.Index
+		}
+	}
+	return -1
+}

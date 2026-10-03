@@ -340,6 +340,69 @@ func (tv *treeState) current() (treeRow, bool) {
 	return tv.rows[tv.cursor], true
 }
 
+// scroll shifts tv.top by delta, keeping the selection within the visible range (vim Ctrl-e/Ctrl-y).
+func (tv *treeState) scroll(delta int) {
+	if len(tv.rows) == 0 {
+		return
+	}
+	n := tv.viewRows()
+	maxTop := max(0, len(tv.rows)-n)
+	tv.top = max(0, min(tv.top+delta, maxTop))
+
+	bottom := min(len(tv.rows)-1, tv.top+n-1)
+	if tv.cursor < tv.top {
+		tv.cursor = tv.top
+		tv.settle(1)
+		if tv.cursor > bottom {
+			tv.settle(-1)
+		}
+		if r, ok := tv.current(); ok {
+			tv.sel = r.id
+		}
+	} else if tv.cursor > bottom {
+		tv.cursor = bottom
+		tv.settle(-1)
+		if tv.cursor < tv.top {
+			tv.settle(1)
+		}
+		if r, ok := tv.current(); ok {
+			tv.sel = r.id
+		}
+	}
+}
+
+// rowAt maps y (relative to tree body) to the visible row and row index.
+func (tv *treeState) rowAt(y int) (int, treeRow, bool) {
+	offset := 0
+	if tv.filtering || tv.query != "" {
+		offset = 1
+	}
+	if y < offset {
+		return -1, treeRow{}, false
+	}
+	idx := tv.top + (y - offset)
+	if idx < 0 || idx >= len(tv.rows) {
+		return -1, treeRow{}, false
+	}
+	return idx, tv.rows[idx], true
+}
+
+// foldGlyphHit reports whether x falls on the fold glyph column for container r.
+func (tv *treeState) foldGlyphHit(r treeRow, x int) bool {
+	if r.kind != rowCollection && r.kind != rowFolder {
+		return false
+	}
+	indent := min(2*r.depth, max(0, tv.w/3))
+	fold := tv.th.Glyphs.Collapsed
+	if r.open {
+		fold = tv.th.Glyphs.Expanded
+	}
+	glyphW := ui.Width(fold)
+	start := 2 + indent
+	end := start + glyphW + 1
+	return x >= start && x < end
+}
+
 // move shifts the cursor by delta selectable rows.
 func (tv *treeState) move(delta int) {
 	if len(tv.rows) == 0 {

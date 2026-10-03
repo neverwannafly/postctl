@@ -28,6 +28,9 @@ func ApplyEnv(opts Options) Options {
 	if truthy(os.Getenv("POSTCTL_ASCII")) {
 		opts.ASCII = true
 	}
+	if truthy(os.Getenv("POSTCTL_NO_MOUSE")) {
+		opts.NoMouse = true
+	}
 	return opts
 }
 

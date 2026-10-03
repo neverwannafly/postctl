@@ -153,6 +153,14 @@ func (r *kindRouter) Sections() []string {
 	return nil
 }
 
+// HandleMouse implements MouseHandler for the active pane.
+func (r *kindRouter) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if h, ok := r.panes[r.active].(MouseHandler); ok {
+		return h.HandleMouse(msg, x, y)
+	}
+	return nil
+}
+
 // BlurCmd runs the active pane's save-on-blur command.
 func (r *kindRouter) BlurCmd() tea.Cmd {
 	if b, ok := r.panes[r.active].(interface{ BlurCmd() tea.Cmd }); ok {

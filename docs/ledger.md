@@ -53,7 +53,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Review fixes done, ready to merge (gate green, not pushed) | ws/ux-v2a-request | 2026-10-03 21:12 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
-| UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
+| UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
 
@@ -999,6 +999,15 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: none.
 - Next: orchestrator merge; do not push.
 
+### 2026-10-03 20:10 IST · UX-M1 · Gemini 3.8 Flash (high) · STARTED
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Read UX-M1 brief, related docs, Bubble Tea v2 mouse API. Starting implementation of mouse support: cell-motion mode on pure tea.View, hit-testing in Update/SetSize, click focus, tree select/double-click/fold, tab clicks, wheel routing, overlay rules, --no-mouse flag and POSTCTL_NO_MOUSE.
+- Files: `docs/ledger.md`
+- Decisions: Follow plan §0 U3 and brief specifications.
+- Tests: Starting work.
+- Blockers / questions: none.
+- Next: Inspect existing layout/panemove geometry and wire mouse options and hit testing.
+
 ### 2026-10-03 20:13 IST · UX-H1 · GPT-5.6 Sol · PROGRESS
 - Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
 - Did: Security follow-up makes URL raw text, query rows, and path variables one restore unit. A masked URL keeps all three current values and reports `URL, query`; a clean URL replaces all three and rebuilds raw text from enabled rows through `model.URL.SyncRaw`.
@@ -1007,14 +1016,6 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Regression table covers clean, query-masked, userinfo-masked, fragment, and disabled-row restores; every case compares raw query data with enabled rows.
 - Blockers / questions: none.
 - Next: full gate and commit.
-
-### 2026-10-03 20:17 IST · UX-H1 · orchestrator (Claude Opus) · DONE
-- Branch/worktree: `ws/ux-h1-history` merged into `main` with `--no-ff` (03eb05b); worktree removed, branch deleted.
-- Did: merged the history screen, restore (masked fields keep the current value; URL, query and path variables move as one unit), diff (linear-space Myers, async, capped), and history discoverability.
-- Reviews: correctness approved 57d58b6 (20,000-case minimality check); security approved 8c21f0f after the masked-URL fix.
-- Correction: the entry above stamped "2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE" was written at about 18:49 IST; later rounds were by GPT-5.6 Sol.
-- Tests: `task agents:check` green on main; `postctl --help` ok.
-- Next: UX-V3 (response pane vim, per-request History tab, diff with previous, jq) and V2b may convert the history screen.
 
 ### 2026-10-03 20:14 IST · UX-T · Composer 2.5 (fast) · PROGRESS
 - Branch/worktree: ws/ux-t-terminal
@@ -1030,12 +1031,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green (build, race, lint 0).
 - Next: orchestrator merge; not pushed.
 
-### 2026-10-03 20:21 IST · UX-T · orchestrator (Claude Opus) · DONE
-- Branch/worktree: `ws/ux-t-terminal` merged into `main` with `--no-ff`; worktree removed, branch deleted.
-- Did: merged `internal/termx` (tmux settings check with a one-time warning, Ctrl-h/j/k/l handoff at pane edges), `docs/terminal.md` (Ghostty and tmux setup, navigator bindings).
-- Reviews: invariants/security approved a5e9c3d; tmux/docs correctness approved b2d65ef after fixes (navigator snippet rewritten and parsed on a private tmux server, per-option query failures no longer hide warnings, `extended-keys-format` is tmux 3.5+, Ghostty lines). Declined: adding the tmux notice to the leak sweep (fixed text and option names only).
-- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
-- Next: none for T.
+### 2026-10-03 20:17 IST · UX-H1 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-h1-history` merged into `main` with `--no-ff` (03eb05b); worktree removed, branch deleted.
+- Did: merged the history screen, restore (masked fields keep the current value; URL, query and path variables move as one unit), diff (linear-space Myers, async, capped), and history discoverability.
+- Reviews: correctness approved 57d58b6 (20,000-case minimality check); security approved 8c21f0f after the masked-URL fix.
+- Correction: the entry above stamped "2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE" was written at about 18:49 IST; later rounds were by GPT-5.6 Sol.
+- Tests: `task agents:check` green on main; `postctl --help` ok.
+- Next: UX-V3 (response pane vim, per-request History tab, diff with previous, jq) and V2b may convert the history screen.
 
 ### 2026-10-03 20:15 IST · UX-V2b · Composer 2.5 (fast) · STARTED
 - Branch/worktree: ws/ux-v2b-screens at `/Users/shubham/work/postctl-wt/ux-v2b-screens`; not pushed.
@@ -1069,6 +1071,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: none yet.
 - Blockers / questions: none.
 - Next: History tab, then diff, then jq.
+
+### 2026-10-03 20:21 IST · UX-T · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-t-terminal` merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged `internal/termx` (tmux settings check with a one-time warning, Ctrl-h/j/k/l handoff at pane edges), `docs/terminal.md` (Ghostty and tmux setup, navigator bindings).
+- Reviews: invariants/security approved a5e9c3d; tmux/docs correctness approved b2d65ef after fixes (navigator snippet rewritten and parsed on a private tmux server, per-option query failures no longer hide warnings, `extended-keys-format` is tmux 3.5+, Ghostty lines). Declined: adding the tmux notice to the leak sweep (fixed text and option names only).
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
+- Next: none for T.
 
 ### 2026-10-03 20:37 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
 - Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
@@ -1113,3 +1122,48 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: red first for the Blur undo test (failed, then passed after `endField`), the flush-on-send tests (failed, then passed), the WebSocket editor and prompt tests (new); `TestPureRef` and the two `maskFor` tables pass (written together with the fix). Proof of the leak sweep (copy of the tree in /tmp, `IsSecret` check in `complete/vars.go` stubbed out): the full-value search stayed silent for every frame because `shorten` cut the value, while the 12-character prefix search failed for all 7 frames and the mask-glyph guard failed too, so the prefix search is the one that matters. `VIMTEXT_NVIM=1 TestDifferentialNvim`: corpus=476 random=500 mismatches=0 allowed=1. Goldens: 6 regenerated (`wspane` log-search and log-search-empty, dark, three sizes; only the per-character SGR of the prompt changed), request goldens unchanged by the merge. `task agents:check` green, `task tui:smoke` PASS, `go mod tidy` no diff, `go run ./cmd/postctl --help` runs.
 - Blockers / questions: none.
 - Next: orchestrator review and merge.
+
+### 2026-10-03 20:45 IST · UX-M1 · Gemini 3.8 Flash (high) · DONE
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Implemented mouse support per brief UX-M1:
+  - Enabled mouse by default (`tea.MouseModeCellMotion` set on pure `tea.View` in `View()`); `--no-mouse` CLI flag and `POSTCTL_NO_MOUSE=1` env var to disable (`tea.MouseModeNone`).
+  - Derived hit regions in `Update`/`SetSize` from layout geometry (`a.geo()`); `View()` remains strictly pure.
+  - Left click focuses panes and delegates to active pane. In TwoPane/SinglePane, clicking switcher headers switches active panes.
+  - Tree mouse interaction: single click selects row, double-click (<=400 ms with injectable `a.now`) or click on selected row opens, click on fold glyph toggles fold, wheel scrolls tree offset.
+  - Pane wheel scrolling routes to the hovered pane without changing focus.
+  - Added `MouseHandler` interface in `internal/tui/pane.go` and implemented delegation in `internal/tui/kindrouter.go`.
+  - Added new `mouse.go` files in `internal/tui/request`, `internal/tui/response`, and `internal/tui/wspane` implementing tab bar clicks and wheel scrolling without editing any existing files in those packages.
+  - Overlay rules: clicks inside forward to overlay; outside clicks on modal dialogs are ignored; outside clicks on non-modal overlays dismiss the overlay.
+  - Added tab hit-testing helpers in `internal/ui/header.go` (`TabRanges`, `TabAt`).
+  - Updated docs: `--no-mouse` in `docs/cli.md` and `README.md`; `## Mouse` section in `cmd/genkeys/main.go` and regenerated `docs/keys.md` via `task keys` (documented Shift-drag / Option-drag selection).
+- Files: `internal/ui/header.go`, `internal/ui/components_test.go`, `internal/tui/pane.go`, `internal/tui/kindrouter.go`, `internal/tui/tree.go`, `internal/tui/mouse.go`, `internal/tui/mouse_test.go`, `internal/tui/request/mouse.go`, `internal/tui/request/mouse_test.go`, `internal/tui/response/mouse.go`, `internal/tui/response/mouse_test.go`, `internal/tui/wspane/mouse.go`, `internal/tui/wspane/mouse_test.go`, `internal/tui/app.go`, `internal/tui/layout.go`, `internal/tui/run.go`, `cmd/postctl/main.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/cli.md`, `README.md`, `docs/ledger.md`.
+- Decisions: Tab hit-testing placed in `internal/ui/header.go` for single source of truth across all tab bars. Existing files in `request/`, `response/`, and `wspane/` left untouched to prevent conflicts with parallel workstreams.
+- Tests: `task agents:check` green (`go build ./...`, `go test -race ./...` with comprehensive hit-testing, focus, double-click, wheel, tab click, and overlay tests; `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` passed.
+- Blockers / questions: none.
+- Next: Ready for orchestrator review and merge.
+
+### 2026-10-03 21:03 IST · UX-M1 · Gemini 3.8 Flash (high) · PROGRESS
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Addressed all review findings 1–9 after merging main (H1, T, V3 items 1–3):
+  1. Handled left-click logic only on `tea.MouseClickMsg` and wheel on `tea.MouseWheelMsg`; release and motion are ignored early.
+  2. Treated full-screen screens (`*screenOverlay`) as modal for outside clicks to avoid skipping Esc cancellation/unsaved edits.
+  3. Response pane: detected collapsed tabs mode at narrow widths and 80 cols, only allowing click on the visible selector at y=1 and ignoring y=2 body clicks; included V3 History tab in tab hit-testing.
+  4. Single-pane switcher: dynamically derived ranges from rendered tab labels via `ui.TabRanges`, handling focus offsets across all pane focus states.
+  5. Tree scrolling via wheel: updated selection when scrolled past the viewport boundary to keep selection visible (vim `Ctrl-e`/`Ctrl-y`).
+  6. Request wheel: ignored wheel events while a text field is editing (`p.Editing()`).
+  7. Performance: returned early on non-click/non-wheel events before hit-testing or rendering overlay views.
+  8. Matrix tests added: 120x40, 99 and 139 boundaries, ASCII look, sidebar toggled, full-screen screens, and collapsed tabs.
+  9. Ignored events before `phaseReady`; cleared pending leader/prefix state (`a.pend = nil`) on click.
+- Files: `internal/tui/mouse.go`, `internal/tui/mouse_test.go`, `internal/tui/tree.go`, `internal/tui/request/mouse.go`, `internal/tui/request/mouse_test.go`, `internal/tui/response/mouse.go`, `internal/tui/response/mouse_test.go`, `internal/tui/wspane/mouse.go`, `docs/ledger.md`.
+- Decisions: Filter out non-click/non-wheel events at top of `onMouse` before layout/hit-region derivation.
+- Tests: `task agents:check` green (`go build ./...`, `go test -race ./...`, `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` PASS.
+- Blockers / questions: none.
+- Next: Ready for re-review and merge.
+
+### 2026-10-03 21:10 IST · UX-M1 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-m1-mouse` (1f015ac) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged mouse support (plan U3): click focus, tree select/open/fold, tab clicks, wheel to the hovered pane, overlay click rules, `--no-mouse` / `POSTCTL_NO_MOUSE=1`.
+- Reviews: two rounds. Fixed: release and drag events acting as clicks (a single click opened a request), an outside click closing full-screen screens without their Esc path, the collapsed response tab bar hit-testing invisible tabs, hard-coded switcher widths, the tree wheel losing the selection, the request wheel committing a field mid-edit, an overlay render per motion event.
+- Follow-ups for M2: no wheel guard in the WebSocket pane while a field is editing; the tab rows' Y offsets are still constants; breakpoint and ASCII mouse tests are mostly geometric.
+- Process note: a reviewer ran its trial merge inside the M1 worktree (on a `trial` branch); the orchestrator discarded it before merging. Reviewer prompts must keep experiments in `/tmp` copies.
+- Tests: `task agents:check` green on main; `postctl --help` lists `--no-mouse`; `task tui:smoke` PASS.
