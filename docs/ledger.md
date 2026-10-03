@@ -57,7 +57,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 | UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Done (round 4), not merged | qa/ux | 2026-10-03 23:38 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Done, merged | qa/ux | 2026-10-03 23:43 IST |
 
 ## Entries
 
@@ -1363,3 +1363,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Goldens: only the 9 `wspane/testdata/state-log-filtered-*` files changed (header line only).
 - Blockers / questions: none.
 - Next: orchestrator merges `qa/ux`.
+
+### 2026-10-03 23:43 IST · UX-QA · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `qa/ux` (6a7d5d5) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged the independent QA pass: shell-level UX leak sweep (`TestSecretDoesNotLeakThroughUXFlows`, every scope plus an OAuth token and literal auth credentials, frames raw and ANSI-stripped, clipboard writes incl. mouse selection, `$EDITOR` files, masked and revealed curl), six bug fixes (secret-field completion, closed secret rows with `{{`, Ctrl-S from the response body, URL bar after a no-op `$EDITOR`, empty history on `Space h`, doubled mode badge), an env-editor click landing one row low, pane notices shown once through the shell toast, a persistent WebSocket log filter label, `[`/`]` passing an unbound key through, a 17-step offline smoke script, docs.
+- Reviews: correctness approved all six fixes (each test fails when reverted); leak audit re-proved six rows independently. Fixed after review: failure paths that printed whole frames, missing OAuth sentinel, an `$EDITOR` sweep not proven on its own, duplicated notices at wide sizes, the lost WebSocket filter indicator.
+- Not claimed: the masked curl path cannot see hydrated values, so its mask stub changes nothing; the masked and revealed copies are both checked instead.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` 17 PASS, 0 FAIL; `go mod tidy` no diff.
+- Programme: UX-V0, V1, Q, H1, V2a, V2b, V3, M1, T, M2 and QA are all merged. Plan §0 U1-U6 are implemented.
