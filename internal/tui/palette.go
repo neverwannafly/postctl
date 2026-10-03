@@ -11,6 +11,8 @@ import (
 func (a *app) builtinActions() []Action {
 	in := func(s Slot) func() tea.Cmd { return func() tea.Cmd { return a.setFocus(s) } }
 	return []Action{
+		{ID: "request.find", Title: "Find request", Group: "Navigation", Keys: "",
+			Run: func() tea.Cmd { return a.openSwitcher() }},
 		{ID: "env.switch", Title: "Switch environment", Group: "Environment", Keys: "E",
 			Run: func() tea.Cmd { a.ov = newEnvOverlay(a); return nil }},
 		{ID: "tree.new", Title: "New request, folder or collection", Group: "Collections", Keys: "n",
