@@ -106,7 +106,7 @@ func (p *Pane) composerView(w, h int) string {
 	right := th.Render(ui.TextSecondary, label)
 	switch {
 	case p.format() == model.WSText:
-		right += "  " + th.Render(ui.TextQuiet, ui.FormatSize(int64(len(p.comp.text()))))
+		right += "  " + th.Render(ui.TextQuiet, ui.FormatSize(int64(len(p.comp.Text()))))
 	case p.compErr != "":
 		msg := th.Truncate(th.Glyphs.Warn+" "+p.compErr, max(8, room-ui.Width(label)-2))
 		right += "  " + th.Render(ui.StatusWarning, msg)
@@ -114,7 +114,7 @@ func (p *Pane) composerView(w, h int) string {
 		right += "  " + th.Render(ui.StatusSuccess, th.Glyphs.Check+" valid")
 	}
 	head := p.sectionHead("Message", "", p.hasCursor(sComposer), right, w)
-	return head + "\n" + p.comp.render(w, max(1, h-1))
+	return head + "\n" + p.comp.Render(w, max(1, h-1))
 }
 
 // ---- saved messages -------------------------------------------------------------------
@@ -166,13 +166,13 @@ func (p *Pane) savedRow(m model.WSMessage, w int, cur bool) string {
 		add(ui.TextPrimary, "  ")
 	}
 	tag := th.Fit(formatTag(m.Format), 4)
-	nameW := min(max(8, w/3), 28)
+	nameW := renameWidth(w)
 	name := m.Name
 	if name == "" {
 		name = "Untitled"
 	}
 	if p.rename != nil && p.renameID == m.ID {
-		sb.WriteString(p.rename.View(th, nameW, true))
+		sb.WriteString(p.rename.Render(nameW, 1))
 		used += nameW
 	} else {
 		tok := ui.TextPrimary
@@ -243,7 +243,7 @@ func (p *Pane) logView(w, h int) string {
 func (p *Pane) searchLine(l *live, w int) string {
 	th := p.th
 	if p.searching {
-		return th.Render(ui.AccentPrimary, "/") + " " + p.search.View(th, max(4, w-2), p.focused)
+		return th.Render(ui.AccentPrimary, "/") + " " + p.search.Render(max(4, w-2), 1)
 	}
 	q := ""
 	if l != nil {

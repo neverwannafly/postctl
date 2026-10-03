@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -55,7 +56,12 @@ func (p *Pane) View() string {
 		body = p.th.Block(p.th.ConfirmView(p.confirm.c, min(w, 64)), w, h)
 	}
 	b.WriteString(p.th.Block(body, w, h))
-	return p.th.Block(b.String(), p.w, p.h)
+	out := p.th.Block(b.String(), p.w, p.h)
+	if pop := p.url.Popup(p.urlWidth()); p.urlE && len(pop) > 0 {
+		// The URL field's completion menu draws over the rows under the bar.
+		out = strings.Join(vimfield.Overlay(strings.Split(out, "\n"), 0, 2+badgeW+2, pop), "\n")
+	}
+	return out
 }
 
 // emptyView explains why there is nothing to edit, or returns "".
@@ -87,8 +93,7 @@ func (p *Pane) barView() string {
 	}
 	badge := th.MethodBadge("WS", badgeW)
 	right := p.actionLabel()
-	urlW := max(4, p.w-2-badgeW-2-ui.Width(right)-1)
-	field := p.url.View(th, urlW, p.urlE && p.focused)
+	field := p.url.Render(p.urlWidth(), 1)
 	return marker + badge + "  " + field + " " + right
 }
 

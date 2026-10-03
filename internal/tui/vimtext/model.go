@@ -249,6 +249,21 @@ func (m *Model) Blur() {
 	m.clearPending()
 }
 
+// SetMask changes [Options.Mask] after construction: a non-empty glyph hides
+// the buffer behind it (one glyph per grapheme cluster), the empty string
+// reveals it. The text is unchanged and edited normally; cursor, scroll and
+// selection keep mapping to the real buffer, so the view is re-fitted.
+// Fields holding secrets also set [Options.Redact] and leave
+// [Options.Completer] nil.
+func (m *Model) SetMask(glyph string) {
+	m.opts.Mask = glyph
+	m.ensureVisible()
+}
+
+// Completing reports whether the completion popup is open, so a parent can
+// leave Up, Down, Enter and Tab to it.
+func (m *Model) Completing() bool { return len(m.completions) > 0 }
+
 // Focused reports whether the editor has focus.
 func (m *Model) Focused() bool { return m.focused }
 

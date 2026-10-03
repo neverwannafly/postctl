@@ -24,11 +24,13 @@ func (p *Pane) Sections() []string {
 	return append([]string{tui.SectionURL}, tabSections[:]...)
 }
 
-// VimMode implements tui.ModeReporter. The text fields are not modal yet, so
-// editing one reports INSERT.
+// VimMode implements tui.ModeReporter: the mode of the focused field (the URL
+// bar, the composer or a cell of the open tab), or "" when no field has the
+// keyboard. The shell reads it as the typing gate: NORMAL does not block the
+// leader.
 func (p *Pane) VimMode() string {
-	if p.Editing() {
-		return "INSERT"
+	if f := p.activeField(); f != nil {
+		return f.ModeName()
 	}
 	return ""
 }
@@ -54,10 +56,21 @@ func (p *Pane) onFocusSection(m tui.FocusSectionMsg) tea.Cmd {
 	return nil
 }
 
+// typingNow reports whether keys are text right now: a field in insert or
+// visual mode, or a prompt or dialog. A field in normal mode is not typing, so
+// the shell's section keys reach it.
+func (p *Pane) typingNow() bool {
+	if !p.Editing() {
+		return false
+	}
+	f := p.activeField()
+	return f == nil || f.Typing()
+}
+
 // onSectionStep moves to the previous or next tab ([ and ]) unless a text
-// field has the keyboard.
+// field is being typed in.
 func (p *Pane) onSectionStep(m tui.SectionStepMsg) tea.Cmd {
-	if !p.editable() || p.Editing() || m.Delta == 0 {
+	if !p.editable() || p.typingNow() || m.Delta == 0 {
 		return nil
 	}
 	p.stopEditing()

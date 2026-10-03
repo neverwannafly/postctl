@@ -330,10 +330,13 @@ func (a *app) hints() []ui.Hint {
 	global := []ui.Hint{
 		hint("?", "Help", 0), hint("Ctrl-P", "Palette", 1), hint("Space", "Actions", 3), hint("q", "Quit", 6),
 	}
-	if a.editing() {
+	if a.typing() {
 		// Plain keys go to the text field, so only the shortcuts that still
 		// work are offered.
 		global = []ui.Hint{hint("Ctrl-P", "Palette", 1)}
+	} else if a.editing() {
+		// A field in normal mode hands Space (the leader) back to the shell.
+		global = []ui.Hint{hint("Ctrl-P", "Palette", 1), hint("Space", "Actions", 3)}
 	}
 	var own []ui.Hint
 	switch a.focus {

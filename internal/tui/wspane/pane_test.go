@@ -22,7 +22,7 @@ func TestConnectSendReceive(t *testing.T) {
 	h.mustHave("Connected")
 	h.mustHave("Disconnect")
 
-	h.key("down") // into the composer
+	h.key("down", "i") // into the composer, typing
 	h.typ(`{"type":"ping"}`)
 	h.key("ctrl+s")
 	h.waitLog(3) // open, sent, echo
@@ -40,8 +40,8 @@ func TestConnectSendReceive(t *testing.T) {
 		t.Fatalf("text format should not need validation: %q", h.p.compErr)
 	}
 	// The composer keeps its text so the message can be sent again.
-	if h.p.comp.text() != `{"type":"ping"}` {
-		t.Fatalf("composer = %q", h.p.comp.text())
+	if h.p.comp.Text() != `{"type":"ping"}` {
+		t.Fatalf("composer = %q", h.p.comp.Text())
 	}
 }
 
@@ -232,6 +232,7 @@ func TestInvalidJSONIsNotSent(t *testing.T) {
 	c := h.connect()
 	h.key("down", "ctrl+t")
 	h.mustHave("JSON")
+	h.key("i")
 	h.typ(`{"a":`)
 	if h.p.compErr == "" {
 		t.Fatal("incomplete JSON must be flagged")
@@ -256,14 +257,14 @@ func TestInvalidJSONIsNotSent(t *testing.T) {
 
 func TestJSONWithVariablesValidates(t *testing.T) {
 	h := newHarness(t)
-	h.key("down", "ctrl+t")
+	h.key("down", "ctrl+t", "i")
 	h.typ(`{"n": {{count}}, "id": "{{$guid}}"}`)
 	if h.p.compErr != "" {
 		t.Fatalf("variables must count as values: %q", h.p.compErr)
 	}
 	h.key("ctrl+r")
-	if !strings.Contains(h.p.comp.text(), "{{count}}") || !strings.Contains(h.p.comp.text(), "\n") {
-		t.Fatalf("format lost the variables or did nothing: %q", h.p.comp.text())
+	if !strings.Contains(h.p.comp.Text(), "{{count}}") || !strings.Contains(h.p.comp.Text(), "\n") {
+		t.Fatalf("format lost the variables or did nothing: %q", h.p.comp.Text())
 	}
 	if h.p.compErr != "" {
 		t.Fatalf("formatted text flagged: %q", h.p.compErr)
@@ -275,6 +276,7 @@ func TestBinaryFormatChecksBase64(t *testing.T) {
 	c := h.connect()
 	h.key("down", "ctrl+t", "ctrl+t")
 	h.mustHave("Binary")
+	h.key("i")
 	h.typ("!!!")
 	if h.p.compErr == "" {
 		t.Fatal("not base64")
@@ -311,7 +313,7 @@ func TestSendFailureIsReported(t *testing.T) {
 	c.mu.Lock()
 	c.sendErr = errors.New("the connection is closed")
 	c.mu.Unlock()
-	h.key("down")
+	h.key("down", "i")
 	h.typ("hello")
 	h.key("ctrl+s")
 	h.mustHave("The connection is closed")
@@ -364,7 +366,7 @@ func TestSaveTemplateAndRename(t *testing.T) {
 	h := newHarness(t)
 	h.req.WebSocket = nil
 	h.send(tui.SelectionMsg{Ref: h.ref()})
-	h.key("down")
+	h.key("down", "i")
 	h.typ(`{"type":"subscribe","channel":"eth"}`)
 	h.key("ctrl+x")
 	ms := h.p.messages()
@@ -374,7 +376,7 @@ func TestSaveTemplateAndRename(t *testing.T) {
 	if !h.p.Editing() {
 		t.Fatal("naming a message is text entry")
 	}
-	h.key("ctrl+u") // clear the suggested name
+	h.key("esc", "c", "c") // normal mode, then change the whole suggested name
 	h.typ("Subscribe ETH")
 	h.key("enter")
 	if got := h.p.messages()[0].Name; got != "Subscribe ETH" {
@@ -421,12 +423,12 @@ func TestRenameCancelKeepsName(t *testing.T) {
 func TestEditSavedLoadsIntoComposer(t *testing.T) {
 	h := newHarness(t)
 	h.key("down", "tab", "down", "e")
-	if h.p.sect != sComposer || h.p.comp.text() != "ping" || h.p.format() != model.WSText {
-		t.Fatalf("section %d text %q format %q", h.p.sect, h.p.comp.text(), h.p.format())
+	if h.p.sect != sComposer || h.p.comp.Text() != "ping" || h.p.format() != model.WSText {
+		t.Fatalf("section %d text %q format %q", h.p.sect, h.p.comp.Text(), h.p.format())
 	}
 	h.key("esc", "down", "tab", "home", "e") // the JSON one
-	if h.p.format() != model.WSJSON || !strings.Contains(h.p.comp.text(), "subscribe") {
-		t.Fatalf("format %q text %q", h.p.format(), h.p.comp.text())
+	if h.p.format() != model.WSJSON || !strings.Contains(h.p.comp.Text(), "subscribe") {
+		t.Fatalf("format %q text %q", h.p.format(), h.p.comp.Text())
 	}
 	if d := h.p.req.WebSocket.Draft; d == nil || d.Format != model.WSJSON {
 		t.Fatalf("draft = %+v", d)
@@ -465,7 +467,7 @@ func TestReorderSaved(t *testing.T) {
 
 func TestComposerDraftPersistsAndAutosaves(t *testing.T) {
 	h := newHarness(t)
-	h.key("down")
+	h.key("down", "i")
 	h.typ("hi")
 	if d := h.p.req.WebSocket.Draft; d == nil || d.Body != "hi" {
 		t.Fatalf("draft = %+v", d)
@@ -483,14 +485,14 @@ func TestComposerDraftPersistsAndAutosaves(t *testing.T) {
 	// Reselecting shows the stored draft again.
 	h.typ("x")
 	h.send(tui.SelectionMsg{Ref: h.ref()})
-	if h.p.comp.text() != "x" {
-		t.Fatalf("composer = %q", h.p.comp.text())
+	if h.p.comp.Text() != "x" {
+		t.Fatalf("composer = %q", h.p.comp.Text())
 	}
 }
 
 func TestBlurFlushesUnsavedEdits(t *testing.T) {
 	h := newHarness(t)
-	h.key("down")
+	h.key("down", "i")
 	h.typ("hi")
 	h.run(h.p.BlurCmd())
 	h.settle()
@@ -514,7 +516,7 @@ func TestEmptyWebSocketSectionIsTrimmed(t *testing.T) {
 	h := newHarness(t)
 	h.req.WebSocket = nil
 	h.send(tui.SelectionMsg{Ref: h.ref()})
-	h.key("down")
+	h.key("down", "i")
 	h.typ("a")
 	h.key("backspace")
 	if h.p.req.WebSocket != nil {
@@ -529,11 +531,11 @@ func TestLogFilterCyclesDirections(t *testing.T) {
 	c := h.connect()
 	c.pushIn("alpha")
 	c.pushIn("beta")
-	h.key("down")
+	h.key("down", "i")
 	h.typ("gamma")
 	h.key("ctrl+s")
 	h.waitLog(5)
-	h.key("tab", "tab", "f") // saved list exists: composer -> saved -> log
+	h.key("esc", "tab", "tab", "f") // saved list exists: composer -> saved -> log
 	if h.p.sect != sLog {
 		t.Fatalf("section = %d", h.p.sect)
 	}
@@ -753,7 +755,7 @@ func TestLogByteBudget(t *testing.T) {
 
 func TestURLEditUpdatesParams(t *testing.T) {
 	h := newHarness(t)
-	h.key("up") // URL bar
+	h.key("up", "A") // URL bar, appending
 	if !h.p.Editing() {
 		t.Fatal("the URL bar is text entry")
 	}
@@ -792,7 +794,7 @@ func TestParamsTabEditsQuery(t *testing.T) {
 	h.typ("depth")
 	h.key("tab")
 	h.typ("7")
-	h.key("esc")
+	h.key("esc", "esc")
 	if !strings.Contains(h.req.URL.Raw, "depth=7") {
 		t.Fatalf("url = %q", h.req.URL.Raw)
 	}
@@ -812,7 +814,7 @@ func TestHeadersTabEditsHeaders(t *testing.T) {
 	h.typ("Authorization")
 	h.key("tab")
 	h.typ("Bearer {{token}}")
-	h.key("esc")
+	h.key("esc", "esc")
 	if got := h.req.Headers; len(got) != 3 || got[1].Key != "Authorization" || got[1].Value != "Bearer {{token}}" || got[1].Disabled {
 		t.Fatalf("headers = %+v", got)
 	}
@@ -843,9 +845,9 @@ func TestAuthTabTypesAndInheritance(t *testing.T) {
 	if h.req.Auth == nil || h.req.Auth.Type != model.AuthBearer {
 		t.Fatalf("auth = %+v", h.req.Auth)
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("hunter2-literal")
-	h.key("esc")
+	h.key("esc", "esc")
 	if h.req.Auth.Bearer.Token != "hunter2-literal" {
 		t.Fatalf("token = %q", h.req.Auth.Bearer.Token)
 	}
@@ -875,25 +877,25 @@ func TestAuthTabWarnsAboutUnsupportedScheme(t *testing.T) {
 func TestSettingsTabEditsWebSocketSettings(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabSettings)
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("graphql-transport-ws, v2")
 	h.key("esc")
 	if got := h.req.WebSocket.Subprotocols; len(got) != 2 || got[0] != "graphql-transport-ws" || got[1] != "v2" {
 		t.Fatalf("subprotocols = %q", got)
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("30s")
 	h.key("esc")
 	if pi := h.req.WebSocket.PingInterval; pi == nil || *pi != 30*time.Second {
 		t.Fatalf("ping = %v", pi)
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("2 MB")
 	h.key("esc")
 	if mb := h.req.WebSocket.MaxMessageBytes; mb == nil || *mb != 2<<20 {
 		t.Fatalf("max = %v", mb)
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("45s")
 	h.key("esc")
 	if to := h.req.Settings.Timeout; to == nil || *to != 45*time.Second {
@@ -914,14 +916,14 @@ func TestSettingsTabEditsWebSocketSettings(t *testing.T) {
 func TestSettingsRejectBadValues(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabSettings)
-	h.key("down", "down", "enter")
+	h.key("down", "down", "i")
 	h.typ("soon")
 	h.mustHave("use 30s or 1m")
 	h.key("esc")
 	if h.req.WebSocket.PingInterval != nil {
 		t.Fatal("a bad value must not be stored")
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("lots")
 	h.mustHave("use 2 MB or 512 KB")
 	h.key("esc")
@@ -1024,7 +1026,7 @@ func TestSelectionProblemFile(t *testing.T) {
 
 func TestReloadKeepsUnsavedEdits(t *testing.T) {
 	h := newHarness(t)
-	h.key("down")
+	h.key("down", "i")
 	h.typ("draft text")
 	fresh := h.req.Clone()
 	fresh.WebSocket = &model.WebSocketSettings{}
@@ -1035,8 +1037,8 @@ func TestReloadKeepsUnsavedEdits(t *testing.T) {
 	if fresh.WebSocket == nil || fresh.WebSocket.Draft == nil || fresh.WebSocket.Draft.Body != "draft text" {
 		t.Fatalf("unsaved draft lost after reload: %+v", fresh.WebSocket)
 	}
-	if h.p.comp.text() != "draft text" {
-		t.Fatalf("composer = %q", h.p.comp.text())
+	if h.p.comp.Text() != "draft text" {
+		t.Fatalf("composer = %q", h.p.comp.Text())
 	}
 }
 
@@ -1050,15 +1052,15 @@ func TestThemeChangeRestylesEverything(t *testing.T) {
 
 func TestPasteIntoURLAndComposer(t *testing.T) {
 	h := newHarness(t)
-	h.key("up")
+	h.key("up", "A")
 	h.paste("/extra")
 	if !strings.HasSuffix(h.req.URL.Raw, "/extra") {
 		t.Fatalf("url = %q", h.req.URL.Raw)
 	}
-	h.key("esc", "down")
+	h.key("esc", "esc", "down")
 	h.paste("line one\nline two")
-	if h.p.comp.text() != "line one\nline two" {
-		t.Fatalf("composer = %q", h.p.comp.text())
+	if h.p.comp.Text() != "line one\nline two" {
+		t.Fatalf("composer = %q", h.p.comp.Text())
 	}
 }
 
@@ -1206,7 +1208,7 @@ func TestDirectionIsNotOnlyColor(t *testing.T) {
 	h := newHarness(t, withLook(looks()[1], 100, 30))
 	c := h.connect()
 	c.pushIn("from server")
-	h.key("down")
+	h.key("down", "i")
 	h.typ("from me")
 	h.key("ctrl+s")
 	h.waitLog(3)

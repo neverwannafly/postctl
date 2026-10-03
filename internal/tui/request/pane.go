@@ -1,7 +1,6 @@
 package request
 
 import (
-	"github.com/shubham/postctl/internal/tui/textin"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/oauth2"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -147,6 +147,9 @@ type tabView interface {
 	paste(p *Pane, m tea.PasteMsg) (changed bool)
 	// editing reports whether a text field has input focus.
 	editing() bool
+	// field is the vim field that has input focus, or nil (no field, or a
+	// list the tab draws itself).
+	field() *vimfield.Field
 	// stop leaves any edit mode.
 	stop()
 	// enter is called when the cursor arrives from the tab bar.
@@ -178,9 +181,13 @@ type Pane struct {
 
 	zone zone
 	tab  tabID
-	url  *textin.Input
+	url  *vimfield.Field
 	urlE bool // the URL field has input focus
 	msel *methodSel
+
+	// fieldKey is the field whose edits belong to the open request-level undo
+	// step; see recordIn.
+	fieldKey *vimfield.Field
 
 	views [numTabs]tabView
 
@@ -210,28 +217,35 @@ func New(env tui.PaneEnv, d Deps) *Pane {
 		hist:  map[model.ID]*history{},
 		saves: map[model.ID]*saveState{},
 	}
-	p.url = textin.New("")
-	p.url.Placeholder = "Enter request URL"
+	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter request URL"})
 	p.views = [numTabs]tabView{
 		tabParams:   newKVView(kindParams),
 		tabAuth:     newAuthView(),
 		tabHeaders:  newKVView(kindHeaders),
-		tabBody:     newBodyView(env.Theme),
-		tabPre:      newScriptView(true, env.Theme),
-		tabTests:    newScriptView(false, env.Theme),
+		tabBody:     newBodyView(p),
+		tabPre:      newScriptView(true, p),
+		tabTests:    newScriptView(false, p),
 		tabSettings: newSettingsView(),
 	}
-	p.applyTheme()
 	return p
 }
 
+// applyTheme rebuilds the fields, which draw with the theme they were built
+// with, keeping their text.
 func (p *Pane) applyTheme() {
-	p.url.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
+	text := p.url.Text()
+	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter request URL"})
+	p.url.Set(text)
+	p.urlE = false
 	for _, v := range p.views {
-		if t, ok := v.(interface{ setTheme(ui.Theme) }); ok {
-			t.setTheme(p.th)
+		if t, ok := v.(interface{ setTheme(p *Pane) }); ok {
+			t.setTheme(p)
 		}
 	}
+	if p.zone == zBar {
+		p.zone = zTabs
+	}
+	p.fitURL()
 }
 
 // Title implements tui.Titled.
@@ -247,7 +261,8 @@ func (p *Pane) Title() string {
 }
 
 // Editing implements tui.Editor: while a text field has focus the shell sends
-// every key here.
+// every key here. A field in normal mode hands back the keys it does not own
+// with tui.ForwardKeyMsg and tui.ForwardSeqMsg.
 func (p *Pane) Editing() bool {
 	if p.req == nil {
 		return false
@@ -256,17 +271,37 @@ func (p *Pane) Editing() bool {
 }
 
 // SetSize implements tui.Pane.
-func (p *Pane) SetSize(w, h int) { p.w, p.h = w, h }
+func (p *Pane) SetSize(w, h int) {
+	p.w, p.h = w, h
+	p.fitURL()
+}
 
-// Focus implements tui.Pane.
+// urlWidth is the width of the URL field in the bar.
+func (p *Pane) urlWidth() int {
+	return max(4, p.w-2-methodW-2-ui.Width(p.sendLabel())-1)
+}
+
+// fitURL sizes the URL field. Sizes follow the cursor in Update paths only.
+func (p *Pane) fitURL() { p.url.Fit(p.urlWidth(), 1) }
+
+// Focus implements tui.Pane: the field that was being edited gets the
+// keyboard back, in the mode it was left in.
 func (p *Pane) Focus() tea.Cmd {
 	p.focused = true
+	if f := p.activeField(); f != nil {
+		f.Focus()
+	}
 	return nil
 }
 
-// Blur implements tui.Pane: unsaved edits are written at once.
+// Blur implements tui.Pane. The field stops drawing its cursor; the shell
+// writes unsaved edits through BlurCmd.
 func (p *Pane) Blur() {
 	p.focused = false
+	p.endField() // a later visit is a separate request-level undo step
+	if f := p.activeField(); f != nil {
+		f.Blur()
+	}
 }
 
 // hasRequest reports whether a request is open for editing.

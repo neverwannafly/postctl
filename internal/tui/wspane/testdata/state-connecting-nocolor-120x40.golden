@@ -1,4 +1,4 @@
-  WS      {{baseUrl}}/stream?channel=btc Connecting                                                                     
+  WS      {{baseUrl}}/stream?channel=btc                                                                      Connecting
   ⠙ Connecting 2.0 s. Esc cancels                                                                                       
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                      
 ━━━━━━━━━━━─────────────────────────────────────────────────────────────────────────────────────────────────────────────

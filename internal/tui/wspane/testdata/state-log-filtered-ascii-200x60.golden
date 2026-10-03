@@ -1,4 +1,4 @@
-  WS      {{baseUrl}}/stream?channel=btc Disconnect                                                                                                                                                     
+  WS      {{baseUrl}}/stream?channel=btc                                                                                                                                                      Disconnect
   Showing: Received                                                                                                                                                                                     
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
 ===========---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

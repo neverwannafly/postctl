@@ -10,7 +10,7 @@ import (
 
 func TestAutosaveDebounce(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("a")
 	if n, last := h.dirty(); n != 1 || !last {
 		t.Fatalf("dirty msgs = %d last=%v, want one dirty=true", n, last)
@@ -39,7 +39,7 @@ func TestAutosaveDebounce(t *testing.T) {
 
 func TestAutosaveOnBlur(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("a")
 	h.p.Blur()
 	h.run(h.p.BlurCmd())
@@ -55,7 +55,7 @@ func TestAutosaveOnBlur(t *testing.T) {
 
 func TestSelectionChangeFlushesEdits(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("a")
 	other := h.req.Clone()
 	other.ID = "other"
@@ -68,7 +68,7 @@ func TestSelectionChangeFlushesEdits(t *testing.T) {
 
 func TestSaveFailureIsShown(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("a")
 	h.advance(time.Second)
 	h.send(tui.SaveDoneMsg{Kind: tui.SaveRequest, ID: h.req.ID, Err: errors.New("disk full")})
@@ -80,7 +80,7 @@ func TestSaveFailureIsShown(t *testing.T) {
 
 func TestEditsAfterFlushSaveAgain(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("a")
 	h.advance(time.Second)
 	h.typ("b")
@@ -124,7 +124,7 @@ func TestUndoRedoStructuralSteps(t *testing.T) {
 
 func TestUndoCoalescesTyping(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("abc")
 	h.key("ctrl+z")
 	if h.req.URL.Raw != "{{baseUrl}}/v1/charges/:id?limit=10&debug=1" {
@@ -133,13 +133,26 @@ func TestUndoCoalescesTyping(t *testing.T) {
 	if h.p.url.Text() != h.req.URL.Raw {
 		t.Fatalf("URL field %q out of sync", h.p.url.Text())
 	}
+	// One visit to a field is one request-level step, pauses included (inside
+	// the field, vim's own undo applies).
 	h.advance(2 * time.Second)
+	h.key("A")
 	h.typ("x")
 	h.advance(2 * time.Second)
 	h.typ("y")
 	h.key("ctrl+z")
+	if got := h.req.URL.Raw; got != "{{baseUrl}}/v1/charges/:id?limit=10&debug=1" {
+		t.Fatalf("one field visit should be one step, raw = %q", got)
+	}
+	// Leaving the field closes the step: the next visit is a new one.
+	h.key("A")
+	h.typ("x")
+	h.key("esc", "esc")
+	h.key("up", "A")
+	h.typ("y")
+	h.key("ctrl+z")
 	if got := h.req.URL.Raw; got != "{{baseUrl}}/v1/charges/:id?limit=10&debug=1x" {
-		t.Fatalf("pauses split undo steps, raw = %q", got)
+		t.Fatalf("a second visit should be its own step, raw = %q", got)
 	}
 }
 

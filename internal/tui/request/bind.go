@@ -52,9 +52,9 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	p.refreshChain()
 	p.reloadAll()
 	if m.Open && p.req != nil && p.req.URL.Raw == "" {
-		// A brand-new request: start at the URL.
-		p.zone = zBar
-		p.urlE = true
+		// A brand-new request: start at the URL, typing.
+		p.setZone(zBar)
+		p.focusURL("i")
 	}
 	if p.req != nil {
 		if patch, ok := p.takePendingPatch(p.req.ID); ok {
@@ -109,7 +109,9 @@ func (p *Pane) onReloaded(ws *model.Workspace) tea.Cmd {
 // stopAll leaves every edit mode.
 func (p *Pane) stopAll() {
 	p.urlE = false
+	p.url.Blur()
 	p.msel = nil
+	p.endField()
 	for _, v := range p.views {
 		v.stop()
 	}
@@ -122,6 +124,7 @@ func (p *Pane) reloadAll() {
 		return
 	}
 	p.url.Set(p.req.URL.Raw)
+	p.fitURL()
 	for _, v := range p.views {
 		v.reload(p)
 	}

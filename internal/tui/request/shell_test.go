@@ -24,12 +24,23 @@ type shellRig struct {
 	inbox chan tea.Msg
 	clip  []string
 	token string
+	quit  bool // the shell asked to quit
 	ws    *model.Workspace
+	dir   string // the workspace root on disk
 }
 
 const shellBearer = "shell-test-bearer-0001"
 
 func newShellRig(t *testing.T, editor string) *shellRig {
+	t.Helper()
+	return newShellRigWith(t, editor, func(req *model.Request) {
+		req.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: shellBearer}}
+	})
+}
+
+// newShellRigWith is newShellRig with a caller-chosen setup of the "Create
+// charge" request before it is written to disk.
+func newShellRigWith(t *testing.T, editor string, setup func(*model.Request)) *shellRig {
 	t.Helper()
 	dir := t.TempDir()
 	ws := tuitest.Demo()
@@ -39,11 +50,11 @@ func newShellRig(t *testing.T, editor string) *shellRig {
 			target = r
 		}
 	}
-	target.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: shellBearer}}
+	setup(target)
 	if _, err := tuitest.Write(dir, ws); err != nil {
 		t.Fatal(err)
 	}
-	r := &shellRig{t: t, inbox: make(chan tea.Msg, 1024), token: shellBearer}
+	r := &shellRig{t: t, inbox: make(chan tea.Msg, 1024), token: shellBearer, dir: dir}
 	deps := Deps{
 		Clipboard: func(text string) tea.Cmd { r.clip = append(r.clip, text); return nil },
 		TempDir:   t.TempDir(),
@@ -98,6 +109,7 @@ func (r *shellRig) send(msg tea.Msg) {
 		}
 		return
 	case tea.QuitMsg:
+		r.quit = true
 		return
 	}
 	var cmd tea.Cmd
@@ -224,7 +236,7 @@ func TestShellPendingRestoreDropsOnFirstDifferentBinding(t *testing.T) {
 func TestSpaceIInsertsASnippet(t *testing.T) {
 	r := newShellRig(t, "")
 	r.keys("g", "t")
-	r.keys("esc") // the script editor starts in insert; Space is text there
+	r.keys("esc") // the script editor starts in normal mode; Esc leaves it
 	r.keys("space", "i")
 	r.mustHave("Insert a snippet")
 	r.keys("enter")
@@ -232,4 +244,38 @@ func TestSpaceIInsertsASnippet(t *testing.T) {
 		t.Fatal("Enter inserts the snippet and closes the picker")
 	}
 	r.mustHave("Status code is 200")
+}
+
+// ---- keys from a field in normal mode ---------------------------------------------------
+
+func TestShellKeysWorkFromAFieldInNormalMode(t *testing.T) {
+	r := newShellRig(t, "")
+	r.keys("g", "u") // the URL field, in normal mode
+	r.mustHave("NORMAL")
+	r.keys("space", "?")
+	r.mustHave("Everywhere") // the help overlay
+	r.keys("esc")
+	r.keys(":")
+	r.mustHave("Command")
+	r.keys("esc", "esc") // the command line is modal: insert to normal, then close
+	r.keys("g", "b")     // the Body tab
+	r.mustHave("Body")
+	if r.quit {
+		t.Fatal("none of those keys quits")
+	}
+	r.keys("g", "u", "q")
+	if !r.quit {
+		t.Fatal("q from a field in normal mode should reach the shell's quit")
+	}
+}
+
+func TestShellKeysAreTextInInsertMode(t *testing.T) {
+	r := newShellRig(t, "")
+	r.keys("g", "u", "A")
+	r.mustHave("INSERT")
+	r.keys("space", ":", "q", "g", "b")
+	r.mustHave(" :qgb")
+	if r.quit {
+		t.Fatal("q in insert mode is text")
+	}
 }

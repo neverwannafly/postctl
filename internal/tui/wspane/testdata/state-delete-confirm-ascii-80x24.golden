@@ -1,4 +1,4 @@
-  WS      {{baseUrl}}/stream?channel=btc Connect                                
+  WS      {{baseUrl}}/stream?channel=btc                              Connect   
   o Not connected                                                               
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                              
 ===========---------------------------------------------------------------------

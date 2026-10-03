@@ -33,7 +33,7 @@ func TestURLTypingUpdatesRequestAndKeepsDisabledParams(t *testing.T) {
 	if h.p.zone != zBar || !h.p.Editing() {
 		t.Fatalf("zone=%v editing=%v, want URL bar editing", h.p.zone, h.p.Editing())
 	}
-	h.key("end")
+	h.key("A")
 	h.typ("&extra=1")
 	if got := h.req.URL.Raw; got != "{{baseUrl}}/v1/charges/:id?limit=10&debug=1&extra=1" {
 		t.Fatalf("raw = %q", got)
@@ -56,7 +56,7 @@ func TestURLTypingUpdatesRequestAndKeepsDisabledParams(t *testing.T) {
 func TestPathVariableValueSurvivesURLEdit(t *testing.T) {
 	h := newHarness(t)
 	h.req.URL.PathVars[0].Value = "42"
-	h.key("up", "end")
+	h.key("up", "A")
 	h.typ("z")
 	if h.req.URL.PathVars[0].Value != "42" {
 		t.Fatalf("path var value = %q", h.req.URL.PathVars[0].Value)
@@ -233,7 +233,7 @@ func TestParamsAddRowStartsAtKeyAndTabToValue(t *testing.T) {
 
 func TestParamsAddRowThenEscDropsEmptyRow(t *testing.T) {
 	h := newHarness(t)
-	h.key("down", "a", "esc")
+	h.key("down", "a", "esc", "esc")
 	if n := len(h.req.URL.Query); n != 2 {
 		t.Fatalf("empty draft row kept: %d rows", n)
 	}
@@ -274,9 +274,8 @@ func TestParamsDeleteAndReorder(t *testing.T) {
 
 func TestParamsEditValueInline(t *testing.T) {
 	h := newHarness(t)
-	h.key("down", "enter") // edit value of "limit"
-	h.key("ctrl+a")
-	h.key("ctrl+k")
+	h.key("down", "enter") // edit value of "limit", in normal mode
+	h.key("C")
 	h.typ("50")
 	h.key("enter")
 	if h.req.URL.Query[0].Value != "50" || !strings.Contains(h.req.URL.Raw, "limit=50") {
@@ -291,7 +290,7 @@ func TestPathVariablesEditValueOnly(t *testing.T) {
 	if len(h.req.URL.PathVars) != 1 {
 		t.Fatal("path variable deleted")
 	}
-	h.key("enter")
+	h.key("enter", "A")
 	h.typ("7")
 	h.key("enter")
 	if h.req.URL.PathVars[0].Value != "7" {
@@ -306,7 +305,7 @@ func TestHeadersAddToggleBulk(t *testing.T) {
 	h.typ("X-Id")
 	h.key("tab")
 	h.typ("9")
-	h.key("esc")
+	h.key("esc", "esc")
 	if len(h.req.Headers) != 3 || h.req.Headers[1].Key != "X-Id" || h.req.Headers[1].Value != "9" {
 		t.Fatalf("headers = %v", h.req.Headers)
 	}
@@ -337,9 +336,9 @@ func TestBulkEditLive(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabHeaders)
 	h.key("down", "b")
-	h.key("ctrl+a") // start of line (textarea)
+	h.key("g", "g", "O") // a new first line
 	h.typ("X-New: v")
-	h.key("enter")
+	h.key("esc")
 	found := false
 	for _, k := range h.req.Headers {
 		if k.Key == "X-New" && k.Value == "v" {
@@ -380,8 +379,7 @@ func TestIOnAKVRowEditsLikeEnter(t *testing.T) {
 	if !h.p.Editing() || h.p.VimMode() != "INSERT" {
 		t.Fatalf("i must start editing in insert (editing=%v mode=%q)", h.p.Editing(), h.p.VimMode())
 	}
-	h.key("ctrl+a")
-	h.key("ctrl+k")
+	h.key("esc", "C")
 	h.typ("50")
 	h.key("enter")
 	if h.req.URL.Query[0].Value != "50" {

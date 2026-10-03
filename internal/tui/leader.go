@@ -56,7 +56,7 @@ var leaderBindings = []leaderBinding{
 	{[]string{"R"}, []string{"runner.open"}, "Run collection"},
 	{[]string{"y"}, []string{"request.curl"}, "Copy as curl"},
 	{[]string{"Y"}, []string{"request.curl.reveal"}, "Copy curl, revealed"},
-	{[]string{"o"}, []string{"request.editor"}, "Open in $EDITOR"},
+	{[]string{"o"}, []string{"request.editor", "ws.editor"}, "Open in $EDITOR"},
 	{[]string{"v"}, []string{"request.reveal"}, "Reveal secrets"},
 	{[]string{"i"}, []string{"request.snippet"}, "Insert snippet"},
 	{[]string{"c"}, []string{"cookies.open"}, "Cookies"},

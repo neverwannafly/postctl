@@ -192,7 +192,7 @@ func TestShellEndToEnd(t *testing.T) {
 	r.waitFor("Connected")
 	r.waitFor("welcome")
 
-	r.keys("down") // into the composer
+	r.keys("down", "i") // into the composer, typing
 	r.typ(`{"type":"ping"}`)
 	r.keys("ctrl+s")
 	r.waitFor("↑ 1 sent")

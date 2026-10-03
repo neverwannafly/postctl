@@ -50,7 +50,18 @@ func (m *Model) View() string {
 		}
 		cursorX := gutter + displayColumn(m.lines[m.row], m.col, m.opts.TabText) -
 			displayColumn(m.lines[m.row], m.left, m.opts.TabText)
-		cursorX = min(max(0, cursorX), max(0, m.width-8))
+		// Slide the menu left when the cursor is near the right edge, so its
+		// widest row (label and detail) stays readable.
+		need := 0
+		for i := 0; i < popupRows; i++ {
+			item := m.completions[(m.completeSel+i)%len(m.completions)]
+			w := 2 + ui.Width(item.Label)
+			if item.Detail != "" {
+				w += 2 + ui.Width(item.Detail)
+			}
+			need = max(need, w)
+		}
+		cursorX = min(max(0, cursorX), max(0, m.width-max(8, need)))
 		for i := 0; i < popupRows; i++ {
 			idx := (m.completeSel + i) % len(m.completions)
 			item := m.completions[idx]
@@ -229,3 +240,41 @@ func (m *Model) rehighlightRow(row int) {
 		m.highlights[row] = spans[0]
 	}
 }
+
+// ScrollLines moves the top visible line by n lines (positive scrolls down),
+// like Ctrl-e and Ctrl-y: the window moves, the cursor stays inside it (it is
+// pushed to the nearest row that is visible, honouring the scroll margin), and
+// the text, the mode and any pending command are untouched.
+func (m *Model) ScrollLines(n int) {
+	if n == 0 || len(m.lines) == 0 {
+		return
+	}
+	visible := max(1, m.height)
+	if m.searching {
+		visible = max(1, visible-1)
+	}
+	maxTop := max(0, len(m.lines)-visible)
+	top := min(max(0, m.top+n), maxTop)
+	if top == m.top {
+		return
+	}
+	m.top = top
+	margin := min(2, max(0, (visible-1)/2))
+	lo, hi := top+margin, top+visible-1-margin
+	if top == 0 {
+		lo = 0
+	}
+	if top == maxTop {
+		hi = len(m.lines) - 1
+	}
+	switch {
+	case m.row < lo:
+		m.moveVertical(lo - m.row)
+	case m.row > hi:
+		m.moveVertical(hi - m.row)
+	}
+	m.ensureVisible()
+}
+
+// Top is the zero-based index of the first visible line.
+func (m *Model) Top() int { return m.top }

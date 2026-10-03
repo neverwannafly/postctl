@@ -99,7 +99,7 @@ func TestGoldenStates(t *testing.T) {
 		name  string
 		build func(h *harness)
 	}{
-		{"editing-url", func(h *harness) { h.key("up"); h.typ("/x") }},
+		{"editing-url", func(h *harness) { h.key("up", "A"); h.typ("/x") }},
 		{"method-selector", func(h *harness) { h.key("up", "shift+tab") }},
 		{"sending", func(h *harness) {
 			h.send(tui.SendStartedMsg{RequestID: h.req.ID})

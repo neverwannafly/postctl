@@ -80,19 +80,42 @@ type Titled interface {
 // the shell forwards every key (except Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S,
 // Ctrl-Enter and Ctrl-C, which acts as Esc) to the pane, so typing Space, "g",
 // "q", ":" or "1" never triggers a global shortcut or starts a leader sequence.
+// A modal field in normal mode hands the keys it does not own back through
+// [ForwardKeyMsg] and [ForwardSeqMsg]; in insert and visual mode they are text.
 type Editor interface {
 	// Editing reports whether a text field has focus.
 	Editing() bool
 }
 
 // ModeReporter is implemented by panes whose text fields have an editing mode.
-// The footer starts with the label while the pane has focus. Until the vim
-// editor lands (plan U1, V2a), existing widgets report "INSERT" while a text
-// field is being edited and "" otherwise.
+// The footer starts with the label while the pane has focus. The shell also
+// reads it as the typing gate: while a field reports "NORMAL" the leader, the
+// g prefix, Ctrl-C and the pane-movement keys stay available; "INSERT",
+// "VISUAL" and "VISUAL LINE" (and "" while Editing is true) mean plain keys are
+// text.
 type ModeReporter interface {
 	// VimMode returns "NORMAL", "INSERT", "VISUAL", "VISUAL LINE", or "" when
 	// no text field has focus.
 	VimMode() string
+}
+
+// ForwardKeyMsg is returned (as a command) by a pane whose focused modal text
+// field is in normal mode and was handed a key it does not own: Space, ":",
+// "q", Tab, Ctrl-o, Ctrl-h/j/k/l and the like. The shell handles Key exactly
+// as if it had arrived while no text field was being edited: global keys, the
+// leader and goto prefixes, pane movement. It never routes the key back to the
+// pane, so a key nobody binds is dropped.
+type ForwardKeyMsg struct {
+	// Key is the original key press.
+	Key tea.KeyPressMsg
+}
+
+// ForwardSeqMsg is returned by a pane whose focused normal-mode field read a
+// two-key sequence it does not own, for example "gu" or "gb" (section jumps).
+// The shell runs it as the g-prefix follow-up key.
+type ForwardSeqMsg struct {
+	// Seq is the sequence, the prefix "g" followed by one key.
+	Seq string
 }
 
 // screenVimMode returns a hosted screen's vim mode label when it implements

@@ -5,6 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -33,20 +35,42 @@ var testSnippets = []snippet{
 // scriptView is the Pre-request and Tests tabs.
 type scriptView struct {
 	pre  bool
-	ed   *textEditor
-	th   ui.Theme
+	ed   *vimfield.Field
 	on   bool // the editor has input focus
 	pick bool // the snippet list is open
 	sel  int
 }
 
-func newScriptView(pre bool, th ui.Theme) *scriptView {
-	return &scriptView{pre: pre, th: th, ed: newTextEditor(th, true)}
+func newScriptView(pre bool, p *Pane) *scriptView {
+	s := &scriptView{pre: pre}
+	s.build(p, "")
+	return s
 }
 
-func (s *scriptView) setTheme(th ui.Theme) {
-	s.th = th
-	s.ed.setTheme(th)
+// build creates the editor: JavaScript highlighting, line numbers, and pm.*
+// plus {{variable}} completion.
+func (s *scriptView) build(p *Pane, text string) {
+	s.ed = p.newField(fieldSpec{numbers: true, lang: "javascript", script: true})
+	s.ed.Set(text)
+}
+
+func (s *scriptView) setTheme(p *Pane) {
+	s.build(p, s.ed.Text())
+	s.on = false
+}
+
+// field is the focused editor, or nil.
+func (s *scriptView) field() *vimfield.Field {
+	if s.on {
+		return s.ed
+	}
+	return nil
+}
+
+// size gives the editor the size view draws it at.
+func (s *scriptView) size(p *Pane) {
+	w, h := p.bodySize()
+	s.ed.Fit(w, max(1, h-1))
 }
 
 func (s *scriptView) script(p *Pane) *model.Script {
@@ -92,10 +116,10 @@ func (s *scriptView) reload(p *Pane) {
 	if p.req == nil {
 		return
 	}
-	s.ed.set(s.source(p))
+	s.ed.Set(s.source(p))
 	if !p.Editing() {
 		s.on = false
-		s.ed.blur()
+		s.ed.Blur()
 	}
 	s.pick = false
 }
@@ -103,24 +127,26 @@ func (s *scriptView) reload(p *Pane) {
 func (s *scriptView) stop() {
 	s.on = false
 	s.pick = false
-	s.ed.blur()
+	s.ed.Blur()
 }
 
 func (s *scriptView) editing() bool { return s.on || s.pick }
 func (s *scriptView) atTop() bool   { return !s.on && !s.pick }
 
+// enter puts the cursor in the script, in normal mode.
 func (s *scriptView) enter(p *Pane) {
-	s.ed.set(s.source(p))
+	s.ed.Set(s.source(p))
 	s.on = true
-	s.ed.focus()
+	s.size(p)
+	s.ed.Begin("")
 }
 
 func (s *scriptView) paste(p *Pane, m tea.PasteMsg) bool {
 	if !s.on {
 		return false
 	}
-	if s.ed.update(m) {
-		s.setSource(p, s.ed.text())
+	if s.ed.Paste(m).Changed {
+		s.setSource(p, s.ed.Text())
 		return true
 	}
 	return false
@@ -147,41 +173,43 @@ func (s *scriptView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 		case "enter":
 			s.pick = false
 			code := items[s.sel].code
-			cur := s.ed.text()
+			cur := s.ed.Text()
 			if cur != "" && !strings.HasSuffix(cur, "\n") {
 				code = "\n" + code
 			}
-			s.ed.ta.MoveToEnd()
-			s.ed.insertText(code + "\n")
-			s.setSource(p, s.ed.text())
+			s.ed.Replace(cur + code + "\n")
+			s.setSource(p, s.ed.Text())
 			s.on = true
-			s.ed.focus()
+			s.size(p)
+			s.ed.Begin("")
 			return true, true, nil
 		}
 		return true, false, nil
 	}
 	if s.on {
-		switch k {
-		case "esc":
+		s.size(p)
+		res := s.ed.Update(m)
+		changed := false
+		if res.Changed {
+			s.setSource(p, s.ed.Text())
+			changed = true
+		}
+		if res.Event.Kind == vimtext.Leave {
 			s.on = false
-			s.ed.blur()
-			return true, false, nil
-		case "tab":
-			// Insert two spaces rather than moving focus.
-			s.ed.insertText("  ")
-			s.setSource(p, s.ed.text())
-			return true, true, nil
+			s.ed.Blur()
+			return true, changed, res.Cmd
 		}
-		if s.ed.update(m) {
-			s.setSource(p, s.ed.text())
-			return true, true, nil
-		}
-		return true, false, nil
+		return true, changed, batch(res.Cmd, forward(s.ed, res.Event))
 	}
 	switch k {
-	case "enter", "i":
+	case "enter", "i", "a", "A", "I":
+		start := ""
+		if k != "enter" {
+			start = k
+		}
 		s.on = true
-		s.ed.focus()
+		s.size(p)
+		s.ed.Begin(start)
 		return true, false, nil
 	}
 	return false, false, nil
@@ -197,7 +225,7 @@ func (s *scriptView) hints(p *Pane) []ui.Hint {
 	case s.pick:
 		return []ui.Hint{{Key: "Enter", Label: "Insert", Priority: 1}, {Key: "Esc", Label: "Close", Priority: 1}, {Key: "↑↓", Label: "Choose", Priority: 3}}
 	case s.on:
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}}
+		return fieldHints(s.ed, "Done")
 	}
 	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "Space i", Label: "Snippets", Priority: 3}, {Key: "Space o", Label: "$EDITOR", Priority: 4}}
 }
@@ -214,14 +242,14 @@ func (s *scriptView) view(p *Pane, w, h int) string {
 	var status string
 	switch {
 	case s.on:
-		l, c := s.ed.pos()
-		status = "Line " + itoa(l) + ", column " + itoa(c) + " " + th.Glyphs.Dot + " " + itoa(s.ed.lineCount()) + " lines"
+		row, col := s.ed.Cursor()
+		status = "Line " + itoa(row+1) + ", column " + itoa(col+1) + " " + th.Glyphs.Dot + " " + itoa(s.ed.LineCount()) + " lines"
 	case strings.TrimSpace(s.source(p)) == "":
 		status = "JavaScript runs " + when + ". Press Enter to write one, Space i for snippets."
 	default:
 		status = "JavaScript runs " + when
 	}
-	return s.ed.render(w, max(1, h-1)) + "\n" + th.Render(ui.TextQuiet, th.Truncate(status, w))
+	return s.ed.Render(w, max(1, h-1)) + "\n" + th.Render(ui.TextQuiet, th.Truncate(status, w))
 }
 
 func (s *scriptView) pickerView(p *Pane, w, h int) string {

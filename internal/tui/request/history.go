@@ -202,7 +202,11 @@ func (p *Pane) redoStep() tea.Cmd {
 func (p *Pane) restore(snap *model.Request, note string) tea.Cmd {
 	snap.ID = p.req.ID
 	*p.req = *snap
+	wasBar := p.zone == zBar
 	p.stopAll()
 	p.reloadAll()
+	if wasBar {
+		p.setZone(zBar) // the URL field stays open, in normal mode
+	}
 	return tea.Batch(p.touched(), p.setNotice(note))
 }

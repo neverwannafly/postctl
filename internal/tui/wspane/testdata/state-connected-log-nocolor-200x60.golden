@@ -1,4 +1,4 @@
-  WS      {{baseUrl}}/stream?channel=btc Disconnect                                                                                                                                                     
+  WS      {{baseUrl}}/stream?channel=btc                                                                                                                                                      Disconnect
   ● Connected · ↑ 1 sent · ↓ 4 received                                                                                                                                                                 
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
 ━━━━━━━━━━━─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

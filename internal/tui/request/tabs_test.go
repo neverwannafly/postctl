@@ -19,9 +19,9 @@ func TestBodyRawEditingAndValidation(t *testing.T) {
 	if !h.p.Editing() {
 		t.Fatal("moving onto the editor should focus it")
 	}
-	h.key("ctrl+home")
+	h.key("g", "g")
 	h.mustHave("Valid JSON")
-	h.key("ctrl+end")
+	h.key("G", "A")
 	h.typ(",")
 	if !strings.HasSuffix(h.req.Body.Raw, ",") {
 		t.Fatalf("raw = %q", h.req.Body.Raw)
@@ -30,9 +30,13 @@ func TestBodyRawEditingAndValidation(t *testing.T) {
 	if !strings.Contains(v, "line 1, column") {
 		t.Fatalf("no validation hint with position:\n%s", v)
 	}
+	h.key("esc") // insert to normal
+	if h.p.VimMode() != "NORMAL" {
+		t.Fatalf("mode after one esc = %q", h.p.VimMode())
+	}
 	h.key("esc")
 	if h.p.Editing() {
-		t.Fatal("esc should leave the editor")
+		t.Fatal("a second esc should leave the editor")
 	}
 }
 
@@ -88,7 +92,7 @@ func TestBodyModeSwitchKeepsContent(t *testing.T) {
 	h.typ("k")
 	h.key("tab")
 	h.typ("v")
-	h.key("esc")
+	h.key("esc", "esc")
 	if len(h.req.Body.URLEncoded) != 1 || h.req.Body.URLEncoded[0].Key != "k" || h.req.Body.URLEncoded[0].Value != "v" {
 		t.Fatalf("urlencoded = %v", h.req.Body.URLEncoded)
 	}
@@ -103,9 +107,9 @@ func TestBodyBinaryPath(t *testing.T) {
 	h.req.Body = model.Body{Mode: model.BodyBinary}
 	h.p.reloadAll()
 	h.gotoTab(tabBody)
-	h.key("down", "down", "enter")
+	h.key("down", "down", "i")
 	h.typ("/tmp/a.bin")
-	h.key("esc")
+	h.key("esc", "esc")
 	if h.req.Body.File != "/tmp/a.bin" {
 		t.Fatalf("file = %q", h.req.Body.File)
 	}
@@ -116,9 +120,9 @@ func TestBodyGraphQL(t *testing.T) {
 	h.req.Body = model.Body{Mode: model.BodyGraphQL}
 	h.p.reloadAll()
 	h.gotoTab(tabBody)
-	h.key("down", "down") // into Query
+	h.key("down", "down", "i") // into Query, typing
 	h.typ("{me}")
-	h.key("tab") // Variables
+	h.key("esc", "tab", "i") // Variables, from normal mode
 	h.typ("{}")
 	gq := h.req.Body.GraphQL
 	if gq == nil || gq.Query != "{me}" || gq.Variables != "{}" {
@@ -151,16 +155,17 @@ func TestFormDataFileToggle(t *testing.T) {
 func TestPreRequestScriptEditing(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabPre)
-	h.key("down") // enters and focuses the editor
-	if !h.p.Editing() {
-		t.Fatal("script editor should be focused")
+	h.key("down") // enters and focuses the editor, in normal mode
+	if !h.p.Editing() || h.p.VimMode() != "NORMAL" {
+		t.Fatalf("script editor should be focused in normal mode, got %q", h.p.VimMode())
 	}
+	h.key("i")
 	h.typ("x=1")
 	if h.req.Scripts.PreRequest == nil || h.req.Scripts.PreRequest.Source != "x=1" {
 		t.Fatalf("script = %+v", h.req.Scripts.PreRequest)
 	}
 	h.mustHave("1 ") // line number gutter
-	h.key("esc")
+	h.key("esc", "esc")
 	h.key("ctrl+z")
 	if h.req.Scripts.PreRequest != nil && h.req.Scripts.PreRequest.Source != "" {
 		t.Fatalf("undo left %+v", h.req.Scripts.PreRequest)
@@ -172,7 +177,7 @@ func TestScriptClearedBecomesEmpty(t *testing.T) {
 	h.req.Scripts.Test = &model.Script{Source: "a"}
 	h.p.reloadAll()
 	h.gotoTab(tabTests)
-	h.key("down", "ctrl+e", "backspace")
+	h.key("down", "x")
 	if !h.req.Scripts.Test.Empty() {
 		t.Fatalf("script = %+v", h.req.Scripts.Test)
 	}
@@ -211,13 +216,13 @@ func TestSettingsToggleAndValidate(t *testing.T) {
 		t.Fatal("TLS not turned off")
 	}
 	h.mustHave("certificates are not checked")
-	h.key("down", "enter") // timeout
+	h.key("down", "i") // timeout
 	h.typ("abc")
 	h.mustHave("use 30s")
 	if h.req.Settings.Timeout != nil {
 		t.Fatal("invalid timeout applied")
 	}
-	h.key("ctrl+u")
+	h.key("esc", "S")
 	h.typ("2m")
 	if to := h.req.Settings.Timeout; to == nil || to.String() != "2m0s" {
 		t.Fatalf("timeout = %v", to)
@@ -228,9 +233,9 @@ func TestSettingsToggleAndValidate(t *testing.T) {
 func TestSettingsMaxRedirects(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabSettings)
-	h.key("down", "down", "enter")
+	h.key("down", "down", "i")
 	h.typ("5")
-	h.key("esc")
+	h.key("esc", "esc")
 	if m := h.req.Settings.MaxRedirects; m == nil || *m != 5 {
 		t.Fatalf("max = %v", m)
 	}

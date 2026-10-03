@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -19,11 +20,13 @@ type settingsView struct {
 
 func newSettingsView() *settingsView { return &settingsView{} }
 
-func (s *settingsView) reload(p *Pane) { s.f.reset() }
-func (s *settingsView) stop()          { s.f.reset() }
-func (s *settingsView) editing() bool  { return s.f.edit }
-func (s *settingsView) enter(p *Pane)  { s.f.reveal = false }
-func (s *settingsView) atTop() bool    { return s.f.cur == 0 && !s.f.edit }
+func (s *settingsView) reload(p *Pane)         { s.f.reset() }
+func (s *settingsView) stop()                  { s.f.reset() }
+func (s *settingsView) editing() bool          { return s.f.edit }
+func (s *settingsView) enter(p *Pane)          { s.f.reveal = false }
+func (s *settingsView) atTop() bool            { return s.f.cur == 0 && !s.f.edit }
+func (s *settingsView) field() *vimfield.Field { return s.f.field() }
+func (s *settingsView) setTheme(*Pane)         { s.f.in, s.f.edit = nil, false }
 
 func (s *settingsView) paste(p *Pane, m tea.PasteMsg) bool {
 	return s.f.paste(p, func() []formRow { return s.rows(p) }, m)
@@ -142,10 +145,15 @@ func (s *settingsView) view(p *Pane, w, h int) string {
 
 func (s *settingsView) hints(p *Pane) []ui.Hint {
 	if s.f.edit {
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Tab", Label: "Next field", Priority: 3}}
+		return append(fieldHints(s.f.in, "Done"), ui.Hint{Key: "Tab", Label: "Next field", Priority: 3})
 	}
 	return []ui.Hint{
 		{Key: "Enter", Label: "Toggle or edit", Priority: 2},
 		{Key: "↑↓", Label: "Field", Priority: 4},
 	}
+}
+
+// fieldExternal implements fieldEditable for the open settings row.
+func (s *settingsView) fieldExternal(p *Pane) (string, func(*Pane, string), string) {
+	return s.f.fieldExternal(p, func() []formRow { return s.rows(p) })
 }

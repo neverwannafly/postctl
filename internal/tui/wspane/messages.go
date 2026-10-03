@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
-	"github.com/shubham/postctl/internal/tui/textin"
 	"github.com/shubham/postctl/internal/ui"
 	"github.com/shubham/postctl/internal/wsx"
 )
@@ -36,7 +36,7 @@ func (p *Pane) composerMessage() model.WSMessage {
 	if f == model.WSText {
 		f = ""
 	}
-	return model.WSMessage{Body: p.comp.text(), Format: f}
+	return model.WSMessage{Body: p.comp.Text(), Format: f}
 }
 
 // jsonProblem says why body is not valid JSON once variables are resolved, or
@@ -58,7 +58,7 @@ func (p *Pane) revalidate() {
 	if p.req == nil || p.scNum == nil {
 		return
 	}
-	body := p.comp.text()
+	body := p.comp.Text()
 	switch p.format() {
 	case model.WSJSON:
 		p.compErr = p.jsonProblem(body)
@@ -74,7 +74,7 @@ func (p *Pane) revalidate() {
 // composerEdited stores the composer text in the request's draft.
 func (p *Pane) composerEdited() tea.Cmd {
 	d := p.draft()
-	d.Body = p.comp.text()
+	d.Body = p.comp.Text()
 	p.setDraft(d)
 	p.revalidate()
 	return p.touched()
@@ -86,9 +86,10 @@ func (p *Pane) cycleFormat() tea.Cmd {
 		model.WSText: model.WSJSON, model.WSJSON: model.WSBinaryBase64, model.WSBinaryBase64: model.WSText,
 	}[p.format()]
 	d := p.draft()
-	d.Body = p.comp.text()
+	d.Body = p.comp.Text()
 	d.Format = next
 	p.setDraft(d)
+	p.syncComposer()
 	p.revalidate()
 	return tea.Batch(p.touched(), p.setNotice("Format: "+formatName(next), false))
 }
@@ -118,7 +119,7 @@ func (p *Pane) formatJSON() tea.Cmd {
 	if p.req == nil {
 		return nil
 	}
-	body := p.comp.text()
+	body := p.comp.Text()
 	out, err := formatJSON(body)
 	if err != nil {
 		return p.setNotice("Cannot format: "+strings.TrimPrefix(err.Error(), wsx.ErrInvalidJSON.Error()+": "), true)
@@ -126,7 +127,7 @@ func (p *Pane) formatJSON() tea.Cmd {
 	if out == body {
 		return p.setNotice("Already formatted", false)
 	}
-	p.comp.set(out)
+	p.comp.Set(out)
 	return tea.Batch(p.composerEdited(), p.setNotice("Formatted JSON", false))
 }
 
@@ -240,12 +241,13 @@ func (p *Pane) loadSaved() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	p.comp.set(m.Body)
+	p.comp.Set(m.Body)
 	f := m.Format
 	if f == model.WSText {
 		f = ""
 	}
 	p.setDraft(model.WSMessage{Body: m.Body, Format: f})
+	p.syncComposer()
 	p.revalidate()
 	p.setSection(sComposer)
 	return p.touched()
@@ -256,32 +258,37 @@ func (p *Pane) beginRename() {
 	if !ok {
 		return
 	}
-	p.rename = textin.New(m.Name)
-	p.rename.Placeholder = "name"
+	p.rename = p.newField(fieldSpec{single: true, plain: true, placeholder: "name"})
+	p.rename.Set(m.Name)
 	p.renameID = m.ID
+	p.fitPrompts()
+	p.rename.Begin("A")
 }
 
+// renameKey edits the template name. Enter saves it, Esc in normal mode
+// cancels (Esc in insert mode only returns to normal mode).
 func (p *Pane) renameKey(m tea.KeyPressMsg) tea.Cmd {
-	switch m.String() {
-	case "esc":
+	p.fitPrompts()
+	res := p.rename.Update(m)
+	switch res.Event.Kind {
+	case vimtext.Leave:
 		p.rename = nil
-	case "enter":
+		return res.Cmd
+	case vimtext.Submit:
 		name := strings.TrimSpace(p.rename.Text())
 		p.rename = nil
-		if name == "" {
-			return nil
-		}
-		ms := p.messages()
-		for i := range ms {
-			if ms[i].ID == p.renameID && ms[i].Name != name {
-				ms[i].Name = name
-				return p.touched()
+		if name != "" {
+			ms := p.messages()
+			for i := range ms {
+				if ms[i].ID == p.renameID && ms[i].Name != name {
+					ms[i].Name = name
+					return tea.Batch(res.Cmd, p.touched())
+				}
 			}
 		}
-	default:
-		p.rename.Update(m)
+		return res.Cmd
 	}
-	return nil
+	return tea.Batch(res.Cmd, forward(p.rename, res.Event))
 }
 
 func (p *Pane) askDeleteSaved() tea.Cmd {
@@ -362,25 +369,34 @@ func (p *Pane) beginSearch() {
 	l := p.cur()
 	p.searching = true
 	p.search.Set(l.log.query)
+	p.fitPrompts()
+	p.search.Begin("A")
 }
 
+// searchKey edits the log search. The results follow the text; Enter keeps
+// them and closes the prompt, Esc in normal mode clears the search (Esc in
+// insert mode only returns to normal mode).
 func (p *Pane) searchKey(m tea.KeyPressMsg) tea.Cmd {
 	l := p.cur()
-	switch m.String() {
-	case "enter":
+	p.fitPrompts()
+	res := p.search.Update(m)
+	if q := p.search.Text(); res.Changed && q != l.log.query {
+		l.log.query = q
+		l.log.refilter()
+	}
+	switch res.Event.Kind {
+	case vimtext.Submit:
 		p.searching = false
-	case "esc":
+		p.search.Blur()
+		return res.Cmd
+	case vimtext.Leave:
 		p.searching = false
+		p.search.Blur()
 		l.log.query = ""
 		l.log.refilter()
-	default:
-		p.search.Update(m)
-		if q := p.search.Text(); q != l.log.query {
-			l.log.query = q
-			l.log.refilter()
-		}
+		return res.Cmd
 	}
-	return nil
+	return tea.Batch(res.Cmd, forward(p.search, res.Event))
 }
 
 func (p *Pane) clearLog() tea.Cmd {
@@ -549,45 +565,70 @@ func (p *Pane) logKey(m tea.KeyPressMsg) tea.Cmd {
 // setSection moves the cursor within the Messages tab.
 func (p *Pane) setSection(s section) {
 	p.sect = s
+	if s == sComposer {
+		p.fitComposer()
+		p.comp.Begin("") // the composer always opens in normal mode
+	}
 	p.syncFocus()
 }
 
 // syncFocus gives the composer's text area input focus only while it is the
 // section with the cursor.
 func (p *Pane) syncFocus() {
+	if p.focused && p.urlE && p.editable() {
+		p.url.Focus()
+	} else {
+		p.url.Blur()
+	}
 	if p.focused && p.zone == zBody && p.tab == tabMessages && p.sect == sComposer && p.editable() {
-		p.comp.focus()
+		p.comp.Focus()
 		return
 	}
-	p.comp.blur()
+	p.comp.Blur()
 }
 
+// composerKey routes a key to the composer. Ctrl-T (format) and Ctrl-X (save
+// message) work in every mode; Ctrl-R formats JSON while typing (in normal mode
+// it stays vim's redo). In normal mode Tab and Shift-Tab move to the other
+// sections, Esc leaves for the tab bar, and the keys the editor does not own
+// (Space, ":", "q", g+letter) go to the shell.
 func (p *Pane) composerKey(m tea.KeyPressMsg) tea.Cmd {
 	switch m.String() {
 	case "ctrl+t":
 		return p.cycleFormat()
-	case "ctrl+r":
-		return p.formatJSON()
 	case "ctrl+x":
 		return p.saveTemplate()
-	case "tab":
-		if len(p.messages()) > 0 {
-			p.setSection(sSaved)
-		} else {
-			p.setSection(sLog)
+	case "ctrl+r":
+		if p.comp.Typing() {
+			return p.formatJSON()
 		}
-		return nil
-	case "shift+tab":
-		p.setSection(sLog)
-		return nil
-	case "esc":
+	}
+	p.fitComposer()
+	res := p.comp.Update(m)
+	cmds := []tea.Cmd{res.Cmd}
+	if res.Changed {
+		cmds = append(cmds, p.composerEdited())
+	}
+	switch res.Event.Kind {
+	case vimtext.Leave:
 		p.setZone(zTabs)
-		return nil
+	case vimtext.Unhandled:
+		switch res.Event.Key.String() {
+		case "tab":
+			if len(p.messages()) > 0 {
+				p.setSection(sSaved)
+			} else {
+				p.setSection(sLog)
+			}
+		case "shift+tab":
+			p.setSection(sLog)
+		default:
+			cmds = append(cmds, forward(p.comp, res.Event))
+		}
+	default:
+		cmds = append(cmds, forward(p.comp, res.Event))
 	}
-	if p.comp.update(m) {
-		return p.composerEdited()
-	}
-	return nil
+	return tea.Batch(cmds...)
 }
 
 func (p *Pane) savedKey(m tea.KeyPressMsg) tea.Cmd {

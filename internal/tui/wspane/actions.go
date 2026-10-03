@@ -30,15 +30,16 @@ func (p *Pane) Actions() []tui.Action {
 		sendKeys = "Ctrl-Enter"
 	}
 	acts := []tui.Action{
-		{ID: "ws.connect", Title: "Connect", Group: "WebSocket", Keys: sendKeys, Enabled: idle, Run: p.connect},
+		{ID: "ws.connect", Title: "Connect", Group: "WebSocket", Keys: sendKeys, Enabled: idle, Run: func() tea.Cmd { return p.withFlush(p.connect()) }},
 		{ID: "ws.disconnect", Title: "Disconnect", Group: "WebSocket", Enabled: active, Run: func() tea.Cmd {
 			if p.state() == stConnecting {
 				return p.cancelConnect()
 			}
 			return p.disconnect()
 		}},
+		{ID: "ws.editor", Title: "Edit in $EDITOR", Group: "WebSocket", Keys: "Space o", Enabled: ok, Run: p.openEditor},
 		{ID: "ws.reconnect", Title: "Reconnect", Group: "WebSocket", Enabled: ok, Run: p.reconnect},
-		{ID: "ws.send", Title: "Send message", Group: "WebSocket", Keys: sendKeys, Enabled: open, Run: p.sendComposer},
+		{ID: "ws.send", Title: "Send message", Group: "WebSocket", Keys: sendKeys, Enabled: open, Run: func() tea.Cmd { return p.withFlush(p.sendComposer()) }},
 		{ID: "ws.ping", Title: "Send ping", Group: "WebSocket", Enabled: open, Run: p.ping},
 		{ID: "ws.formatJSON", Title: "Format JSON message", Group: "WebSocket", Keys: "Ctrl-R", Enabled: ok, Run: p.formatJSON},
 		{ID: "ws.format", Title: "Change message format (text, JSON, binary)", Group: "WebSocket", Keys: "Ctrl-T", Enabled: ok, Run: p.cycleFormat},

@@ -14,6 +14,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/spinner"
@@ -345,6 +346,10 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.sendSavedRequest(msg.RequestID)
 	case foldPersistMsg:
 		return a, a.onFoldPersist(msg)
+	case ForwardKeyMsg:
+		return a, a.forwardedKey(msg.Key)
+	case ForwardSeqMsg:
+		return a, a.forwardedSeq(msg.Seq)
 	}
 	// Anything else (including pane-private messages) goes to both panes.
 	return a, a.forward(msg)
@@ -557,10 +562,22 @@ func (a *app) editing() bool {
 	}
 }
 
+// typing reports whether the focused pane's text field consumes plain keys as
+// text: insert and visual mode. A modal field in normal mode (ModeReporter says
+// "NORMAL") is editing but not typing, so the leader and the pane-movement keys
+// reach the shell through [ForwardKeyMsg]. A pane that reports no mode counts
+// as typing whenever it is editing.
+func (a *app) typing() bool {
+	if a.focus == SlotSidebar {
+		return a.editing() // the tree filter has its own modal handling
+	}
+	return a.editing() && a.modeLabel() != "NORMAL"
+}
+
 // insertActive reports whether a text field has the keyboard in a way that
 // makes Ctrl-C act as Esc and keys like Backspace belong to the field: a pane
-// or tree-filter field being edited, or an overlay built around a text input
-// (palette, request switcher, prompts).
+// or tree-filter field in insert or visual mode, or an overlay built around a
+// text input (palette, request switcher, prompts).
 func (a *app) insertActive() bool {
 	switch o := a.ov.(type) {
 	case *pickerOverlay:
@@ -570,12 +587,36 @@ func (a *app) insertActive() bool {
 	case *switcherOverlay:
 		return o.input.inserting()
 	case nil:
-		if a.editing() {
-			return true
-		}
-		return a.tree != nil && a.tree.filterInserting()
+		return a.typing() || (a.tree != nil && a.tree.filterInserting())
 	}
 	return false
+}
+
+// forwardedKey handles a key a modal field handed back with [ForwardKeyMsg]:
+// the same shell keys as when nothing is being edited, never the pane again.
+func (a *app) forwardedKey(msg tea.KeyPressMsg) tea.Cmd {
+	if a.ov != nil || a.phase != phaseReady || a.pend != nil {
+		return nil
+	}
+	if cmd, ok := a.commonKey(msg); ok {
+		return cmd
+	}
+	if cmd, ok := a.globalKey(msg); ok {
+		return cmd
+	}
+	return nil
+}
+
+// forwardedSeq handles a "g"+key sequence a modal field handed back with
+// [ForwardSeqMsg] as the follow-up of the goto prefix.
+func (a *app) forwardedSeq(seq string) tea.Cmd {
+	if a.ov != nil || a.phase != phaseReady || a.pend != nil {
+		return nil
+	}
+	if utf8.RuneCountInString(seq) != 2 || seq[0] != 'g' || seq == "gg" {
+		return nil
+	}
+	return a.gotoKey(seq[1:])
 }
 
 // ctrlC is the Ctrl-C ladder: it acts as Esc while typing; elsewhere the first

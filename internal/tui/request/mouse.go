@@ -53,49 +53,67 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 	case tea.MouseWheelMsg:
 		switch msg.Button {
 		case tea.MouseWheelUp:
-			p.scrollWheel(-1, msg)
+			p.scrollWheel(-1)
 		case tea.MouseWheelDown:
-			p.scrollWheel(1, msg)
+			p.scrollWheel(1)
 		}
 	}
 	return nil
 }
 
-func (p *Pane) scrollWheel(delta int, msg tea.MouseMsg) {
-	if p.Editing() {
+// wheelLines is how many lines one wheel notch scrolls a text editor.
+const wheelLines = 3
+
+// scrollWheel scrolls the tab under the pointer. A field that is being typed
+// into (insert or visual mode) or a modal selector owns its input, so the wheel
+// does nothing then. A script, raw body or GraphQL editor scrolls its view
+// whether or not it has the cursor: ScrollLines never edits or changes the
+// mode. Lists move their cursor, unless one of their cells is open.
+func (p *Pane) scrollWheel(delta int) {
+	if p.msel != nil || p.typing() {
 		return
-	}
-	var key rune
-	if delta < 0 {
-		key = tea.KeyUp
-	} else {
-		key = tea.KeyDown
 	}
 	switch p.tab {
 	case tabPre, tabTests:
 		if sv, ok := p.views[p.tab].(*scriptView); ok && sv.ed != nil {
-			sv.ed.update(msg)
+			sv.size(p) // scroll against the size view draws
+			sv.ed.ScrollLines(delta * wheelLines)
 			return
 		}
 	case tabBody:
 		if bv, ok := p.views[tabBody].(*bodyView); ok {
-			mode := bv.mode(p)
-			if mode == model.BodyRaw && bv.raw != nil {
-				bv.raw.update(msg)
-				return
-			}
-			if mode == model.BodyGraphQL {
+			switch bv.mode(p) {
+			case model.BodyRaw:
+				if bv.raw != nil {
+					bv.fit(p, zkRaw)
+					bv.raw.ScrollLines(delta * wheelLines)
+					return
+				}
+			case model.BodyGraphQL:
 				if bv.gq != nil {
-					bv.gq.update(msg)
+					bv.fit(p, zkQuery)
+					bv.gq.ScrollLines(delta * wheelLines)
 					return
 				}
 			}
 		}
 	}
-	if v := p.views[p.tab]; v != nil {
-		_, changed, _ := v.key(p, tea.KeyPressMsg{Code: key})
-		if changed {
-			p.syncURL()
-		}
+	v := p.views[p.tab]
+	if v == nil || v.editing() {
+		return
 	}
+	key := tea.KeyDown
+	if delta < 0 {
+		key = tea.KeyUp
+	}
+	if _, changed, _ := v.key(p, tea.KeyPressMsg{Code: key}); changed {
+		p.syncURL()
+	}
+}
+
+// typing reports whether the focused field takes plain keys as text (insert or
+// visual mode). The wheel leaves such a field alone.
+func (p *Pane) typing() bool {
+	f := p.activeField()
+	return f != nil && f.Typing()
 }

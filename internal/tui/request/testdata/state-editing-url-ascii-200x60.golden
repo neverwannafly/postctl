@@ -1,4 +1,4 @@
-> POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1/x  Send                                                                                                                                           
+> POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1/x                                                                                                                                         Send    
   > https://staging.example.com/v1/charges/:id?limit=10&debug=1/x                                                                                                                                Unsaved
 Params(2)  Auth  Headers(1)  Body *  Pre-request  Tests  Settings                                                                                                                                       
 =========-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
