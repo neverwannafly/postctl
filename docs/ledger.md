@@ -988,3 +988,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: Regression table covers clean, query-masked, userinfo-masked, fragment, and disabled-row restores; every case compares raw query data with enabled rows.
 - Blockers / questions: none.
 - Next: full gate and commit.
+
+### 2026-10-03 20:17 IST · UX-H1 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-h1-history` merged into `main` with `--no-ff` (03eb05b); worktree removed, branch deleted.
+- Did: merged the history screen, restore (masked fields keep the current value; URL, query and path variables move as one unit), diff (linear-space Myers, async, capped), and history discoverability.
+- Reviews: correctness approved 57d58b6 (20,000-case minimality check); security approved 8c21f0f after the masked-URL fix.
+- Correction: the entry above stamped "2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE" was written at about 18:49 IST; later rounds were by GPT-5.6 Sol.
+- Tests: `task agents:check` green on main; `postctl --help` ok.
+- Next: UX-V3 (response pane vim, per-request History tab, diff with previous, jq) and V2b may convert the history screen.
