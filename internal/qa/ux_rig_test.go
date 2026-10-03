@@ -72,7 +72,11 @@ func newUXFixture(t *testing.T, sec uxSecrets) *uxFixture {
 		w.Header().Set("Content-Type", "application/json")
 		// Echo known secrets back in a header and an expired cookie (the cookie
 		// jar then keeps nothing on disk), never in the body.
-		w.Header().Set("X-Echo", r.Header.Get("X-Folder"))
+		echo := r.Header.Get("X-Folder")
+		if strings.HasPrefix(r.URL.Path, "/oauth") {
+			echo = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ") // a header name the redactor does not treat as sensitive
+		}
+		w.Header().Set("X-Echo", echo)
 		w.Header().Set("Set-Cookie", "session="+strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")+"; Max-Age=0; Path=/")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"ok": true, "items": []int{1, 2, 3}, "nested": map[string]any{"count": 2},
