@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -179,6 +180,29 @@ func (h *harness) typ(s string) {
 
 func (h *harness) view() string { return ansi.Strip(h.m.View()) }
 
+func TestUnhydratedSecretEnterPreservesKeychain(t *testing.T) {
+	secrets := store.NewMemorySecrets()
+	ref := model.SecretRef("env/e-stg/token")
+	if err := secrets.Set(context.Background(), ref, "keep-secret"); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, 80, 24)
+	h.ws.Environments[0].Variables[1] = model.Variable{Key: "token", Type: model.VarSecret, SecretRef: ref}
+	h.scr.reveal = false
+	h.key("enter") // table
+	h.key("j")     // token row
+	h.key("enter") // value
+	h.key("enter") // submit unchanged
+	got, err := secrets.Get(context.Background(), ref)
+	if err != nil || got != "keep-secret" {
+		t.Fatalf("keychain value changed: err=%v", err)
+	}
+	v := h.ws.Environments[0].Variables[1]
+	if v.SecretRef != ref {
+		t.Fatal("secret ref cleared")
+	}
+}
+
 func TestViewIsPure(t *testing.T) {
 	h := newHarness(t, 80, 24)
 	h.scr.cur, h.scr.top = 2, 1
@@ -194,6 +218,21 @@ func TestViewIsPure(t *testing.T) {
 	first, second := h.m.View(), h.m.View()
 	if first != second || !reflect.DeepEqual(before, snapshot()) {
 		t.Fatalf("View mutated environment editor state: before=%+v after=%+v", before, snapshot())
+	}
+}
+
+func TestViewIsPureInEditMode(t *testing.T) {
+	h := newHarness(t, 80, 24)
+	h.key("enter")
+	h.key("j")
+	h.key("enter")
+	if h.scr.in == nil {
+		t.Fatal("expected value field editor")
+	}
+	val := h.scr.in.Value()
+	first, second := h.m.View(), h.m.View()
+	if first != second || h.scr.in.Value() != val {
+		t.Fatal("View mutated the table editor while editing")
 	}
 }
 
@@ -385,7 +424,7 @@ func TestAddEditVariable(t *testing.T) {
 
 func TestEmptyNewRowIsDropped(t *testing.T) {
 	h := newHarness(t, 100, 30)
-	h.key("enter", "a", "esc")
+	h.key("enter", "a", "esc", "esc")
 	if n := len(h.env("staging").Variables); n != 3 {
 		t.Fatalf("vars = %d", n)
 	}
@@ -427,9 +466,10 @@ func TestSecretsAreMaskedUntilRevealAndRevealHydrates(t *testing.T) {
 
 func TestEditingSecretValueIsMasked(t *testing.T) {
 	h := newHarness(t, 100, 30)
-	h.key("enter", "down", "enter") // token row, edit value
+	h.key("enter", "j", "enter") // token row, edit value (hydrates for editing)
 	h.mustHave("Value (secret)")
-	h.mustHave("unchanged (hidden)")
+	h.mustNotHave("s3cr3t-value")
+	h.key("esc", "shift+S") // normal, then change the whole line
 	h.typ("hunter2")
 	h.mustNotHave("hunter2")
 	if h.env("staging").Variables[1].Value != "hunter2" {
@@ -437,7 +477,7 @@ func TestEditingSecretValueIsMasked(t *testing.T) {
 	}
 	h.key("ctrl+r")
 	h.mustHave("hunter2")
-	h.key("esc")
+	h.key("esc", "esc")
 }
 
 func TestMakeSecretAndMakePlain(t *testing.T) {
@@ -506,7 +546,7 @@ func TestCollectionVariables(t *testing.T) {
 	h.key("enter", "enter") // edit value
 	h.key("backspace")
 	h.typ("9")
-	h.key("esc")
+	h.key("esc", "esc") // insert → normal → leave cell
 	if got := h.ws.Collections[0].Variables[0].Value; got != "120"+"9" {
 		t.Fatalf("value = %q", got)
 	}

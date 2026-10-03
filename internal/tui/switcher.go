@@ -5,7 +5,6 @@ import (
 	"strings"
 	"unicode"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -204,7 +203,7 @@ type switcherMatch struct {
 
 // switcherOverlay is a dedicated overlay for finding and opening requests.
 type switcherOverlay struct {
-	input    textinput.Model
+	input    *pickInput
 	all      []switcherItem
 	res      []switcherMatch
 	cursor   int
@@ -213,15 +212,7 @@ type switcherOverlay struct {
 }
 
 func newSwitcherOverlay(a *app) (*switcherOverlay, tea.Cmd) {
-	in := textinput.New()
-	in.Prompt = "› "
-	if a.ascii {
-		in.Prompt = "> "
-	}
-	in.Placeholder = "search requests"
-	in.CharLimit = 80
-	styleInput(&in, a.theme)
-	cmd := in.Focus()
+	in, cmd := newPickInput(a.theme, a.ascii, "", "search requests")
 
 	var treeItems []switcherItem
 	itemByID := make(map[model.ID]switcherItem)
@@ -282,18 +273,17 @@ func newSwitcherOverlay(a *app) (*switcherOverlay, tea.Cmd) {
 		}
 	}
 
-	s := &switcherOverlay{
-		input: in,
-		all:   all,
-	}
+	s := &switcherOverlay{input: in, all: all}
 	s.refilter()
 	g := a.geo()
 	s.setSize(g.width, g.bodyH)
 	return s, cmd
 }
 
+func (s *switcherOverlay) overlayVimMode() string { return s.input.vimMode() }
+
 func (s *switcherOverlay) refilter() {
-	q := strings.TrimSpace(s.input.Value())
+	q := s.input.value()
 	if q == "" {
 		s.res = make([]switcherMatch, len(s.all))
 		for i := range s.all {
@@ -339,44 +329,34 @@ func (s *switcherOverlay) refilter() {
 func (s *switcherOverlay) ownsKey(k string) bool { return k == "ctrl+p" }
 
 func (s *switcherOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
-	if k, ok := msg.(tea.KeyPressMsg); ok {
-		page := max(1, s.lastPage-1)
-		switch k.String() {
-		case "esc":
-			return nil, nil
-		case "enter":
-			if s.cursor >= 0 && s.cursor < len(s.res) {
-				it := s.all[s.res[s.cursor].index]
-				return nil, s.openItem(a, it)
-			}
-			return s, nil
-		case "up", "ctrl+p":
-			s.cursor = max(0, s.cursor-1)
-			s.scroll()
-			return s, nil
-		case "down", "ctrl+n":
-			if len(s.res) > 0 {
-				s.cursor = min(len(s.res)-1, s.cursor+1)
-			}
-			s.scroll()
-			return s, nil
-		case "pgup":
-			s.cursor = max(0, s.cursor-page)
-			s.scroll()
-			return s, nil
-		case "pgdown":
-			if len(s.res) > 0 {
-				s.cursor = min(len(s.res)-1, s.cursor+page)
-			}
-			s.scroll()
-			return s, nil
+	page := max(1, s.lastPage-1)
+	cmd, nav := s.input.update(msg, page)
+	switch nav {
+	case pickNavClose:
+		return nil, nil
+	case pickNavSubmit:
+		if s.cursor >= 0 && s.cursor < len(s.res) {
+			it := s.all[s.res[s.cursor].index]
+			return nil, s.openItem(a, it)
 		}
-	}
-
-	before := s.input.Value()
-	var cmd tea.Cmd
-	s.input, cmd = s.input.Update(msg)
-	if s.input.Value() != before {
+		return s, cmd
+	case pickNavUp:
+		s.cursor = max(0, s.cursor-1)
+		s.scroll()
+	case pickNavDown:
+		if len(s.res) > 0 {
+			s.cursor = min(len(s.res)-1, s.cursor+1)
+		}
+		s.scroll()
+	case pickNavPageUp:
+		s.cursor = max(0, s.cursor-page)
+		s.scroll()
+	case pickNavPageDown:
+		if len(s.res) > 0 {
+			s.cursor = min(len(s.res)-1, s.cursor+page)
+		}
+		s.scroll()
+	case pickNavChanged:
 		s.refilter()
 	}
 	return s, cmd
@@ -401,7 +381,7 @@ func (s *switcherOverlay) scroll() {
 }
 
 func (s *switcherOverlay) setSize(w, h int) {
-	s.input.SetWidth(max(8, w-4))
+	s.input.setWidth(max(8, w-4))
 	s.lastPage = max(1, h-4)
 	s.scroll()
 }
@@ -416,11 +396,11 @@ func (s *switcherOverlay) view(a *app, w, h int) string {
 	gap := max(1, w-ui.Width(head)-2-ui.Width(cnt)-ui.Width(esc))
 	topLine := head + "  " + cnt + strings.Repeat(" ", gap) + esc
 
-	lines := []string{topLine, s.input.View(), t.Rule(w)}
+	lines := []string{topLine, s.input.view(t), t.Rule(w)}
 	if len(s.res) == 0 {
 		msg := "No requests yet. Press Esc, then Space a to create one."
-		if strings.TrimSpace(s.input.Value()) != "" {
-			msg = "No matches for \"" + strings.TrimSpace(s.input.Value()) + "\"."
+		if s.input.value() != "" {
+			msg = "No matches for \"" + s.input.value() + "\"."
 		}
 		lines = append(lines, t.Render(ui.TextSecondary, msg))
 		return strings.Join(lines, "\n")

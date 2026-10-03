@@ -69,6 +69,7 @@ var KeyCatalog = []Section{
 			{"Space e", "Switch environment", "Open the active environment switcher"},
 			{"Space E", "Edit environments", "Open the environment and variable editor"},
 			{"Space h", "History", "Open the request send history screen"},
+			{"Space H", "History of this request", "Show the response pane's History tab: past sends of the open request, newest first"},
 			{"Space a", "New", "Create a request, folder or collection (on the first-run screen: create a workspace)"},
 			{"Space r", "Rename", "Rename the selected collection, folder or request"},
 			{"Space d", "Delete", "Delete the selected item (confirms; Cancel is the default)"},
@@ -83,6 +84,8 @@ var KeyCatalog = []Section{
 			{"Space c", "Cookies", "Open the cookie manager"},
 			{"Space b", "Toggle sidebar", "Show or hide the Collections sidebar"},
 			{"Space l", "Reload workspace", "Reload workspace YAML and script files from disk"},
+			{"Space x", "Diff with previous", "Diff the response on screen with the previous send of the same request (redacted bodies and headers)"},
+			{"Space j", "jq filter", "Filter a JSON response with a jq expression, evaluated on the masked body"},
 			{"Space s", "Send", "Send the request, or connect and send for a WebSocket request"},
 			{"Space [, Space ]", "Jump back / forward", "Walk the jump list of opened requests"},
 			{"Space q", "Quit", "Quit postctl"},
@@ -106,6 +109,7 @@ var KeyCatalog = []Section{
 			{"gS", "Settings", "Request: Settings tab"},
 			{"gm", "Messages", "WebSocket: Messages tab"},
 			{"gr", "Response body", "Focus the response pane on its Body tab"},
+			{"gH", "Response history", "Focus the response pane on its History tab"},
 			{"[, ]", "Previous / next tab", "Step through the tabs of the focused pane; repeat without the prefix"},
 		},
 	},
@@ -253,7 +257,7 @@ var KeyCatalog = []Section{
 		Title:       "Response Pane",
 		Description: "Inspecting response payload, headers, timings, test results, and searching.",
 		Entries: []KeyEntry{
-			{"]", "Next tab", "Cycle forward: Body → Headers → Cookies → Tests → Console → Timeline"},
+			{"]", "Next tab", "Cycle forward: Body → Headers → Cookies → Tests → Console → Timeline → History"},
 			{"[", "Previous tab", "Cycle backward through response tabs"},
 			{"gr", "Body tab", "Focus the response pane on its Body tab"},
 			{"↑, k", "Scroll up", "Scroll response viewer up one line"},
@@ -274,6 +278,14 @@ var KeyCatalog = []Section{
 			{"l, →", "Unfold JSON node", "Expand JSON block at cursor"},
 			{"f", "Filter tests", "On Tests tab: toggle showing failed assertions only"},
 			{"u", "Reveal secrets", "Reveal redacted secrets in timeline and header traces"},
+			{"j, k (History tab)", "Move", "Move through the past sends of this request"},
+			{"Enter (History tab)", "Open entry", "Open the entry in the history screen detail"},
+			{"d (History tab)", "Diff with current", "Diff the entry with the response on screen"},
+			{"n, N (diff)", "Next / previous hunk", "Jump between hunks of the response diff"},
+			{"h (diff)", "Headers / body", "Switch the response diff between body and headers"},
+			{"Esc (diff)", "Close diff", "Return to the response tabs"},
+			{"Enter (jq)", "Apply filter", "Run the jq filter on the masked JSON body and close the input"},
+			{"Esc (jq)", "Leave insert, then clear", "In the filter input: first Esc leaves insert, Esc in normal mode clears the filter. With a filter applied, Esc on the Body tab clears it"},
 			{"Ctrl-S", "Retry request", "Retry sending when transport error occurred"},
 			{"Esc", "Cancel send", "Cancel active HTTP request in flight"},
 		},
@@ -284,7 +296,8 @@ var KeyCatalog = []Section{
 		Entries: []KeyEntry{
 			{"[, ]", "Switch tab", "Cycle between Environments, Globals, and Collections tabs"},
 			{"1, 2, 3", "Jump to tab", "1: Environments, 2: Globals, 3: Collections"},
-			{"↑, ↓, Left, Right", "Select environment", "In list: move selection between environments/collections"},
+			{"j, k, ↑, ↓, gg, G, Ctrl-d/u", "Move selection", "In environment list: vim list motions"},
+			{"Left, Right", "Select environment", "Move between environments/collections"},
 			{"Enter, Tab", "Focus variables", "Move focus from environment list to variables table"},
 			{"n", "New environment", "Create and name a new environment (Environments tab)"},
 			{"r, F2", "Rename environment", "Rename the highlighted environment"},
@@ -310,7 +323,7 @@ var KeyCatalog = []Section{
 		Title:       "Cookie Manager",
 		Description: "Inspecting and clearing persistent workspace cookies (.postctl/cookies.json).",
 		Entries: []KeyEntry{
-			{"↑, ↓", "Move selection", "Select previous or next cookie in list"},
+			{"j, k, ↑, ↓, gg, G, Ctrl-d/u", "Move selection", "Select previous or next cookie in list"},
 			{"PgUp, PgDn", "Page up / down", "Scroll cookie list by page"},
 			{"Home, End", "First / last cookie", "Jump to first or last stored cookie"},
 			{"r", "Reveal cookie value", "Toggle display of obscured cookie value"},
@@ -326,7 +339,9 @@ var KeyCatalog = []Section{
 		Title:       "Collection Runner (Space R)",
 		Description: "Configuring, executing, and analyzing multi-request runs like newman.",
 		Entries: []KeyEntry{
-			{"Tab, Shift-Tab", "Navigate fields", "Cycle through Iterations, Data file, Delay, Bail, Persist"},
+			{"j, k, Tab, Shift-Tab", "Navigate fields", "Vim motions or Tab through Iterations, Data file, Delay, Bail, Persist"},
+			{"Esc (field)", "Leave field", "Insert → normal → leave field without closing the screen"},
+			{"Enter (field)", "Edit field", "Re-enter insert mode from normal on a setup or export field"},
 			{"Space", "Toggle option", "Toggle Bail (stop on failure) and Persist variables options"},
 			{"Ctrl-Enter", "Start run", "Begin executing the collection run (needs enhanced keyboard reporting)"},
 			{"Enter (last field)", "Start run", "Begin collection run from bottom of setup form"},
@@ -346,17 +361,22 @@ var KeyCatalog = []Section{
 		Title:       "Request Send History (Space h)",
 		Description: "Reviewing, filtering, and re-executing past requests (.postctl/history/).",
 		Entries: []KeyEntry{
-			{"↑, ↓", "Move selection", "Select previous or next historical request entry"},
-			{"PgUp, PgDn", "Page up / down", "Scroll history list by page"},
-			{"Home, End", "First / last entry", "Jump to top or bottom of history list"},
+			{"j, k, ↑, ↓", "Move selection", "Select previous or next historical request entry"},
+			{"PgUp, PgDn, Ctrl-u, Ctrl-d", "Page up / down", "Scroll history list by page"},
+			{"Home, End, gg, G", "First / last entry", "Jump to top or bottom of history list"},
 			{"/", "Filter history", "Open filter bar to search by request name, path, or URL"},
 			{"f", "Status filter", "Cycle HTTP status filter: All → 2xx → 3xx → 4xx → 5xx"},
 			{"Enter", "View detail", "Open full detail view for selected historical request"},
+			{"m", "Mark entry", "Mark one entry for response diff (shown with * in the list)"},
+			{"d", "Diff with marked", "Compare this entry's response body with the marked entry"},
 			{"o", "Open request", "Jump to and select the original request in the Collections tree"},
 			{"s", "Re-send request", "Immediately re-send the historical request"},
 			{"c", "Clear history", "Prompt confirmation to delete all send history"},
 			{"Tab (detail)", "Next section", "Switch between Request, Response, Headers, and Timeline"},
-			{"y, c (detail)", "Copy curl", "Copy historical request as curl command"},
+			{"r (detail)", "Restore into request", "Restore the redacted template into the saved request (confirm)"},
+			{"y (detail)", "Copy curl", "Copy historical request as curl command"},
+			{"n, N (diff)", "Next/previous hunk", "Jump between diff hunks in the response diff view"},
+			{"h (diff)", "Toggle headers", "Diff response headers instead of bodies"},
 			{"↑, ↓ (detail)", "Scroll content", "Scroll detail body or headers"},
 			{"Enter (filter)", "Apply filter", "Apply current filter text and return to list"},
 			{"Esc (filter)", "Clear filter", "Dismiss filter bar and clear search query"},
@@ -425,7 +445,8 @@ func GenerateMarkdown() string {
 	var b bytes.Buffer
 	b.WriteString("# Keyboard Shortcut Reference\n\n")
 	b.WriteString("`postctl` is designed for fast, keyboard-first navigation without requiring a mouse.\n")
-	b.WriteString("Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Every text field in the request and WebSocket panes is a modal editor (see \"Text fields\"): in insert and visual mode Space, `g`, `q` and `:` are text; in normal mode they reach the keys above.\n\n")
+	b.WriteString("Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Every text field in the request and WebSocket panes is a modal editor (see \"Text fields\"): in insert and visual mode Space, `g`, `q` and `:` are text; in normal mode they reach the keys above. Single-line fields on overlays and full screens (environment editor, runner, history filter, palette) use modal vim editing: `i`/`a` insert, `Esc` back to normal, `y` yank; list screens also use `j`/`k`, `gg`/`G`, and `Ctrl-d`/`Ctrl-u`.\n\n")
+	b.WriteString("For tmux pane handoff (**Ctrl-h/j/k/l** at the layout edge), Ghostty, and **Ctrl-Enter** / clipboard setup, see [`docs/terminal.md`](terminal.md).\n\n")
 	b.WriteString("## Quick Reference Cheat Sheet\n\n")
 	b.WriteString("| Key | Action |\n")
 	b.WriteString("| --- | --- |\n")

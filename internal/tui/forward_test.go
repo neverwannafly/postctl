@@ -61,7 +61,10 @@ func TestForwardedKeysReachTheShellNotThePane(t *testing.T) {
 	if h.a.ov == nil {
 		t.Fatal("a forwarded : should open the command line")
 	}
-	h.keys("esc")
+	h.keys("esc", "esc") // the palette input is modal: insert to normal, then close
+	if h.a.ov != nil {
+		t.Fatal("the command line should close after two Esc presses")
+	}
 
 	h.msg(ForwardKeyMsg{Key: keyOf("q")})
 	if !h.quit {

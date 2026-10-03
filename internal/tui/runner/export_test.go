@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/engine"
+	"github.com/shubham/postctl/internal/tui/screenfield"
 )
 
 func TestExportUsesSharedJSONAndJUnitReporters(t *testing.T) {
@@ -27,7 +28,7 @@ func TestExportUsesSharedJSONAndJUnitReporters(t *testing.T) {
 				engine.RunFinished{Summary: sum},
 			}
 			path := filepath.Join(t.TempDir(), "run"+tc.ext)
-			m.exportPath.Set(path)
+			m.exportPath, _ = screenfield.New(m.th, path, "export path", false)
 			msg := m.confirmExport()()
 			done, ok := msg.(exportDoneMsg)
 			if !ok || done.err != nil {
@@ -51,8 +52,8 @@ func TestExportFormatToggleChangesExtension(t *testing.T) {
 	if _, cmd := m.exportKey(tea.KeyPressMsg{Code: tea.KeyTab}); cmd != nil {
 		t.Fatal("toggle returned a command")
 	}
-	if !m.exportXML || filepath.Ext(m.exportPath.Text()) != ".xml" {
-		t.Fatalf("format xml=%v path=%q", m.exportXML, m.exportPath.Text())
+	if !m.exportXML || filepath.Ext(m.exportPath.Value()) != ".xml" {
+		t.Fatalf("format xml=%v path=%q", m.exportXML, m.exportPath.Value())
 	}
 }
 

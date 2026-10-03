@@ -94,7 +94,7 @@ func TestEscAndCtrlCStillLeaveOverlays(t *testing.T) {
 			p, ran := sendCounter()
 			h := uxHarness(t, p, 160, 30)
 			o.open(h)
-			h.keys("esc")
+			h.overlayDismiss()
 			if h.a.ov != nil || h.a.pend != nil || *ran != 0 {
 				t.Fatalf("esc: ov=%T pend=%v sends=%d", h.a.ov, h.a.pend, *ran)
 			}
@@ -135,7 +135,7 @@ func TestSwitcherKeepsItsOwnKeys(t *testing.T) {
 	if h.a.ov != sw || sw.cursor != 1 {
 		t.Fatalf("ctrl+p moves up inside the switcher (ov=%T cursor=%d)", h.a.ov, sw.cursor)
 	}
-	h.keys("esc")
+	h.overlayDismiss()
 	if h.a.ov != nil || *ran != 0 {
 		t.Fatalf("esc closes the switcher (ov=%T)", h.a.ov)
 	}
@@ -204,7 +204,7 @@ func TestSlashIsContextual(t *testing.T) {
 	if h.a.focus != SlotSidebar || !h.a.tree.filtering {
 		t.Fatalf("/ with Collections focused filters the tree (filtering=%v)", h.a.tree.filtering)
 	}
-	h.keys("esc")
+	h.keys("esc", "esc")
 	for _, c := range []struct {
 		slot string
 		pane *uxPane

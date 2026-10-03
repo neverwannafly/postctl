@@ -84,6 +84,9 @@ func (s *session) entry(out *Outcome) history.Entry {
 	if out.ScriptError != nil {
 		e.ScriptError = redactor.Text(out.ScriptError.Text)
 	}
+	if src := out.Unresolved; src != nil {
+		e.Template = history.TemplateFromRequest(src, redactor)
+	}
 	return e
 }
 

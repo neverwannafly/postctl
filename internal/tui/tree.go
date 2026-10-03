@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/shubham/postctl/internal/model"
@@ -91,8 +90,8 @@ type treeState struct {
 	sel    model.ID // selected row ID; survives rebuilds and reloads
 	w, h   int
 
-	filter    textinput.Model
-	filtering bool // the filter input has focus
+	filter    *pickInput
+	filtering bool // the filter field has focus (insert or normal)
 	query     string
 
 	cache []string
@@ -106,10 +105,7 @@ func newTree(th ui.Theme) *treeState {
 		nodes:    map[model.ID]*node{},
 		counts:   map[model.ID]int{},
 	}
-	f := textinput.New()
-	f.Prompt = "/ "
-	f.Placeholder = "filter requests"
-	f.CharLimit = 80
+	f, _ := newPickInput(th, th.ASCII, "/ ", "filter requests")
 	tv.filter = f
 	tv.setTheme(th)
 	return tv
@@ -118,22 +114,6 @@ func newTree(th ui.Theme) *treeState {
 func (tv *treeState) setTheme(th ui.Theme) {
 	tv.th = th
 	tv.cache = nil
-	styleInput(&tv.filter, th)
-}
-
-// styleInput applies theme tokens to a text input. The cursor is steady:
-// nothing blinks.
-func styleInput(in *textinput.Model, th ui.Theme) {
-	s := textinput.DefaultStyles(th.Dark)
-	for _, st := range []*textinput.StyleState{&s.Focused, &s.Blurred} {
-		st.Prompt = th.Style(ui.AccentPrimary)
-		st.Text = th.Style(ui.TextPrimary)
-		st.Placeholder = th.Style(ui.TextQuiet)
-		st.Suggestion = th.Style(ui.TextQuiet)
-	}
-	s.Cursor.Color = th.Color(ui.AccentPrimary)
-	s.Cursor.Blink = false
-	in.SetStyles(s)
 }
 
 // setSize sets the content area.
@@ -142,7 +122,7 @@ func (tv *treeState) setSize(w, h int) {
 		tv.cache = nil
 	}
 	tv.w, tv.h = w, h
-	tv.filter.SetWidth(max(4, w-3))
+	tv.filter.setWidth(max(4, w-3))
 	tv.ensureVisible()
 }
 
@@ -483,8 +463,8 @@ func (tv *treeState) problemByID(id model.ID) *store.FileError {
 
 // clearFilter drops the filter without touching the selection.
 func (tv *treeState) clearFilter() {
-	tv.filter.Reset()
-	tv.filter.Blur()
+	tv.filter.ed.SetValue("")
+	tv.filter.ed.Blur()
 	tv.filtering = false
 	if tv.query != "" {
 		tv.query = ""
@@ -495,47 +475,83 @@ func (tv *treeState) clearFilter() {
 func (tv *treeState) startFilter() tea.Cmd {
 	tv.filtering = true
 	tv.ensureVisible()
-	return tv.filter.Focus()
+	return tv.filter.ed.Focus()
+}
+
+func (tv *treeState) filterInserting() bool {
+	return tv.filtering && tv.filter.inserting()
+}
+
+func (tv *treeState) filterVimMode() string {
+	if !tv.filtering {
+		return ""
+	}
+	return tv.filter.vimMode()
 }
 
 // filterKey handles a key while the filter input has focus. It returns
 // whether the selection changed.
 func (tv *treeState) filterKey(msg tea.KeyPressMsg) (cmd tea.Cmd, moved bool) {
-	switch msg.String() {
-	case "esc":
-		tv.clearFilter()
-		tv.rebuild()
-		return nil, true
-	case "enter":
-		// Keep the results and the selection; hand the keyboard back to the
-		// list so Enter again opens the request.
+	page := max(1, tv.viewRows())
+	cmd, nav := tv.filter.update(msg, page)
+	switch nav {
+	case pickNavClose:
 		tv.filtering = false
-		tv.filter.Blur()
+		tv.filter.ed.Blur()
+		return cmd, false
+	case pickNavSubmit:
+		tv.filtering = false
+		tv.filter.ed.Blur()
 		if tv.query == "" {
 			tv.rebuild()
 		}
-		return nil, false
-	case "up":
+		return cmd, false
+	case pickNavUp:
 		tv.move(-1)
-		return nil, true
-	case "down":
+		return cmd, true
+	case pickNavDown:
 		tv.move(1)
-		return nil, true
-	}
-	var c tea.Cmd
-	tv.filter, c = tv.filter.Update(msg)
-	if q := strings.TrimSpace(tv.filter.Value()); q != tv.query {
-		tv.query = q
-		tv.cursor = 0
-		tv.top = 0
-		tv.sel = ""
-		tv.rebuild()
-		if r, ok := tv.current(); ok {
-			tv.sel = r.id
+		return cmd, true
+	case pickNavPageUp:
+		tv.move(-max(1, page-1))
+		return cmd, true
+	case pickNavPageDown:
+		tv.move(max(1, page-1))
+		return cmd, true
+	case pickNavChanged:
+		if q := tv.filter.value(); q != tv.query {
+			tv.query = q
+			tv.cursor = 0
+			tv.top = 0
+			tv.sel = ""
+			tv.rebuild()
+			if r, ok := tv.current(); ok {
+				tv.sel = r.id
+			}
+			return cmd, true
 		}
-		return c, true
 	}
-	return c, false
+	return cmd, false
+}
+
+// filterPaste applies pasted text to the filter field.
+func (tv *treeState) filterPaste(p tea.PasteMsg) (tea.Cmd, bool) {
+	p.Content = collapsePaste(p.Content)
+	cmd, nav := tv.filter.update(p, max(1, tv.viewRows()))
+	if nav == pickNavChanged {
+		if q := tv.filter.value(); q != tv.query {
+			tv.query = q
+			tv.cursor = 0
+			tv.top = 0
+			tv.sel = ""
+			tv.rebuild()
+			if r, ok := tv.current(); ok {
+				tv.sel = r.id
+			}
+			return cmd, true
+		}
+	}
+	return cmd, false
 }
 
 // view renders the tree into exactly h lines of w cells.
@@ -543,7 +559,7 @@ func (tv *treeState) view(focused bool) string {
 	t := tv.th
 	var lines []string
 	if tv.filtering || tv.query != "" {
-		lines = append(lines, tv.filter.View())
+		lines = append(lines, tv.filter.view(tv.th))
 	}
 	n := tv.viewRows()
 	if len(tv.rows) == 0 {

@@ -222,6 +222,26 @@ func TestEnsureVisibleIncludesCursorCell(t *testing.T) {
 	}
 }
 
+func TestEnsureVisiblePastEOLUsesCellWidths(t *testing.T) {
+	th := ui.NewTheme(true, true, false)
+	m := New(th, Options{SingleLine: true, StartInsert: true})
+	m.SetValue("界a")
+	m.SetSize(3, 1)
+	m.SetCursor(0, 2)
+	if m.left == 0 {
+		t.Fatal("EOL scroll used grapheme count; cursor hidden at exact cell fit")
+	}
+	if !strings.Contains(m.View(), " ") {
+		t.Fatalf("expected visible insert cursor at EOL, got:\n%s", m.View())
+	}
+	m.mode = Normal
+	m.SetCursor(0, 2)
+	m.ensureVisible()
+	if m.left == 0 {
+		t.Fatal("normal mode EOL scroll should use cell widths")
+	}
+}
+
 func TestUndoRedoHistoryIsBounded(t *testing.T) {
 	m := New(ui.NewTheme(true, true, false), Options{})
 	for i := range historyLimit + 25 {
@@ -266,6 +286,55 @@ func TestReadOnlyNeverChanges(t *testing.T) {
 	}
 	if m.Value() != "abc" {
 		t.Fatal("read-only editor changed")
+	}
+}
+
+func TestEnsureVisibleLineFitsWithCursorOnCharacter(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{SingleLine: true})
+	m.SetValue("1234567890")
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.mode = Normal
+	m.col = 9
+	m.ensureVisible()
+	if m.left != 0 {
+		t.Fatalf("left=%d want 0 when line fits with cursor on last char", m.left)
+	}
+}
+
+func TestEnsureVisiblePastEndNeedsRoomForCursor(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{SingleLine: true})
+	m.SetValue("1234567890")
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.mode = Insert
+	m.col = 10
+	m.ensureVisible()
+	if m.left == 0 {
+		t.Fatal("insert at EOL on full-width line should scroll")
+	}
+}
+
+func TestMaskKeepsCursorColumnsAligned(t *testing.T) {
+	th := ui.NewTheme(true, true, false)
+	m := New(th, Options{SingleLine: true, Mask: th.Glyphs.Mask})
+	const secret = "abcdefghijklmnopqrstuvwxyz012345"
+	m.SetValue(secret)
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.SetCursor(0, 15)
+	view := m.View()
+	if strings.Contains(view, secret) {
+		t.Fatal("masked view shows secret")
+	}
+	if !strings.Contains(view, th.Glyphs.Mask) {
+		t.Fatal("masked view shows no mask glyph")
+	}
+	_, _ = m.Update(tea.KeyPressMsg{Code: 'v', Text: "v"})
+	_, _ = m.Update(tea.KeyPressMsg{Code: 'l', Text: "l"})
+	vis := m.View()
+	if strings.Contains(vis, secret) {
+		t.Fatal("visual selection leaked secret")
 	}
 }
 

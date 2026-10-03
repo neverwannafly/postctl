@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 )
 
@@ -116,7 +117,7 @@ func TestTreeFilterNoMatchExplains(t *testing.T) {
 	h.typeText("zzzz")
 	h.mustHave("No matches")
 	h.mustHave("Esc clears the filter")
-	h.keys("esc")
+	h.treeFilterDismiss()
 	h.mustHave("List charges")
 }
 
@@ -186,6 +187,35 @@ func TestCreateRequestAfterSelectedRequest(t *testing.T) {
 	}
 }
 
+func TestCreateRequestFromHistoryUsesTreeCreatePath(t *testing.T) {
+	h := newHarness(t, demo(), 160, 30)
+	coll := h.a.ws.Collections[0]
+	folder := coll.Items[0].(*model.Folder)
+	before := len(folder.Items)
+	h.msg(CreateRequestFromHistoryMsg{
+		CollectionID: coll.ID,
+		ParentID:     folder.ID,
+		Name:         "Restored request",
+		Template: history.RequestTemplate{
+			Method: "PATCH",
+			URL:    "{{baseUrl}}/restored",
+		},
+	})
+	if len(folder.Items) != before+1 {
+		t.Fatal("restored request was not inserted")
+	}
+	req, ok := folder.Items[before].(*model.Request)
+	if !ok || req.Name != "Restored request" || req.Method != "PATCH" {
+		t.Fatal("restored request did not use normal request creation")
+	}
+	if h.a.tree.sel != req.ID || h.a.focus != SlotRequest {
+		t.Fatal("restored request was not selected and opened")
+	}
+	if len(h.be.saved) != 1 || h.be.saved[0] != coll.ID {
+		t.Fatal("restored request did not queue the normal collection save")
+	}
+}
+
 func itemNames(items []model.Item) []string {
 	var out []string
 	for _, it := range items {
@@ -225,7 +255,7 @@ func TestPromptValidatesName(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.keys("space", "a", "enter")
 	h.mustHave("Enter a name.")
-	h.keys("esc")
+	h.overlayDismiss()
 	if h.a.ov != nil || len(h.be.saved) != 0 {
 		t.Fatal("cancel must not write anything")
 	}

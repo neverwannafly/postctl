@@ -328,6 +328,7 @@ func (s *session) execute(
 	}
 
 	emit(StepResolve, stepResolve)
+	out.Unresolved = working.Clone()
 	resolved, err := vars.ResolveRequest(working, chain, s.store)
 	if err != nil {
 		out.Err = err

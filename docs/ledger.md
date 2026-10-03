@@ -50,13 +50,50 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done, merged to main | ws/ux-v0-shell | 2026-10-03 19:44 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done, merged to main | ws/ux-v1-vimtext | 2026-10-03 20:08 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
-| UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
+| UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Done, ready to merge (gate green, not pushed) | ws/ux-v2a-request | 2026-10-03 20:55 IST |
-| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
-| UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
+| UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
+| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
 
 ## Entries
+
+### 2026-10-03 19:56 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: Merged main (V0 leader keys, Q switcher). Re-review fixes: Myers O((N+M)×D) diff with 5k edit cap; async diff with Comparing state and Esc cancel; hunk line numbers after omitted prefix; pending restore dropped on request switch; full template replacement (empty values allowed); URL fragment and enabled-query rebuild; autosave persistence test; history j/k/gg/G keys; merge conflicts in README, ledger, leak sweep.
+- Files: `internal/tui/{diffview,history,request}`, `internal/history/template.go`, `cmd/genkeys`, `docs/keys.md`, goldens, `internal/qa/secret_leak_test.go`, `docs/ledger.md`
+- Decisions: `history.request` leader action deferred to V3; shell restore cancel covered at pane level plus shell apply-when-open test.
+- Tests: `task agents:check` green. Benchmark `BenchmarkDiff20kLines`: ~137 ms/op (1-line change at 20k lines).
+- Blockers / questions: none
+- Next: none
+
+### 2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: Addressed reviewer findings 1–12: structural template `masked` flags and URL/query parity; restore full replacement with mask-glyph refusal; pending patch + `tea.Sequence`; body/binary/truncation flags; Hirschberg diff + `@@` hunks; WebSocket restore disabled; literal-sentinel leak sweep + restore persist check; multipart basename; JSON pretty when both sides parse; diff layout golden fix.
+- Files: `internal/history/{template.go,*_test.go}`, `internal/tui/{history/*,diffview/*,request/restore.go,bind.go}`, `internal/qa/secret_leak_test.go`, goldens, `docs/ledger.md`
+- Decisions: Restore-as-new uses empty URL when template URL is masked; history JSONL may still contain mask glyphs in templates (excluded from workspace glyph sweep).
+- Tests: `task agents:check` green. Masking proof: stubbed `templateFieldValue` to return raw values → `TestLiteralSecretNotStoredInTemplateJSON` fails; full sweep passes with masking restored.
+- Blockers / questions: none
+- Next: none
+
+### 2026-10-03 19:05 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: History entries now store a redacted unresolved `template` for restore. Engine records it from the pre-resolve request; sensitive fields keep pure `{{var}}` refs only. TUI History: `m` mark, `d` diff responses (reusable `internal/tui/diffview`), `r` restore with confirm (or create `<name> (restored)` when the request is gone) via `ApplyRequestPatchMsg` and request-pane undo/autosave. Docs, keys, goldens, leak sweep extended (template on disk, restore frame, diff frame).
+- Files: `internal/history/template.go`, `internal/engine/{record.go,session.go,types.go,record_test.go}`, `internal/tui/{pane.go,history/*,diffview/*,request/restore.go}`, `internal/qa/secret_leak_test.go`, `docs/{engine,model}.md`, `README.md`, `docs/keys.md`, goldens under `internal/tui/history/testdata` and `internal/tui/diffview/testdata`
+- Decisions: `Outcome.Unresolved` holds the template source (never logged). Masked/truncated template fields stay on restore; status lists key names only. Diff uses redacted history bodies only.
+- Tests: `task agents:check` green (build, race, lint 0). Leak sweep: temporarily disabled `templateFieldValue` masking (`return Mask` → `return value`); sentinel still absent because templates store `{{var}}` refs — literal masking covered by `TestTemplateSensitiveFieldRule` and `TestHistoryHoldsNoSecrets`.
+- Blockers / questions: none
+- Next: none
+
+### 2026-10-03 18:35 IST · UX-H1 · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/ux-h1-history
+- Did: Read UX-H1 brief, plan U5, history/redactor/engine record path, history screen, request undo/autosave, leak sweep.
+- Files: (implementation starting)
+- Decisions: Template built from pre-resolve request after pre-request scripts; sensitive fields keep value only when pure {{var}} refs (brief regex); diffview is a reusable package for V3.
+- Tests: pending
+- Blockers / questions: none
+- Next: history template + record, restore message, diffview, history UI, leak sweep extension, docs, gate
 
 ### 2026-09-29 22:45 IST · Plan · Orchestrator · STARTED
 - Did: Read `~/work/prod-console-tui` docs (design-language, tui-stack, plan, AGENTS, README; skipped okta.md as requested). Drafted `docs/plan.md` v0 with architecture, storage proposal, import mapping, script API tiers, workstreams and model assignments.
@@ -952,3 +989,118 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: new `request/vim_test.go` (13 field kinds: enter and leave, normal-mode keys reach the shell, insert-mode keys are text, mode follows the field, Ctrl-S in three modes, Enter in the URL bar, Esc ladder, one undo step per visit, autosave and blur flush, `$EDITOR` round trip for the URL and a single-line cell, hidden-secret refusal, masked completion in frames, `pm.` completion, purity per field), `wspane/vim_test.go`, `tui/forward_test.go`, `complete` and `vimfield` suites, shell-level tests for both panes. Leak sweep: three frames with the completion menu open on an environment secret (URL, header value) and a folder secret (URL), 140x40; proved by making the completer show values (the sweep failed), then restored. Goldens: 287 files regenerated (106 `request`, 181 `wspane`; 80x24, 120x40, 200x60 in dark, `NO_COLOR`, ASCII) and read: the Send button moved right, the empty script gutter lost its padding, the focused empty composer hides its placeholder; the editing-URL and composer scenarios now enter insert mode. `docs/keys.md` regenerated. `task tui:smoke` PASS (3 of 3). `task agents:check` green: build, `go test -race ./...`, `golangci-lint run` 0 issues. `go mod tidy` applied.
 - Blockers / questions: none. Not pushed.
 - Next: orchestrator review and merge; V2b may drop `textin` and `textarea` once its screens are converted.
+
+### 2026-10-03 20:08 IST · UX-H1 · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
+- Did: Completed the final correctness and security review round. Replaced the traced and small-input diff paths with linear-space middle-snake Myers, enforced the edit-cap notice, generation-guarded both async diff messages, wired hosted-screen `gg`, and covered reverse hunk navigation. Restores now preserve raw template variables in URLs, keep URL and query rows consistent when masked, never fall back to a resolved URL, cancel stale pending patches on the first different binding, and create restored requests through the shell tree-create helper. Added URL-encoded and form-data literal-secret coverage.
+- Files: `internal/history/template.go`, `internal/qa/secret_leak_test.go`, `internal/tui/{app.go,pane.go,sidebar.go,tree_test.go}`, `internal/tui/diffview/`, `internal/tui/history/`, `internal/tui/request/`, `docs/ledger.md`
+- Decisions: Restore-as-new is a typed shell message; the shell owns ID creation, insertion ordering, selection, and collection-save behavior. Diff computation retains no per-distance trace rows and stops once the 5,000-edit budget cannot be met.
+- Tests: fixed-seed randomized minimality/reconstruction test passed 2,000 cases. Expanded leak sweep passed; temporarily bypassing URL-encoded/form-data body masking made it fail, then the mutation was reverted. Nine diff goldens regenerated and structurally reviewed. `task agents:check` green. Benchmarks: 20k lines at 1% changes 3,762,583 ns/op and 9,446,292 B/op; completely different 5k-line sides 20,243,442 ns/op and 573,472 B/op, bounded by the edit cap.
+- Blockers / questions: none.
+- Next: orchestrator merge; do not push.
+
+### 2026-10-03 20:13 IST · UX-H1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
+- Did: Security follow-up makes URL raw text, query rows, and path variables one restore unit. A masked URL keeps all three current values and reports `URL, query`; a clean URL replaces all three and rebuilds raw text from enabled rows through `model.URL.SyncRaw`.
+- Files: `internal/tui/request/restore.go`, `internal/tui/request/restore_test.go`, `docs/ledger.md`
+- Decisions: Disabled query rows remain structured editor state but are omitted from rebuilt raw URLs, matching the request editor.
+- Tests: Regression table covers clean, query-masked, userinfo-masked, fragment, and disabled-row restores; every case compares raw query data with enabled rows.
+- Blockers / questions: none.
+- Next: full gate and commit.
+
+### 2026-10-03 20:17 IST · UX-H1 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-h1-history` merged into `main` with `--no-ff` (03eb05b); worktree removed, branch deleted.
+- Did: merged the history screen, restore (masked fields keep the current value; URL, query and path variables move as one unit), diff (linear-space Myers, async, capped), and history discoverability.
+- Reviews: correctness approved 57d58b6 (20,000-case minimality check); security approved 8c21f0f after the masked-URL fix.
+- Correction: the entry above stamped "2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE" was written at about 18:49 IST; later rounds were by GPT-5.6 Sol.
+- Tests: `task agents:check` green on main; `postctl --help` ok.
+- Next: UX-V3 (response pane vim, per-request History tab, diff with previous, jq) and V2b may convert the history screen.
+
+### 2026-10-03 20:14 IST · UX-T · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-t-terminal
+- Did: review fixes — real vim-tmux-navigator tmux.conf (ps-based is_postctl, copy-mode-vi); CheckSettings continues on per-option errors; tmux 3.5+ note for extended-keys-format; Ghostty config lines; HandoffPane uses injected env.
+- Tests: `task agents:check` green; tmux snippet validated on `-L postctl-check` private socket.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:11 IST · UX-T · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-t-terminal · ~/work/postctl-wt/ux-t-terminal
+- Did: tmux pane handoff on layout edge via `Options.OnEdge` (`tmux select-pane -L|-D|-U|-R`, skips zoomed windows); one-shot tmux settings check in Init (300 ms, fake runner in tests); `docs/terminal.md` for Ghostty/tmux and fallbacks; links from README and keys.md.
+- Files: `internal/termx/*`, `cmd/postctl/{wire,terminal}.go`, `internal/tui/{app,startup_test}.go`, `docs/terminal.md`, `cmd/genkeys/main.go`, `docs/keys.md`, `README.md`, `docs/ledger.md`
+- Decisions: reuse footer toast for the notice; `StartupCmd` + `StartupNoopMsg` in Options/Init; no real tmux in tests.
+- Tests: `task agents:check` green (build, race, lint 0).
+- Next: orchestrator merge; not pushed.
+
+### 2026-10-03 20:21 IST · UX-T · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-t-terminal` merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged `internal/termx` (tmux settings check with a one-time warning, Ctrl-h/j/k/l handoff at pane edges), `docs/terminal.md` (Ghostty and tmux setup, navigator bindings).
+- Reviews: invariants/security approved a5e9c3d; tmux/docs correctness approved b2d65ef after fixes (navigator snippet rewritten and parsed on a private tmux server, per-option query failures no longer hide warnings, `extended-keys-format` is tmux 3.5+, Ghostty lines). Declined: adding the tmux notice to the leak sweep (fixed text and option names only).
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
+- Next: none for T.
+
+### 2026-10-03 20:15 IST · UX-V2b · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/ux-v2b-screens at `/Users/shubham/work/postctl-wt/ux-v2b-screens`; not pushed.
+- Did: Read brief and design-language key map; scoped parallel owners (skip `internal/tui/history/` for H1).
+- Next: vimtext overlays, listmotion helper, envedit/cookies/runner screens, leak sweep frame, goldens and gate.
+
+### 2026-10-03 20:27 IST · UX-V2b · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Converted palette, switcher, prompts, tree filter, env editor, cookies and runner form fields to `vimtext` via `pickInput`/`promptInput` and `screenfield`; shared `listmotion` for j/k, gg/G, Ctrl-d/u; overlay Esc ladder (insert → normal → close); footer mode labels; vimtext fixes (full-line visibility after SetValue, display redaction for masked single-line fields). Extended `internal/qa/secret_leak_test.go` with an env-editor secret-cell frame. Skipped `internal/tui/history/` per brief (H1).
+- Files: `internal/tui/{pickinput,listmotion,screenfield,overlays,palette,switcher,tree,app,layout,pane}.go`, `internal/tui/{envedit,cookies,runner}/`, `internal/tui/vimtext/render.go`, `internal/qa/secret_leak_test.go`, tests and goldens.
+- Tests: `task agents:check` green; `task tui:smoke` PASS; 21 golden files updated.
+- Next: orchestrator merge after V2a/M1/T land.
+
+### 2026-10-03 20:36 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; merged main (H1, T, V3 brief); not pushed.
+- Did: Review fixes on 1c5c795 — envedit `applyTextIfChanged` + unhydrated-secret test; vimtext `Options.Mask` (reverted render Redact); leak sweep hydrates sentinel, env-editor normal/insert/visual at 80/140, runner setup + switcher, mask-glyph asserts (stub Mask to prove); runner field Esc/Enter ladder + listmotion on setup/summary; View purity sizing in SetSize; history vim filter + listmotion + VimMode; listmotion empty/shrink; keys.md via genkeys; Ctrl-R reveal before vimtext in envedit.
+- Tests: `task agents:check` green; `task tui:smoke` PASS. Leak proofs: sentinel absent and mask glyph present on env-editor frames; workspace files still mask-glyph-clean via `assertMaskGlyphsAbsent`.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:40 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Removed ledger conflict markers; runner setup routes keys to focused insert/visual fields before listmotion (blurred fields, Enter→normal); listmotion shrink reports Moved; vimtext ensureVisible EOL vs on-char; runner goldens refreshed.
+- Tests: `task agents:check` green; `task tui:smoke` PASS; `VIMTEXT_NVIM=1` differential green.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:19 IST · UX-V3 · Sonnet 5.5 (high) · STARTED
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: read the brief, AGENTS files and the response, history, diffview and leader code. Starting items 1-3 (History tab, diff with previous, jq filter). Item 4 (read-only vimtext body) waits for V2a on main.
+- Files: none yet.
+- Decisions: the response pane registers `history.request`, `response.diff` and `response.jq` itself (it owns the state they need); history access goes through a new `response.Deps` factory wired in `cmd/postctl/wire.go`.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: History tab, then diff, then jq.
+
+### 2026-10-03 20:37 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: items 1-3 shipped. (1) Per-request History tab in the response pane (`Space H`, `gH`, `d` diff with the selected entry, `Enter` opens the History screen filtered to the request). (2) Diff with previous (`Space x`, body and headers, `h` toggles). (3) jq filter (`Space j`, gojq v0.12.19: no env, no modules, 250 ms and 1 MiB limits, errors without data). Item 4 (read-only vimtext body) not started.
+- Files: new in `internal/tui/response` (`deps.go`, `history_tab.go`, `diff.go`, `jq.go`, `jq_pane.go`, tests, 45 new goldens, no existing golden changed); outside it: `internal/tui/send.go` (`SendResult.HistoryID`), `internal/tui/tuiengine/tuiengine.go`, `internal/tui/pane.go` (`ScreenEnv.HistoryRequest/HistoryEntry`, `ScreenOpenedMsg`), `internal/tui/response_actions.go` (new), `internal/tui/app.go` (one case), `internal/tui/history/history.go` (request filter, title), `cmd/postctl/main.go`, `cmd/postctl/wire.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/tui-stack.md`, `go.mod`, `go.sum` (gojq, timefmt-go; `go mod tidy` also moved uniseg to direct, which main already needed), `internal/qa/secret_leak_test.go`.
+- Decisions: the pane registers `history.request`, `response.diff`, `response.jq` itself (state lives there); the History tab, section and actions exist only when `Deps.Log` is set. The diff always compares redacted text on both sides, even with reveal on. jq works on the masked body; its output is tied to the reveal state it was computed for. `y` now copies masked text (jq output or masked body) unless reveal is on. History rows mask the server reason phrase with the current result's redactor. The base Body tab is still unmasked, as before (exempt in the leak sweep); item 4 owns that.
+- Tests: `task agents:check` green (0 lint issues), `task tui:smoke` PASS. Leak sweep extended (`renderResponseV3Frames`): History tab, History tab with a secret in the reason phrase, diff body, diff headers, jq whole-document and field filters, and the text a jq yank copies, for the Bearer and Folder requests. Proved by removing the masking: jq input (8 frames fail), diff body (2), diff headers (2), history reason phrase (2); all restored.
+- Blockers / questions: none. Brief deviations: actions registered in the pane rather than `response_actions.go`; `Space x` is enabled whenever a request is selected and toasts the reason when there is nothing to diff (not disabled).
+- Next: item 4 once V2a merges.
+
+### 2026-10-03 20:44 IST · UX-V3 · orchestrator (Claude Opus) · PROGRESS
+- Branch/worktree: items 1-3 of `ws/ux-v3-response` (ca99c24) merged into `main` with `--no-ff`; the worktree stays for item 4 (read-only vimtext body), which waits for UX-V2a.
+- Did: merged the response History tab (`gH`, `Space H`), diff with previous (`Space x`), jq filter (`Space j`, gojq v0.12.19).
+- Reviews: security approved (about 60 jq filters checked for leaks through error text; diff and jq leak cases re-proven by stubbing). Correctness raised one item (jq Esc); declined because the code follows the Esc ladder, and the brief was corrected (f44a1d3).
+- Decisions: the on-screen response Body tab stays unmasked (INT4 decision, leak-sweep exemption); yank, diff, jq and every external path stay masked. Follow-ups for item 4: no clock read in the History tab `View`; document that gojq has no memory cap.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+
+### 2026-10-03 21:05 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; merged main (V3 1–3); not pushed.
+- Did: Security re-check fixes — leak sweep hydrates secret via `thenEdit`/`hydrate` (no Ctrl-R), captures insert/normal/visual env-editor frames and history vim filter; Esc once stays in field. Fixed mask: per-glyph while editing, fixed four-glyph `Redact` for yank; narrow-width `ensureVisible`; edit-mode purity tests (envedit, runner, screenfield). History merge keeps vim filter + per-request filter.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential. Leak stub proofs (/tmp copy): unset `screenfield` `Options.Mask` fails env-editor insert 80+140; vimtext render mask disabled fails insert 80+140; identity `Redact` does not fail display frames (yank length covered by `TestYankMaskedSecretUsesFixedMask`).
+- Next: orchestrator merge.
+
+### 2026-10-03 21:15 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Leak `assertAbsent` checks raw and ANSI-stripped text; env-editor mask assert targets the `Value (secret)` line only. Runner setup `i`/`a`/`I`/`A` focus fields in insert; vimtext EOL scroll uses cell widths; screenfield yank test via `New`+`SetClipboard`.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential green. Stub `Options.Mask` off: all six env-editor frames fail (insert/normal/visual × 80/140). Full sweep with ANSI strip: no other frame regressions.
+- Next: orchestrator merge.
+
+### 2026-10-03 20:56 IST · UX-V2b · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-v2b-screens` (892acdd) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged vim editing for the palette, switcher, tree filter, name prompts, env editor cells, runner setup and export fields, and the history screen filter; shared `listmotion` (j/k, gg/G, Ctrl-d/u) and `screenfield`; additive `vimtext` `Options.Mask` (one glyph per cluster while a secret is being edited; yank and every other view use the fixed mask).
+- Reviews: five rounds. Fixed: an unhydrated secret erased on Enter, a render-time Redact that broke cursor mapping, a leak sweep that could not fail, View sizing calls, runner field routing, a committed conflict marker. The leak sweep now also searches ANSI-stripped frames repo-wide (cursor escapes could split a sentinel); no other frame regressed. Orchestrator re-proved it: with the screenfield mask disabled, `go test ./internal/qa` fails.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+- Next: UX-V2a must adopt `Options.Mask` and add `SetMask(string)` (empty reveals) instead of its own mask API.

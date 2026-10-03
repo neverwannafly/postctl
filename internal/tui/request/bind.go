@@ -17,8 +17,18 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 		return nil
 	}
 	var cmd tea.Cmd
+	restoreCancelled := false
+	if ref.Request != nil && (old == nil || old.ID != ref.Request.ID) {
+		restoreCancelled = p.dropPendingPatches(ref.Request.ID)
+	}
 	if old != nil {
-		cmd = p.flush(old.ID)
+		if flush := p.flush(old.ID); flush != nil {
+			if cmd == nil {
+				cmd = flush
+			} else {
+				cmd = tea.Batch(cmd, flush)
+			}
+		}
 	}
 	p.stopAll()
 	p.ref = ref
@@ -27,7 +37,17 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	p.zone = zTabs
 	p.msel = nil
 	p.confirm = nil
-	p.notice = ""
+	if restoreCancelled {
+		p.notice = "Restore cancelled: you switched requests"
+		n := p.setNotice(p.notice)
+		if cmd == nil {
+			cmd = n
+		} else {
+			cmd = tea.Batch(cmd, n)
+		}
+	} else {
+		p.notice = ""
+	}
 	p.oauthErr = ""
 	p.refreshChain()
 	p.reloadAll()
@@ -35,6 +55,14 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 		// A brand-new request: start at the URL, typing.
 		p.setZone(zBar)
 		p.focusURL("i")
+	}
+	if p.req != nil {
+		if patch, ok := p.takePendingPatch(p.req.ID); ok {
+			if cmd == nil {
+				return p.applyHistoryTemplateNow(patch)
+			}
+			return tea.Batch(cmd, p.applyHistoryTemplateNow(patch))
+		}
 	}
 	return cmd
 }

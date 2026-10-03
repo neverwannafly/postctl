@@ -254,6 +254,17 @@ websocket:
 
 More complete samples (every body mode, auth type, disabled rows, scripts, examples) are the golden files in `internal/store/testdata/golden/workspace/`; regenerate them with `go test ./internal/store -run TestGolden -update`.
 
+## Send history (`.postctl/history/history.jsonl`)
+
+Each line is one JSON object (`history.Entry`). Besides the resolved-on-the-wire
+`request` snapshot, new entries include an optional `template` object
+(`history.RequestTemplate`): method, raw `url`, `query`, `pathVariables`,
+`headers`, body mode and body fields (`bodyRaw`, `bodyUrlencoded`, `bodyFormData`,
+`bodyGraphQLVariables`), and `bodyTruncated`. Values are redacted; entries written
+before restore support omit `template`. See `docs/engine.md` (History) for
+redaction rules. This is not part of the YAML workspace schema; it lives only in
+the append-only log.
+
 ## Store API in one screen
 
 ```go

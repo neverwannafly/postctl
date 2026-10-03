@@ -18,8 +18,9 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/report"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/listmotion"
 	"github.com/shubham/postctl/internal/tui/response"
-	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/screenfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -79,10 +80,12 @@ type Model struct {
 	scopeLabel string
 
 	field      int
+	setupNav   listmotion.View
+	failCur    int
 	envID      model.ID
-	iterations *textin.Input
-	dataPath   *textin.Input
-	delayMS    *textin.Input
+	iterations *screenfield.Field
+	dataPath   *screenfield.Field
+	delayMS    *screenfield.Field
 	bail       bool
 	persist    bool
 
@@ -98,7 +101,8 @@ type Model struct {
 	runCancel  context.CancelFunc
 	runCh      <-chan engine.RunEvent
 	runEvents  []engine.RunEvent
-	exportPath *textin.Input
+	exportPath *screenfield.Field
+	listNav    listmotion.View
 	exportXML  bool
 	conf       ui.Confirm
 	notice     string
@@ -109,12 +113,16 @@ type Model struct {
 
 // New builds the runner screen.
 func New(env tui.ScreenEnv, d Deps) *Model {
+	iters, _ := screenfield.New(env.Theme, "1", "", false)
+	data, _ := screenfield.New(env.Theme, "", "path to CSV", false)
+	delay, _ := screenfield.New(env.Theme, "0", "", false)
+	export, _ := screenfield.New(env.Theme, "", "export path", false)
 	m := &Model{
 		th: env.Theme, env: env, deps: d,
-		iterations: textin.New("1"),
-		dataPath:   textin.New(""),
-		delayMS:    textin.New("0"),
-		exportPath: textin.New(""),
+		iterations: iters,
+		dataPath:   data,
+		delayMS:    delay,
+		exportPath: export,
 		bail:       false,
 		persist:    true,
 		spin:       env.Theme.NewSpinner(),
@@ -125,7 +133,17 @@ func New(env tui.ScreenEnv, d Deps) *Model {
 	}
 	m.envID = env.ActiveEnv
 	m.scopeLabel = m.buildScopeLabel()
+	m.blurSetupFields()
+	m.exportPath.Blur()
 	return m
+}
+
+func (m *Model) blurSetupFields() {
+	for _, f := range []*screenfield.Field{m.iterations, m.dataPath, m.delayMS} {
+		if f != nil {
+			f.Blur()
+		}
+	}
 }
 
 func (m *Model) buildScopeLabel() string {
@@ -142,7 +160,21 @@ func (m *Model) buildScopeLabel() string {
 }
 
 // SetSize implements tui.Screen.
-func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
+func (m *Model) SetSize(w, h int) {
+	m.w, m.h = w, h
+	if m.iterations != nil {
+		m.iterations.SetWidth(20)
+	}
+	if m.dataPath != nil {
+		m.dataPath.SetWidth(max(4, w-20))
+	}
+	if m.delayMS != nil {
+		m.delayMS.SetWidth(12)
+	}
+	if m.exportPath != nil {
+		m.exportPath.SetWidth(max(4, w-2))
+	}
+}
 
 // KeyHints implements tui.Screen.
 func (m *Model) KeyHints() []ui.Hint {
@@ -232,13 +264,51 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 	return m, nil
 }
 
+// VimMode implements tui.ModeReporter.
+func (m *Model) VimMode() string {
+	switch m.phase {
+	case phSetup:
+		if f := m.activeField(); f != nil {
+			return f.VimMode()
+		}
+	case phExport:
+		return m.exportPath.VimMode()
+	}
+	return ""
+}
+
 func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	if f := m.activeField(); f != nil && f.Focused() {
+		_, _, cmd, leave, _ := f.UpdateEx(k)
+		if leave {
+			f.Blur()
+		}
+		return m, cmd
+	}
+	if f := m.activeField(); f != nil && !f.Focused() {
+		switch k.String() {
+		case "i", "a", "I", "A":
+			focus := f.FocusNormal()
+			_, _, cmd, _, _ := f.UpdateEx(k)
+			return m, tea.Batch(focus, cmd)
+		}
+	}
+	m.setupNav.Cursor = m.field
+	if r := listmotion.Key(k, listmotion.Config{Count: 7, Page: 7}, &m.setupNav); r.Handled {
+		if r.Moved {
+			m.blurSetupFields()
+			m.field = m.setupNav.Cursor
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
 	case "tab":
+		m.blurSetupFields()
 		m.field = (m.field + 1) % 7
 	case "shift+tab":
+		m.blurSetupFields()
 		m.field = (m.field + 6) % 7
 	case " ":
 		switch m.field {
@@ -247,18 +317,20 @@ func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		case 6:
 			m.persist = !m.persist
 		}
-	case "ctrl+enter", "enter":
-		if m.field == 6 || k.String() == "ctrl+enter" {
+	case "ctrl+enter":
+		return m, m.startRun()
+	case "enter":
+		if m.field == 6 {
 			return m, m.startRun()
 		}
-		fallthrough
-	default:
-		m.activeInput().Update(k)
+		if f := m.activeField(); f != nil {
+			return m, f.FocusNormal()
+		}
 	}
 	return m, nil
 }
 
-func (m *Model) activeInput() *textin.Input {
+func (m *Model) activeField() *screenfield.Field {
 	switch m.field {
 	case 2:
 		return m.iterations
@@ -267,11 +339,19 @@ func (m *Model) activeInput() *textin.Input {
 	case 4:
 		return m.delayMS
 	default:
-		return m.iterations
+		return nil
 	}
 }
 
 func (m *Model) liveKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	rows := m.visibleRows()
+	m.listNav.Cursor, m.listNav.Top = m.cur, m.top
+	if r := listmotion.Key(k, listmotion.Config{Count: len(rows), Page: max(1, m.h-8)}, &m.listNav); r.Handled {
+		if r.Moved {
+			m.cur, m.top = m.listNav.Cursor, m.listNav.Top
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc":
 		m.phase = phConfirmCancel
@@ -292,6 +372,17 @@ func (m *Model) liveKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 }
 
 func (m *Model) summaryKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	failN := 0
+	if m.summary != nil {
+		failN = len(m.summary.Failures)
+	}
+	m.listNav.Cursor = m.failCur
+	if r := listmotion.Key(k, listmotion.Config{Count: failN, Page: max(1, m.h-12)}, &m.listNav); r.Handled {
+		if r.Moved {
+			m.failCur = m.listNav.Cursor
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
@@ -308,14 +399,32 @@ func (m *Model) summaryKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 func (m *Model) exportKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc":
+		if m.exportPath.Inserting() {
+			_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
+			return m, cmd
+		}
+		if m.exportPath.VimMode() == "NORMAL" {
+			m.exportPath.Blur()
+			return m, nil
+		}
 		m.phase = phSummary
+	case "enter":
+		if !m.exportPath.Inserting() {
+			if m.exportPath.VimMode() == "" {
+				return m, m.exportPath.Focus()
+			}
+			if m.exportPath.VimMode() == "NORMAL" {
+				_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
+				return m, tea.Batch(cmd, m.exportPath.Focus())
+			}
+		}
+		return m, m.confirmExport()
 	case "tab":
 		m.exportXML = !m.exportXML
-		m.exportPath.Set(swapExportExtension(m.exportPath.Text(), m.exportXML))
-	case "enter":
-		return m, m.confirmExport()
+		m.exportPath, _ = screenfield.New(m.th, swapExportExtension(m.exportPath.Value(), m.exportXML), "export path", false)
 	default:
-		m.exportPath.Update(k)
+		_, _, cmd, _, _ := m.exportPath.UpdateEx(k)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -326,7 +435,7 @@ func (m *Model) beginExport() (tui.Screen, tea.Cmd) {
 	}
 	m.phase = phExport
 	m.exportXML = false
-	m.exportPath.Set(defaultExportPath(m.env, false))
+	m.exportPath, _ = screenfield.New(m.th, defaultExportPath(m.env, false), "export path", false)
 	return m, nil
 }
 
@@ -449,13 +558,13 @@ func (m *Model) startRunFailedOnly() tea.Cmd {
 }
 
 func (m *Model) buildInput(only []model.ID) (engine.RunInput, error) {
-	iters, _ := strconv.Atoi(strings.TrimSpace(m.iterations.Text()))
+	iters, _ := strconv.Atoi(strings.TrimSpace(m.iterations.Value()))
 	if iters <= 0 {
 		iters = 1
 	}
-	delay, _ := strconv.Atoi(strings.TrimSpace(m.delayMS.Text()))
+	delay, _ := strconv.Atoi(strings.TrimSpace(m.delayMS.Value()))
 	var data []map[string]any
-	if p := strings.TrimSpace(m.dataPath.Text()); p != "" {
+	if p := strings.TrimSpace(m.dataPath.Value()); p != "" {
 		rows, err := engine.LoadDataFile(p)
 		if err != nil {
 			return engine.RunInput{}, err
@@ -618,7 +727,7 @@ type exportDoneMsg struct {
 }
 
 func (m *Model) confirmExport() tea.Cmd {
-	path := strings.TrimSpace(m.exportPath.Text())
+	path := strings.TrimSpace(m.exportPath.Value())
 	if path == "" {
 		return func() tea.Msg { return exportDoneMsg{err: fmt.Errorf("choose a file path")} }
 	}
@@ -782,9 +891,9 @@ func (m *Model) viewSetup() string {
 	lines := []string{
 		fieldLine(t, m.field == 0, "Scope", m.scopeLabel),
 		fieldLine(t, m.field == 1, "Environment", m.envLabel()),
-		fieldLine(t, m.field == 2, "Iterations", m.iterations.View(t, 20, m.field == 2)),
-		fieldLine(t, m.field == 3, "Data file", m.dataPath.View(t, m.w-20, m.field == 3)),
-		fieldLine(t, m.field == 4, "Delay (ms)", m.delayMS.View(t, 12, m.field == 4)),
+		fieldLine(t, m.field == 2, "Iterations", runnerField(m.iterations, 20)),
+		fieldLine(t, m.field == 3, "Data file", runnerField(m.dataPath, m.w-20)),
+		fieldLine(t, m.field == 4, "Delay (ms)", runnerField(m.delayMS, 12)),
 		fieldLine(t, m.field == 5, "Bail on failure", checkbox(m.bail)),
 		fieldLine(t, m.field == 6, "Persist variables", checkbox(m.persist)),
 	}
@@ -971,6 +1080,13 @@ func (m *Model) viewExport() string {
 	}
 	body += m.th.Render(ui.TextSecondary, "Format") + "  " + m.th.Render(ui.AccentPrimary, format) + m.th.Render(ui.TextQuiet, "  Tab toggles") + "\n"
 	body += m.th.Render(ui.TextSecondary, "File path") + "\n"
-	body += m.th.Render(ui.AccentPrimary, m.exportPath.View(m.th, m.w-2, true))
+	body += m.th.Render(ui.AccentPrimary, runnerField(m.exportPath, m.w-2))
 	return body
+}
+
+func runnerField(f *screenfield.Field, _ int) string {
+	if f == nil {
+		return ""
+	}
+	return f.View()
 }

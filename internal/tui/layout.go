@@ -306,9 +306,15 @@ func (a *app) hints() []ui.Hint {
 		return []ui.Hint{hint("q", "Quit", 0)}
 	case a.ov != nil:
 		hs := a.ov.hints(a)
-		switch a.ov.(type) {
-		case *pickerOverlay, *promptOverlay:
-			hs = append([]ui.Hint{hint("INSERT", "", 0)}, hs...)
+		if m, ok := a.ov.(overlayVimMode); ok {
+			if s := m.overlayVimMode(); s != "" {
+				hs = append([]ui.Hint{hint(s, "", 0)}, hs...)
+			}
+		}
+		if o, ok := a.ov.(*screenOverlay); ok {
+			if s := screenVimMode(o.s); s != "" {
+				hs = append([]ui.Hint{hint(s, "", 0)}, hs...)
+			}
 		}
 		return hs
 	case a.pend != nil:
@@ -352,10 +358,17 @@ func (a *app) hints() []ui.Hint {
 // modeLabel is the editing mode shown at the start of the footer while a text
 // field has the keyboard, or "".
 func (a *app) modeLabel() string {
+	if a.ov != nil {
+		if m, ok := a.ov.(overlayVimMode); ok {
+			if s := m.overlayVimMode(); s != "" {
+				return s
+			}
+		}
+	}
 	switch a.focus {
 	case SlotSidebar:
-		if a.tree.filtering {
-			return "INSERT"
+		if s := a.tree.filterVimMode(); s != "" {
+			return s
 		}
 	case SlotRequest:
 		if m, ok := a.request.(ModeReporter); ok {
@@ -371,7 +384,7 @@ func (a *app) modeLabel() string {
 
 func (a *app) sidebarHints() []ui.Hint {
 	if a.tree.filtering {
-		return []ui.Hint{hint("Enter", "Keep results", 0), hint("Esc", "Clear filter", 0), hint(arrowsUD(a.ascii), "Move", 1)}
+		return []ui.Hint{hint("Enter", "Keep results", 0), hint("Esc", "Normal or close", 0), hint("j/k", "Move", 1)}
 	}
 	hs := []ui.Hint{}
 	r, ok := a.tree.current()

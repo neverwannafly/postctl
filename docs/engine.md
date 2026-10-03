@@ -268,9 +268,19 @@ the TUI and the CLI can share it.
  "request":{"method":"POST","url":"https://…?token=••••","headers":[{"key":"Authorization","value":"••••"}],"body":"…"},
  "status":201,"statusText":"Created","durationMs":184,"sizeBytes":1234,
  "tests":{"passed":3,"failed":0,"skipped":0},"scriptError":"","error":"",
- "response":{"headers":[…],"body":"…","bodyEncoding":"","truncated":false}}
+ "response":{"headers":[…],"body":"…","bodyEncoding":"","truncated":false},
+ "template":{"method":"POST","url":"{{baseUrl}}/…","headers":[{"key":"Authorization","value":"Bearer {{token}}"}],
+             "bodyMode":"raw","bodyRaw":"…","bodyTruncated":false}}
 ```
 
+- **`template`** (optional on older entries) is the **unresolved** request after
+  pre-request scripts and before variable resolution, redacted with the same
+  rules as snapshots. Credential-looking header/query/body fields keep their
+  value only when it is entirely `{{variable}}` references (with an optional
+  `Bearer`/`Basic`/`Token` prefix); otherwise they are stored as `••••`. Known
+  secret variable values are masked everywhere. The TUI uses `template` to
+  restore method, URL, params, headers and body into the editor without writing
+  resolved hosts or mask glyphs into request files.
 - **API.** `Open(dir, Options)`, `Append(Entry)`, `List(Filter)` (newest first,
   summaries without bodies; filter by request, collection, text, time, limit and
   offset), `Get(id)` (full entry), `Clear()`, `Len()`.

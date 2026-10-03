@@ -17,6 +17,7 @@ require (
 	github.com/dop251/goja_nodejs v0.0.0-20260918173711-b481721df8a2
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/golang/snappy v1.0.0
+	github.com/itchyny/gojq v0.12.19
 	github.com/rivo/uniseg v0.4.7
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/tidwall/gjson v1.19.0
@@ -34,6 +35,7 @@ require (
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8 // indirect
+	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect

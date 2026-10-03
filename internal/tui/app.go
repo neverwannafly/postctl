@@ -58,6 +58,9 @@ type Options struct {
 	// in that direction (plan U2). The terminal-handoff workstream sets it to
 	// hand the move to tmux. Nil does nothing.
 	OnEdge func(dir Direction) tea.Cmd
+	// StartupCmd runs once during Init (for example a tmux settings check).
+	// Nil skips it.
+	StartupCmd tea.Cmd
 	// NoWatch disables file watching (tests).
 	NoWatch bool
 	// Light assumes a light terminal background until the terminal answers;
@@ -199,6 +202,9 @@ func newApp(opts Options) *app {
 // Init starts loading the workspace and asks the terminal for its background.
 func (a *app) Init() tea.Cmd {
 	cmds := []tea.Cmd{a.loadCmd(nil), tea.RequestBackgroundColor}
+	if a.opts.StartupCmd != nil {
+		cmds = append(cmds, a.opts.StartupCmd)
+	}
 	if !a.accessible {
 		cmds = append(cmds, tea.Tick(loadingDelay, func(time.Time) tea.Msg { return showLoadingMsg{} }))
 	}
@@ -209,6 +215,8 @@ func (a *app) Init() tea.Cmd {
 
 type (
 	showLoadingMsg struct{}
+	// StartupNoopMsg is returned when an optional Init command has nothing to report.
+	StartupNoopMsg struct{}
 	toastExpireMsg int
 	loadedMsg      struct {
 		seq      int
@@ -260,6 +268,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.forward(msg)
 	case tea.PasteMsg:
 		return a, a.onPaste(msg)
+	case StartupNoopMsg:
+		return a, nil
 	case showLoadingMsg:
 		if a.phase == phaseLoading {
 			a.showLoading = true
@@ -318,8 +328,12 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.openScreen(msg.Screen)
 	case OpenSwitcherMsg:
 		return a, a.openSwitcher()
+	case OpenRequestHistoryMsg:
+		return a, a.openRequestHistory(msg)
 	case SelectRequestMsg:
 		return a, a.selectRequest(msg.RequestID)
+	case CreateRequestFromHistoryMsg:
+		return a, a.createRequestFromHistory(msg)
 	case SendSavedRequestMsg:
 		return a, a.sendSavedRequest(msg.RequestID)
 	case foldPersistMsg:
@@ -501,12 +515,14 @@ func (a *app) onPaste(msg tea.PasteMsg) tea.Cmd {
 	if a.ov != nil {
 		return a.updateOverlay(msg)
 	}
-	if a.focus == SlotSidebar {
-		if a.tree.filtering {
-			var cmd tea.Cmd
-			a.tree.filter, cmd = a.tree.filter.Update(msg)
-			return cmd
+	if a.focus == SlotSidebar && a.tree.filtering {
+		cmd, moved := a.tree.filterPaste(msg)
+		if moved {
+			return tea.Batch(cmd, a.syncSelection(false))
 		}
+		return cmd
+	}
+	if a.focus == SlotSidebar {
 		return nil
 	}
 	return a.updateFocused(msg)
@@ -544,6 +560,9 @@ func (a *app) editing() bool {
 // reach the shell through [ForwardKeyMsg]. A pane that reports no mode counts
 // as typing whenever it is editing.
 func (a *app) typing() bool {
+	if a.focus == SlotSidebar {
+		return a.editing() // the tree filter has its own modal handling
+	}
 	return a.editing() && a.modeLabel() != "NORMAL"
 }
 
@@ -552,11 +571,15 @@ func (a *app) typing() bool {
 // or tree-filter field in insert or visual mode, or an overlay built around a
 // text input (palette, request switcher, prompts).
 func (a *app) insertActive() bool {
-	switch a.ov.(type) {
-	case *pickerOverlay, *promptOverlay, *switcherOverlay:
-		return true
+	switch o := a.ov.(type) {
+	case *pickerOverlay:
+		return o.input.inserting()
+	case *promptOverlay:
+		return o.input.inserting()
+	case *switcherOverlay:
+		return o.input.inserting()
 	case nil:
-		return a.typing() || (a.tree != nil && a.tree.filtering)
+		return a.typing() || (a.tree != nil && a.tree.filterInserting())
 	}
 	return false
 }

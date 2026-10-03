@@ -7,6 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -228,7 +229,11 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 	case kindWebSocket:
 		item = model.NewWebSocketRequest(name, "")
 	default:
-		item = model.NewRequest(name, "GET", "")
+		_, cmd, err := a.createRequestAt(coll, parent, index, name, "GET", "")
+		if err != nil {
+			return "Could not add it here: " + errText(err), nil
+		}
+		return "", cmd
 	}
 	if err := coll.Insert(parent.ContainerID(), index, item); err != nil {
 		return "Could not add it here: " + errText(err), nil
@@ -237,6 +242,57 @@ func (a *app) create(kind itemKind, name string) (string, tea.Cmd) {
 		a.tree.expanded[parent.ContainerID()] = true
 	}
 	return "", a.afterEdit(coll, item.ItemID(), kind == kindRequest || kind == kindWebSocket)
+}
+
+func (a *app) createRequestAt(
+	coll *model.Collection,
+	parent model.Container,
+	index int,
+	name, method, rawURL string,
+) (*model.Request, tea.Cmd, error) {
+	req := model.NewRequest(name, method, rawURL)
+	if err := coll.Insert(parent.ContainerID(), index, req); err != nil {
+		return nil, nil, err
+	}
+	if parent.ContainerID() != coll.ID {
+		a.tree.expanded[parent.ContainerID()] = true
+	}
+	return req, a.afterEdit(coll, req.ID, true), nil
+}
+
+func (a *app) createRequestFromHistory(msg CreateRequestFromHistoryMsg) tea.Cmd {
+	if a.ws == nil {
+		return a.toastErr("Could not restore the request: no workspace is open.")
+	}
+	coll := a.ws.Collection(msg.CollectionID)
+	if coll == nil {
+		return a.toastErr("Could not restore the request: collection no longer exists.")
+	}
+	var parent model.Container = coll
+	if msg.ParentID != "" && msg.ParentID != coll.ID {
+		it, _, _, ok := coll.Find(msg.ParentID)
+		folder, isFolder := it.(*model.Folder)
+		if !ok || !isFolder {
+			return a.toastErr("Could not restore the request: folder no longer exists.")
+		}
+		parent = folder
+	}
+	method := msg.Template.Method
+	if method == "" {
+		method = "GET"
+	}
+	rawURL := msg.Template.URL
+	if history.FieldMasked(msg.Template.URLMasked, rawURL) || !history.RestoreSafeValue(rawURL) {
+		rawURL = ""
+	}
+	req, created, err := a.createRequestAt(coll, parent, -1, msg.Name, method, rawURL)
+	if err != nil {
+		return a.toastErr("Could not restore the request: " + errText(err))
+	}
+	patch := func() tea.Msg {
+		return ApplyRequestPatchMsg{RequestID: req.ID, Template: msg.Template}
+	}
+	return tea.Batch(created, patch)
 }
 
 // insertionPoint picks where a new request or folder goes: inside a selected
