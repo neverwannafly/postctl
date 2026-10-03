@@ -405,6 +405,7 @@ func GenerateMarkdown() string {
 	b.WriteString("# Keyboard Shortcut Reference\n\n")
 	b.WriteString("`postctl` is designed for fast, keyboard-first navigation without requiring a mouse.\n")
 	b.WriteString("Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Text fields insert what you type, including Space, `g`, `q` and `:`; modal editing inside text fields is a separate workstream and is not advertised here until it ships.\n\n")
+	b.WriteString("For tmux pane handoff (**Ctrl-h/j/k/l** at the layout edge), Ghostty, and **Ctrl-Enter** / clipboard setup, see [`docs/terminal.md`](terminal.md).\n\n")
 	b.WriteString("## Quick Reference Cheat Sheet\n\n")
 	b.WriteString("| Key | Action |\n")
 	b.WriteString("| --- | --- |\n")

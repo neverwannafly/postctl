@@ -54,7 +54,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
-| UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
+| UX-T tmux/terminal | Composer 2.5 (fast) | Done | ws/ux-t-terminal | 2026-10-03 20:11 IST |
 
 ## Entries
 
@@ -934,3 +934,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: phase 1 merged except H1 (Q, V0, V1 on main). Wrote phase 2 briefs `UX-V2a-request-vim`, `UX-V2b-screens-vim`, `UX-M1-mouse`, `UX-T-terminal`; created their worktrees.
 - Decisions: key forwarding from text fields in normal mode uses new `ForwardKeyMsg`/`ForwardSeqMsg` (owned by V2a); "always" keys work in panes and non-modal overlays only; H1 final fix round reassigned to GPT-5.6 Sol.
 - Next: V3 brief once H1 merges; M2 and QA after phase 2.
+
+### 2026-10-03 20:11 IST · UX-T · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-t-terminal · ~/work/postctl-wt/ux-t-terminal
+- Did: tmux pane handoff on layout edge via `Options.OnEdge` (`tmux select-pane -L|-D|-U|-R`, skips zoomed windows); one-shot tmux settings check in Init (300 ms, fake runner in tests); `docs/terminal.md` for Ghostty/tmux and fallbacks; links from README and keys.md.
+- Files: `internal/termx/*`, `cmd/postctl/{wire,terminal}.go`, `internal/tui/{app,startup_test}.go`, `docs/terminal.md`, `cmd/genkeys/main.go`, `docs/keys.md`, `README.md`, `docs/ledger.md`
+- Decisions: reuse footer toast for the notice; `StartupCmd` + `StartupNoopMsg` in Options/Init; no real tmux in tests.
+- Tests: `task agents:check` green (build, race, lint 0).
+- Next: orchestrator merge; not pushed.
