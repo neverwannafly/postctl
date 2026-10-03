@@ -19,6 +19,7 @@ import (
 	"github.com/shubham/postctl/internal/tui/fakesend"
 	histui "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
+	"github.com/shubham/postctl/internal/tui/response"
 	"github.com/shubham/postctl/internal/tui/runner"
 	"github.com/shubham/postctl/internal/tui/tuiengine"
 	"github.com/shubham/postctl/internal/tui/wspane"
@@ -135,8 +136,7 @@ func (s lazySecrets) Delete(ctx context.Context, ref model.SecretRef) error {
 }
 
 // wireEditors fills in the screens and panes this workstream owns without
-// overwriting anything the caller already set (the response pane is wired in
-// openUI).
+// overwriting anything the caller already set.
 func wireEditors(o *tui.Options) {
 	engines := &lazyEngine{backend: o.Backend}
 	if o.Sender == nil {
@@ -149,6 +149,11 @@ func wireEditors(o *tui.Options) {
 	if o.NewRequestPane == nil {
 		o.NewRequestPane = request.Factory(request.Deps{
 			Tokens: oauth2.NewSource(lazySecrets{engine: engines}, nil),
+		})
+	}
+	if o.NewResponsePane == nil {
+		o.NewResponsePane = response.Factory(response.Deps{
+			Log: func() (tui.HistoryReader, error) { return engines.historyLog() },
 		})
 	}
 	if _, ok := o.NewPaneForKind[model.KindWebSocket]; !ok && o.Backend != nil {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/x/ansi"
+	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/ui"
@@ -49,6 +50,53 @@ func TestGoldenRenders(t *testing.T) {
 			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
 			p.applyResult(demoResult(id))
 			p.tab = tabTimeline
+		}},
+		{"history-tab", func(p *Pane) {
+			id := model.NewID()
+			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
+			p.deps = goldenDeps()
+			res := demoResult(id)
+			res.HistoryID = "e3"
+			p.applyResult(res)
+			p.hist = histState{loaded: true, items: goldenHistory(id), cur: 1}
+			p.tab = tabHistory
+		}},
+		{"history-empty", func(p *Pane) {
+			p.ref = tui.RequestRef{Request: &model.Request{ID: model.NewID()}}
+			p.deps = goldenDeps()
+			p.hist = histState{loaded: true}
+			p.tab = tabHistory
+		}},
+		{"diff-body", func(p *Pane) {
+			id := model.NewID()
+			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
+			p.deps = goldenDeps()
+			res := demoResult(id)
+			res.Response.Body = []byte(`{"data":{"items":[{"id":"ch_1","amount":1500},{"id":"ch_2","amount":300}],"total":2},"ok":true}`)
+			p.applyResult(res)
+			prev := goldenHistory(id)[1]
+			prev.Response = &history.ResponseSnapshot{
+				Headers: []model.KV{{Key: "Content-Type", Value: "application/json"}},
+				Body:    `{"data":{"items":[{"id":"ch_1","amount":1200}],"total":1},"ok":true}`,
+			}
+			ready := buildDiff(1, p.th, 0, 0, "Previous", &prev, res)
+			p.diff = diffState{open: true, body: ready.body, headers: ready.headers, showBody: true}
+		}},
+		{"jq-output", func(p *Pane) {
+			id := model.NewID()
+			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
+			p.applyResult(demoResult(id))
+			p.jq = jqState{filter: ".data.items[]", started: true, have: true, lines: []string{
+				"{", `  "id": "ch_1",`, `  "amount": 1200`, "}",
+			}}
+		}},
+		{"jq-open", func(p *Pane) {
+			id := model.NewID()
+			p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
+			p.applyResult(demoResult(id))
+			p.w = 80
+			p.newJQInput(".data.items[]")
+			p.jq.open = true
 		}},
 		{"sending", func(p *Pane) {
 			id := model.NewID()
@@ -91,6 +139,25 @@ func TestGoldenRenders(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func goldenDeps() Deps {
+	return Deps{
+		Log: func() (tui.HistoryReader, error) { return nil, nil },
+		Now: func() time.Time { return v3Now },
+	}
+}
+
+// goldenHistory lists three sends of id, newest first: a success, a client
+// error and a transport failure.
+func goldenHistory(id model.ID) []history.Entry {
+	return []history.Entry{
+		v3Entry("e3", id, 12*time.Second, 200, "OK", `{}`),
+		v3Entry("e2", id, 7*time.Minute, 404, "Not Found", `{}`),
+		{ID: "e1", Time: v3Now.Add(-26 * time.Hour), RequestID: id,
+			Request: history.RequestSnapshot{Method: "GET", URL: "https://api.example.test/items"},
+			Error:   "connection refused", DurationMS: 31},
 	}
 }
 

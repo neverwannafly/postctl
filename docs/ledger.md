@@ -55,7 +55,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
-| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Started | ws/ux-v3-response | 2026-10-03 20:20 IST |
+| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
 
 ## Entries
 
@@ -1018,3 +1018,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Reviews: invariants/security approved a5e9c3d; tmux/docs correctness approved b2d65ef after fixes (navigator snippet rewritten and parsed on a private tmux server, per-option query failures no longer hide warnings, `extended-keys-format` is tmux 3.5+, Ghostty lines). Declined: adding the tmux notice to the leak sweep (fixed text and option names only).
 - Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
 - Next: none for T.
+
+### 2026-10-03 20:19 IST · UX-V3 · Sonnet 5.5 (high) · STARTED
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: read the brief, AGENTS files and the response, history, diffview and leader code. Starting items 1-3 (History tab, diff with previous, jq filter). Item 4 (read-only vimtext body) waits for V2a on main.
+- Files: none yet.
+- Decisions: the response pane registers `history.request`, `response.diff` and `response.jq` itself (it owns the state they need); history access goes through a new `response.Deps` factory wired in `cmd/postctl/wire.go`.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: History tab, then diff, then jq.
+
+### 2026-10-03 20:37 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: items 1-3 shipped. (1) Per-request History tab in the response pane (`Space H`, `gH`, `d` diff with the selected entry, `Enter` opens the History screen filtered to the request). (2) Diff with previous (`Space x`, body and headers, `h` toggles). (3) jq filter (`Space j`, gojq v0.12.19: no env, no modules, 250 ms and 1 MiB limits, errors without data). Item 4 (read-only vimtext body) not started.
+- Files: new in `internal/tui/response` (`deps.go`, `history_tab.go`, `diff.go`, `jq.go`, `jq_pane.go`, tests, 45 new goldens, no existing golden changed); outside it: `internal/tui/send.go` (`SendResult.HistoryID`), `internal/tui/tuiengine/tuiengine.go`, `internal/tui/pane.go` (`ScreenEnv.HistoryRequest/HistoryEntry`, `ScreenOpenedMsg`), `internal/tui/response_actions.go` (new), `internal/tui/app.go` (one case), `internal/tui/history/history.go` (request filter, title), `cmd/postctl/main.go`, `cmd/postctl/wire.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/tui-stack.md`, `go.mod`, `go.sum` (gojq, timefmt-go; `go mod tidy` also moved uniseg to direct, which main already needed), `internal/qa/secret_leak_test.go`.
+- Decisions: the pane registers `history.request`, `response.diff`, `response.jq` itself (state lives there); the History tab, section and actions exist only when `Deps.Log` is set. The diff always compares redacted text on both sides, even with reveal on. jq works on the masked body; its output is tied to the reveal state it was computed for. `y` now copies masked text (jq output or masked body) unless reveal is on. History rows mask the server reason phrase with the current result's redactor. The base Body tab is still unmasked, as before (exempt in the leak sweep); item 4 owns that.
+- Tests: `task agents:check` green (0 lint issues), `task tui:smoke` PASS. Leak sweep extended (`renderResponseV3Frames`): History tab, History tab with a secret in the reason phrase, diff body, diff headers, jq whole-document and field filters, and the text a jq yank copies, for the Bearer and Folder requests. Proved by removing the masking: jq input (8 frames fail), diff body (2), diff headers (2), history reason phrase (2); all restored.
+- Blockers / questions: none. Brief deviations: actions registered in the pane rather than `response_actions.go`; `Space x` is enabled whenever a request is selected and toasts the reason when there is nothing to diff (not disabled).
+- Next: item 4 once V2a merges.

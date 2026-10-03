@@ -327,6 +327,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.openScreen(msg.Screen)
 	case OpenSwitcherMsg:
 		return a, a.openSwitcher()
+	case OpenRequestHistoryMsg:
+		return a, a.openRequestHistory(msg)
 	case SelectRequestMsg:
 		return a, a.selectRequest(msg.RequestID)
 	case CreateRequestFromHistoryMsg:
