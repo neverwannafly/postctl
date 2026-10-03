@@ -4,7 +4,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -41,8 +42,16 @@ type form struct {
 	cur    int
 	top    int
 	edit   bool
-	in     *textin.Input
+	in     *vimfield.Field
 	reveal bool
+}
+
+// field is the focused row editor, or nil.
+func (f *form) field() *vimfield.Field {
+	if f.edit {
+		return f.in
+	}
+	return nil
 }
 
 func (f *form) reset() {
@@ -90,73 +99,65 @@ func (f *form) maskFor(r formRow, text string) bool {
 	return r.secret && !f.reveal && !strings.Contains(text, "{{")
 }
 
-func (f *form) beginEdit(p *Pane, r formRow) {
+// rowWidth is the width the open row editor gets.
+func rowWidth(p *Pane) int {
+	w, _ := p.bodySize()
+	return max(4, w-2-min(20, max(10, w/3))-1)
+}
+
+// beginEdit opens a text row. start is "" for normal mode or "i", "a", "A", "I".
+func (f *form) beginEdit(p *Pane, r formRow, start string) {
 	f.edit = true
-	f.in = textin.New(r.value)
-	f.in.Placeholder = r.placeholder
-	f.in.Mask = f.maskFor(r, f.in.Text())
-	if !r.secret {
-		f.in.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
+	f.in = p.newField(fieldSpec{single: true, secret: r.secret, placeholder: r.placeholder})
+	f.in.Set(r.value)
+	f.in.SetMask(f.maskFor(r, f.in.Text()))
+	f.in.Fit(rowWidth(p), 1)
+	f.in.Begin(start)
+}
+
+// setReveal shows or hides the secret literal being edited.
+func (f *form) setReveal(on bool, r formRow) {
+	f.reveal = on
+	if f.edit && f.in != nil {
+		f.in.SetMask(f.maskFor(r, f.in.Text()))
 	}
 }
 
 // key handles a key. rows returns fresh rows, because an edit can change the
 // form's shape (for example when the auth type changes).
-func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, changed bool) {
+func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, changed bool, cmd tea.Cmd) {
 	rs := rows()
 	f.clamp(rs)
 	if len(rs) == 0 {
-		return false, false
+		return false, false, nil
 	}
 	s := m.String()
-	r := rs[f.cur]
 	if f.edit {
-		switch s {
-		case "esc", "enter":
-			f.edit = false
-			return true, false
-		case "tab", "down", "shift+tab", "up":
-			f.edit = false
-			dir := 1
-			if s == "shift+tab" || s == "up" {
-				dir = -1
-			}
-			if f.step(rs, dir) && rs[f.cur].kind == rowText {
-				f.beginEdit(p, rs[f.cur])
-			}
-			return true, false
-		case "ctrl+r":
-			if r.secret {
-				f.reveal = !f.reveal
-				f.in.Mask = f.maskFor(r, f.in.Text())
-			}
-			return true, false
-		}
-		if f.in.Update(m) {
-			if r.set != nil {
-				changed = r.set(f.in.Text())
-			}
-			f.in.Mask = f.maskFor(r, f.in.Text())
-			return true, changed
-		}
-		return true, false
+		return f.editKey(p, rs, m)
 	}
+	r := rs[f.cur]
 	switch s {
+	case "i", "I", "A":
+		if r.kind == rowText {
+			f.beginEdit(p, r, s)
+			return true, false, nil
+		}
+		return false, false, nil
 	case "up":
-		return f.step(rs, -1), false
+		return f.step(rs, -1), false, nil
 	case "down":
-		return f.step(rs, 1), false
+		return f.step(rs, 1), false, nil
 	case "home":
 		f.cur = 0
 		f.clamp(rs)
-		return true, false
+		return true, false, nil
 	case "end":
 		f.cur = len(rs) - 1
 		f.clamp(rs)
-		return true, false
+		return true, false, nil
 	case "r":
 		f.reveal = !f.reveal
-		return true, false
+		return true, false, nil
 	case "left", "right", "space", " ", "enter":
 		if r.kind == rowChoice && r.cycle != nil {
 			dir := 1
@@ -164,16 +165,74 @@ func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, 
 				dir = -1
 			}
 			r.cycle(dir)
-			return true, true
+			return true, true, nil
 		}
 		if r.kind == rowText && s == "enter" {
-			f.beginEdit(p, r)
-			return true, false
+			f.beginEdit(p, r, "")
+			return true, false, nil
 		}
 		// Left and Right fall through so they can switch tabs.
-		return s == "enter" || s == "space" || s == " ", false
+		return s == "enter" || s == "space" || s == " ", false, nil
 	}
-	return false, false
+	return false, false, nil
+}
+
+// editKey handles a key while a text row is open. Tab and Shift-Tab, Up and
+// Down move to the neighbouring text row; Enter (Submit) and Esc from normal
+// mode (Leave) close the row; keys the field does not own in normal mode go
+// to the shell.
+func (f *form) editKey(p *Pane, rs []formRow, m tea.KeyPressMsg) (handled, changed bool, cmd tea.Cmd) {
+	r := rs[f.cur]
+	s := m.String()
+	if (s == "up" || s == "down") && !f.in.Completing() {
+		return f.moveRow(p, rs, s == "up")
+	}
+	f.in.Fit(rowWidth(p), 1)
+	res := f.in.Update(m)
+	if res.Changed {
+		if r.set != nil {
+			changed = r.set(f.in.Text())
+		}
+		f.in.SetMask(f.maskFor(r, f.in.Text()))
+	}
+	switch res.Event.Kind {
+	case vimtext.Submit, vimtext.Leave:
+		f.edit = false
+		return true, changed, res.Cmd
+	case vimtext.Unhandled:
+		switch res.Event.Key.String() {
+		case "tab":
+			ok, _, _ := f.moveRow(p, rs, false)
+			return ok, changed, res.Cmd
+		case "shift+tab":
+			ok, _, _ := f.moveRow(p, rs, true)
+			return ok, changed, res.Cmd
+		case "ctrl+r":
+			if r.secret {
+				f.setReveal(!f.reveal, r)
+			}
+			return true, changed, res.Cmd
+		}
+	}
+	return true, changed, batch(res.Cmd, forward(f.in, res.Event))
+}
+
+// moveRow closes the open row and opens the next (or previous) text row,
+// continuing in insert mode when the row it left was being typed in.
+func (f *form) moveRow(p *Pane, rs []formRow, up bool) (bool, bool, tea.Cmd) {
+	start := ""
+	if f.in != nil && f.in.Typing() {
+		start = "A"
+	}
+	f.edit = false
+	dir := 1
+	if up {
+		dir = -1
+	}
+	if f.step(rs, dir) && rs[f.cur].kind == rowText {
+		f.beginEdit(p, rs[f.cur], start)
+	}
+	return true, false, nil
 }
 
 func (f *form) paste(p *Pane, rows func() []formRow, m tea.PasteMsg) bool {
@@ -183,12 +242,14 @@ func (f *form) paste(p *Pane, rows func() []formRow, m tea.PasteMsg) bool {
 	rs := rows()
 	f.clamp(rs)
 	r := rs[f.cur]
-	f.in.Update(m)
+	if !f.in.Paste(m).Changed {
+		return false
+	}
 	changed := false
 	if r.set != nil {
 		changed = r.set(f.in.Text())
 	}
-	f.in.Mask = f.maskFor(r, f.in.Text())
+	f.in.SetMask(f.maskFor(r, f.in.Text()))
 	return changed
 }
 
@@ -208,6 +269,10 @@ func (f *form) view(p *Pane, rows []formRow, w, h int) string {
 	if (top > 0 || end < len(rows)) && len(out) > 0 && h > 1 {
 		more := th.Render(ui.TextQuiet, th.Glyphs.Ellipsis+" "+itoa(len(rows))+" fields")
 		out[len(out)-1] = th.Fit(out[len(out)-1], w-ui.Width(more)-1) + " " + more
+	}
+	if view.edit && view.in != nil && view.cur >= top && view.cur < end {
+		// The completion menu of the row draws over the rows next to it.
+		out = vimfield.Overlay(out, view.cur-top, 2+labelW+1, view.in.Popup(valW))
 	}
 	return strings.Join(out, "\n")
 }
@@ -243,7 +308,7 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 	case rowText:
 		switch {
 		case focused && f.edit && f.in != nil:
-			val = f.in.View(th, valW, true)
+			val = f.in.Render(valW, 1)
 		case r.value == "":
 			val = th.Render(ui.TextQuiet, th.Truncate(r.placeholder, valW))
 		case r.secret && !f.reveal && !strings.Contains(r.value, "{{"):
@@ -282,7 +347,7 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 }
 
 // renderSpans draws s with highlight spans, truncated to width.
-func renderSpans(th ui.Theme, s string, spans []textin.Span, width int) string {
+func renderSpans(th ui.Theme, s string, spans []span, width int) string {
 	rs := []rune(s)
 	var b strings.Builder
 	pos := 0

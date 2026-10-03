@@ -1,7 +1,7 @@
 # Keyboard Shortcut Reference
 
 `postctl` is designed for fast, keyboard-first navigation without requiring a mouse.
-Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Text fields insert what you type, including Space, `g`, `q` and `:`; modal editing inside text fields is a separate workstream and is not advertised here until it ships.
+Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Every text field in the request and WebSocket panes is a modal editor (see "Text fields"): in insert and visual mode Space, `g`, `q` and `:` are text; in normal mode they reach the keys above.
 
 ## Quick Reference Cheat Sheet
 
@@ -129,16 +129,16 @@ Editing request target, method, and global pane shortcuts.
 | Key | Action | Description |
 | --- | --- | --- |
 | `Ctrl-S, Ctrl-Enter` | Send request | Send the active request immediately (Ctrl-S always works; Ctrl-Enter needs enhanced keyboard reporting) |
-| `u` | Undo | Undo the previous edit (when not typing) |
-| `Ctrl-r` | Redo | Redo the previously undone edit (when not typing) |
-| `Ctrl-Z` | Undo (typing) | Undo the previous edit while typing in a field |
-| `Ctrl-Y` | Redo (typing) | Redo the previously undone edit while typing in a field |
-| `gu` | Focus URL bar | Jump cursor directly to the URL input line |
-| `Esc` | Cancel send / OAuth | Cancel in-flight HTTP request or pending OAuth2 browser login |
-| `Enter (URL bar)` | Send request | Send request immediately while editing URL |
-| `Shift-Tab (URL bar)` | Method selector | Open the HTTP method dropdown selector |
-| `Tab, Down (URL bar)` | Focus tabs | Move focus down from URL bar to the request tab row |
-| `Esc (URL bar)` | Focus tabs | Move focus from URL bar to the request tab row |
+| `u` | Undo | Undo the previous edit of the request (when no field is open; inside a field u is the editor's own undo) |
+| `Ctrl-r` | Redo | Redo the previously undone edit of the request (when no field is open; inside a field it is the editor's redo) |
+| `Ctrl-Z` | Undo (any mode) | Undo the previous edit of the request from any field and mode; one visit to a field is one step |
+| `Ctrl-Y` | Redo (any mode) | Redo the previously undone edit of the request from any field and mode |
+| `gu` | Focus URL bar | Jump cursor directly to the URL input line (normal mode) |
+| `Esc` | Cancel send / OAuth | Cancel in-flight HTTP request or pending OAuth2 browser login, once no field is open (insert to normal to leaving the field to cancelling) |
+| `Enter (URL bar)` | Send request | Send request immediately, in normal and insert mode |
+| `Shift-Tab (URL bar)` | Method selector | Open the HTTP method dropdown selector (normal mode) |
+| `Tab, Down (URL bar)` | Focus tabs | Move focus down from URL bar to the request tab row (Tab in normal mode) |
+| `Esc (URL bar)` | Normal mode, then focus tabs | Insert mode to normal mode; from normal mode move focus to the request tab row |
 | `←, →, ↑, ↓ (Method)` | Change method | Cycle through GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS |
 | `Enter, Tab (Method)` | Choose method | Select the highlighted HTTP method |
 | `Esc (Method)` | Cancel selector | Dismiss the method selector without changes |
@@ -167,18 +167,21 @@ Managing query parameters, headers, URL-encoded fields, and form-data parts.
 | `↑, ↓` | Move row | Move selection between table rows |
 | `PgUp, PgDn` | Page up / down | Scroll table up or down by a page |
 | `Home, End` | First / last row | Jump to first or last table row |
-| `a, Insert` | Add row | Insert a new row at the bottom of the table |
-| `Enter` | Edit field | Edit active cell (or add new row if table is empty) |
+| `a, Insert` | Add row | Insert a new row after the selected one and start typing in its name |
+| `Enter` | Edit field | Open the active cell in normal mode (or add a new row if the table is empty) |
+| `i, I, A` | Edit field in insert | Open the active cell and start typing (cursor before, at start, or at end) |
 | `x` | Toggle enabled | Enable or disable current row without deleting it (Space is the leader) |
 | `d, Delete` | Delete row | Delete the selected row |
 | `Alt-↑, Shift-↑` | Move row up | Shift current row up in evaluation order |
 | `Alt-↓, Shift-↓` | Move row down | Shift current row down in evaluation order |
 | `b` | Bulk edit | Open raw multiline text area to paste key:value pairs |
 | `t` | Toggle Text / File | Switch form-data part between text value and file upload |
-| `Tab (editing)` | Next field | Advance editing focus: Key → Value → Description |
+| `Tab (editing)` | Next field | Advance editing focus: Key → Value → Description; the mode is kept |
 | `Shift-Tab (editing)` | Previous field | Move editing focus backward |
-| `Enter, Esc (editing)` | Done editing | Commit changes and return to row selection |
-| `Esc (bulk edit)` | Apply bulk edit | Parse multiline text into table rows and close |
+| `↑, ↓ (editing)` | Row | Commit the cell and open the same column of the previous or next row (they belong to the completion menu while it is open) |
+| `Enter (editing)` | Done editing | Commit changes and return to row selection |
+| `Esc (editing)` | Normal mode / done | Insert mode to normal mode; from normal mode commit and return to row selection |
+| `Esc (bulk edit)` | Normal mode / close | Insert mode to normal mode; from normal mode close the bulk editor (rows apply as you type) |
 
 ## Request Pane — Body Tab
 
@@ -189,11 +192,12 @@ Configuring request payload across raw, form, binary, and GraphQL modes.
 | `←, → (Type row)` | Body type | Cycle: none, raw, form-urlencoded, form-data, file, graphql |
 | `Enter (Type)` | Next type | Advance to next body type |
 | `←, → (Lang row)` | Language | Cycle raw syntax: JSON, XML, HTML, Text, JavaScript |
-| `Enter, i` | Edit body | Focus inline textarea to edit raw or GraphQL body |
+| `Enter` | Edit body | Open the raw or GraphQL editor in normal mode |
+| `i, a, I, A` | Edit body in insert | Open the editor and start typing |
 | `f` | Format JSON | Pretty-print and format JSON body (preserves {{variables}}) |
 | `Space o` | Open in $EDITOR | Edit full payload in external editor and reload on save |
-| `Tab (GraphQL)` | Query / Vars | Switch editor focus between GraphQL Query and Variables |
-| `Esc` | Exit editor | Leave body textarea and return to field navigation |
+| `Tab (GraphQL, normal mode)` | Query / Vars | Switch editor focus between GraphQL Query and Variables |
+| `Esc` | Normal mode / exit editor | Insert mode to normal mode; from normal mode leave the editor and return to field navigation |
 
 ## Request Pane — Auth Tab
 
@@ -203,12 +207,14 @@ Configuring authentication schemes and OAuth 2.0 token acquisition.
 | --- | --- | --- |
 | `←, → (Type row)` | Auth type | Cycle: inherit, none, bearer, basic, apikey, digest, oauth2, awsv4, hawk, ntlm |
 | `Enter (Type)` | Next auth type | Advance to next authentication scheme |
-| `Enter` | Edit field | Focus form field for editing |
-| `Tab, Shift-Tab` | Navigate fields | Move focus forward or backward through auth inputs |
-| `Space v` | Reveal secrets | Toggle visibility of masked secret inputs in the form (not while typing) |
+| `Enter` | Edit field | Open the form field in normal mode |
+| `i, I, A` | Edit field in insert | Open the form field and start typing |
+| `Tab, Shift-Tab (editing)` | Navigate fields | Move focus forward or backward through auth inputs |
+| `Ctrl-R (editing)` | Reveal secret | Show or hide the secret literal being edited |
+| `Space v` | Reveal secrets | Toggle visibility of masked secret inputs in the form (also from a field in normal mode) |
 | `Enter (Get new token)` | Get OAuth token | Initiate browser login for OAuth2 with local loopback listener |
 | `c` | Copy sign-in link | Copy OAuth authorization URL to clipboard while waiting |
-| `Esc` | Cancel OAuth / Done | Cancel waiting OAuth login or commit field editing |
+| `Esc` | Cancel OAuth / Done | Cancel waiting OAuth login; in a field insert mode to normal mode, then leave the field |
 
 ## Request Pane — Scripts & Settings Tabs
 
@@ -216,16 +222,31 @@ Authoring pre-request and test scripts, code snippets, and request options.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `Enter, i` | Edit script | Focus script editor textarea |
+| `Enter` | Edit script | Open the script editor in normal mode |
+| `i, a, I, A` | Edit script in insert | Open the script editor and start typing |
 | `Space i` | Snippets picker | Open dropdown of Chai assertions and pm.* snippet templates |
 | `Space o` | Open in $EDITOR | Edit script in external editor (saved as .pre.js or .test.js) |
-| `Tab (editing script)` | Indent | Insert two spaces at cursor |
-| `Esc (editing script)` | Exit editor | Commit script changes and leave textarea |
+| `Esc (editing script)` | Normal mode / exit editor | Insert mode to normal mode; from normal mode leave the editor |
 | `↑, ↓ (Snippets)` | Select snippet | Highlight code snippet in dropdown picker |
 | `Enter (Snippets)` | Insert snippet | Insert snippet code at cursor in script editor |
 | `Esc (Snippets)` | Close snippets | Dismiss snippets picker without inserting |
 | `↑, ↓ (Settings)` | Select setting | Move through request options (Timeout, TLS, Redirects) |
-| `Enter (Settings)` | Toggle or edit | Toggle boolean options (Follow redirects, Verify TLS) or edit numeric and duration settings (e.g. timeout: 30s) |
+| `Enter (Settings)` | Toggle or edit | Toggle boolean options (Follow redirects, Verify TLS) or open numeric and duration settings (e.g. timeout: 30s) in normal mode |
+
+## Text fields (request and WebSocket panes)
+
+The URL bar, table cells, form fields, bodies, scripts and the WebSocket composer are modal editors. The footer shows the mode first.
+
+| Key | Action | Description |
+| --- | --- | --- |
+| `Enter / i, a, I, A` | Enter a field | Enter opens a field in normal mode; i, a, I and A open it and start typing |
+| `Esc` | Normal mode, then leave | Insert or visual mode to normal mode; from normal mode leave the field |
+| `Space, :, q, g+letter (normal mode)` | Shell keys | The leader, command line, quit and the g section jumps work from a field in normal mode (in insert and visual mode they are text) |
+| `Ctrl-S, Ctrl-Enter` | Send / connect | Works in insert, normal and visual mode |
+| `{{` | Variable completion | Type {{ to list variables (nearest scope wins; secrets show as masked dots); Tab or Enter accepts, Esc closes the menu |
+| `pm. (scripts)` | pm.* completion | Type pm. in a script to list the Postman API members |
+| `Space o` | Open in $EDITOR | Edit the URL, a table cell, a form field, a body or a script in your editor (a hidden secret is refused until revealed) |
+| `u, Ctrl-r (in a field)` | Editor undo | Inside a field they are the editor's own undo and redo; Ctrl-Z and Ctrl-Y undo the request |
 
 ## Response Pane
 
@@ -382,14 +403,15 @@ Connecting, composing, saving, and inspecting WebSocket messages.
 | `gu` | Focus URL bar | Jump to the WebSocket URL input |
 | `gm, gp, gh, ga, gS` | Go to tab | Messages, Params, Headers, Auth and Settings tabs |
 | `[, ]` | Previous / next tab | Step through the WebSocket tabs |
-| `Enter (URL bar)` | Connect / disconnect | Toggle the current WebSocket connection |
-| `Esc (connecting)` | Cancel connection | Cancel an in-progress connection attempt |
+| `Enter (URL bar)` | Connect / disconnect | Toggle the current WebSocket connection, in normal and insert mode |
+| `Esc (connecting)` | Cancel connection | Cancel an in-progress connection attempt, once no field is open (insert to normal to leaving the field to cancelling) |
 | `←, →, Home, End` | Switch tab | Navigate Messages, Params, Headers, Auth, and Settings |
 | `c (tab bar)` | Connect / disconnect | Toggle the current WebSocket connection |
-| `Ctrl-T (composer)` | Message format | Cycle text, JSON, and binary message formats |
-| `Ctrl-R (composer)` | Format JSON | Pretty-print the composer as JSON |
-| `Ctrl-X (composer)` | Save message | Save the composer as a reusable message |
-| `Tab, Shift-Tab` | Switch message section | Move among composer, saved messages, and live log |
+| `Enter, i, a, I, A (composer)` | Edit message | The composer is a modal editor; JSON messages are highlighted. Enter the Messages tab from the tab bar with the down arrow |
+| `Ctrl-T (composer)` | Message format | Cycle text, JSON, and binary message formats (any mode) |
+| `Ctrl-R (composer)` | Format JSON | Pretty-print the composer as JSON while typing (in normal mode Ctrl-R is the editor's redo) |
+| `Ctrl-X (composer)` | Save message | Save the composer as a reusable message (any mode) |
+| `Tab, Shift-Tab (normal mode)` | Switch message section | Move among composer, saved messages, and live log |
 | `↑, ↓, Home, End (saved)` | Select saved message | Move through reusable messages |
 | `Enter (saved)` | Send saved message | Send the selected reusable message |
 | `e, r, d, a (saved)` | Manage saved message | Edit, rename, delete, or save a reusable message |

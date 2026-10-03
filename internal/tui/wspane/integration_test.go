@@ -81,7 +81,7 @@ func TestRealClientAgainstEchoServer(t *testing.T) {
 	}
 
 	// The composer sends what was typed.
-	h.key("esc", "down")
+	h.key("esc", "down", "i")
 	h.typ("hello")
 	h.key("ctrl+s")
 	waitFor(t, h, func() bool { mu.Lock(); defer mu.Unlock(); return len(wire) == 2 })

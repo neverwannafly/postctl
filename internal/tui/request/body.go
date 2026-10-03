@@ -9,6 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -75,36 +77,109 @@ const (
 
 // bodyView is the Body tab: mode selector, then the mode's editor.
 type bodyView struct {
-	cur  int
-	on   bool // a text editor has input focus
-	raw  *textEditor
-	gq   *textEditor
-	gv   *textEditor
-	kvs  map[model.BodyMode]*kvView
-	file form
-	hint string // cached validation result for the raw editor
-	warn bool
+	cur    int
+	on     bool // a text editor has input focus
+	raw    *vimfield.Field
+	rawLex string // the lexer raw was built with
+	gq     *vimfield.Field
+	gv     *vimfield.Field
+	kvs    map[model.BodyMode]*kvView
+	file   form
+	hint   string // cached validation result for the raw editor
+	warn   bool
 }
 
-func newBodyView(th ui.Theme) *bodyView {
-	return &bodyView{
-		raw: newTextEditor(th, false),
-		gq:  newTextEditor(th, false),
-		gv:  newTextEditor(th, false),
+func newBodyView(p *Pane) *bodyView {
+	b := &bodyView{
 		kvs: map[model.BodyMode]*kvView{
 			model.BodyURLEncoded: newKVView(kindURLEncoded),
 			model.BodyFormData:   newKVView(kindFormData),
 		},
 	}
+	b.build(p)
+	return b
 }
 
-func (b *bodyView) setTheme(th ui.Theme) {
-	b.raw.setTheme(th)
-	b.gq.setTheme(th)
-	b.gv.setTheme(th)
-	for _, k := range b.kvs {
-		k.setTheme(th)
+// build creates the three editors; it runs again when the theme or the body
+// language changes, keeping their text.
+func (b *bodyView) build(p *Pane) {
+	text := [3]string{}
+	for i, f := range []*vimfield.Field{b.raw, b.gq, b.gv} {
+		if f != nil {
+			text[i] = f.Text()
+		}
 	}
+	b.rawLex = ""
+	if p.req != nil {
+		b.rawLex = bodyLexer(p.req)
+	}
+	b.raw = p.newField(fieldSpec{lang: b.rawLex})
+	b.gq = p.newField(fieldSpec{})
+	b.gv = p.newField(fieldSpec{lang: "json"})
+	b.raw.Set(text[0])
+	b.gq.Set(text[1])
+	b.gv.Set(text[2])
+}
+
+// bodyLexer picks the syntax highlighting for the raw editor: by the body's
+// language, or, for a plain-text body, by an enabled Content-Type header that
+// says JSON. Empty means none.
+func bodyLexer(r *model.Request) string {
+	switch r.Body.Language {
+	case "json":
+		return "json"
+	case "javascript":
+		return "javascript"
+	case "xml", "html":
+		return ""
+	}
+	for _, h := range r.Headers {
+		if !h.Disabled && strings.EqualFold(h.Key, "Content-Type") && strings.Contains(strings.ToLower(h.Value), "json") {
+			return "json"
+		}
+	}
+	return ""
+}
+
+func (b *bodyView) setTheme(p *Pane) {
+	b.build(p)
+	b.blurAll()
+	for _, k := range b.kvs {
+		k.setTheme(p)
+	}
+}
+
+// syncLexer rebuilds the raw editor when the body language (or the
+// Content-Type header) now calls for different highlighting.
+func (b *bodyView) syncLexer(p *Pane) {
+	if p.req == nil || bodyLexer(p.req) == b.rawLex {
+		return
+	}
+	focused := b.on && b.raw.Focused()
+	b.build(p)
+	if focused {
+		b.raw.Focus()
+	}
+}
+
+// field is the focused editor or table cell, or nil.
+func (b *bodyView) field() *vimfield.Field {
+	if b.on {
+		for _, f := range []*vimfield.Field{b.raw, b.gq, b.gv} {
+			if f.Focused() {
+				return f
+			}
+		}
+	}
+	for _, k := range b.kvs {
+		if f := k.field(); f != nil {
+			return f
+		}
+	}
+	if b.file.edit {
+		return b.file.in
+	}
+	return nil
 }
 
 func (b *bodyView) mode(p *Pane) model.BodyMode {
@@ -135,13 +210,14 @@ func (b *bodyView) reload(p *Pane) {
 		return
 	}
 	body := &p.req.Body
-	b.raw.set(body.Raw)
+	b.syncLexer(p)
+	b.raw.Set(body.Raw)
 	if body.GraphQL != nil {
-		b.gq.set(body.GraphQL.Query)
-		b.gv.set(body.GraphQL.Variables)
+		b.gq.Set(body.GraphQL.Query)
+		b.gv.Set(body.GraphQL.Variables)
 	} else {
-		b.gq.set("")
-		b.gv.set("")
+		b.gq.Set("")
+		b.gv.Set("")
 	}
 	for _, k := range b.kvs {
 		k.reload(p)
@@ -157,9 +233,9 @@ func (b *bodyView) reload(p *Pane) {
 
 func (b *bodyView) blurAll() {
 	b.on = false
-	b.raw.blur()
-	b.gq.blur()
-	b.gv.blur()
+	b.raw.Blur()
+	b.gq.Blur()
+	b.gv.Blur()
 }
 
 func (b *bodyView) stop() {
@@ -190,22 +266,42 @@ func (b *bodyView) enter(p *Pane) {
 }
 
 // focusZone puts input focus on the zone's editor when it is a text editor.
-func (b *bodyView) focusZone(p *Pane, z zoneKind) {
+func (b *bodyView) focusZone(p *Pane, z zoneKind, start string) {
 	b.blurAll()
-	switch z {
-	case zkRaw:
-		b.on = true
-		b.raw.focus()
-	case zkQuery:
-		b.on = true
-		b.gq.focus()
-	case zkVars:
-		b.on = true
-		b.gv.focus()
+	b.on = z == zkRaw || z == zkQuery || z == zkVars
+	if e := b.editor(z); e != nil {
+		b.fit(p, z)
+		e.Begin(start)
 	}
 }
 
-func (b *bodyView) editor(z zoneKind) *textEditor {
+// fit sizes the editor of zone z the way view draws it.
+func (b *bodyView) fit(p *Pane, z zoneKind) {
+	w, h := p.bodySize()
+	used := 1
+	if b.mode(p) == model.BodyRaw {
+		used = 2
+	}
+	room := max(1, h-used-1)
+	switch z {
+	case zkRaw:
+		b.raw.Fit(w, max(1, room-1))
+	case zkQuery, zkVars:
+		qh, vh := gqHeights(room)
+		b.gq.Fit(w, qh)
+		b.gv.Fit(w, vh)
+	}
+}
+
+// gqHeights splits the room of the GraphQL layout between the query and the
+// variables editors (two label rows are taken off).
+func gqHeights(room int) (qh, vh int) {
+	qh = max(2, (room-2)*2/3)
+	vh = max(1, room-2-qh)
+	return qh, vh
+}
+
+func (b *bodyView) editor(z zoneKind) *vimfield.Field {
 	switch z {
 	case zkRaw:
 		return b.raw
@@ -233,14 +329,14 @@ func (b *bodyView) write(p *Pane, z zoneKind) {
 	body := &p.req.Body
 	switch z {
 	case zkRaw:
-		body.Raw = b.raw.text()
+		body.Raw = b.raw.Text()
 		b.revalidate(p)
 	case zkQuery, zkVars:
 		if body.GraphQL == nil {
 			body.GraphQL = &model.GraphQLBody{}
 		}
-		body.GraphQL.Query = b.gq.text()
-		body.GraphQL.Variables = b.gv.text()
+		body.GraphQL.Query = b.gq.Text()
+		body.GraphQL.Variables = b.gv.Text()
 		if body.GraphQL.Query == "" && body.GraphQL.Variables == "" {
 			body.GraphQL = nil
 		}
@@ -274,6 +370,7 @@ func (b *bodyView) cycleLang(p *Pane, dir int) {
 		}
 	}
 	p.req.Body.Language = bodyLangs[(cur+dir+len(bodyLangs))%len(bodyLangs)]
+	b.syncLexer(p)
 	b.revalidate(p)
 }
 
@@ -281,7 +378,7 @@ func (b *bodyView) paste(p *Pane, m tea.PasteMsg) bool {
 	lay := b.layout(p)
 	z := lay[min(b.cur, len(lay)-1)]
 	if e := b.editor(z); e != nil && b.on {
-		if e.update(m) {
+		if e.Paste(m).Changed {
 			b.write(p, z)
 			return true
 		}
@@ -304,27 +401,32 @@ func (b *bodyView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 
 	// Editing a text editor.
 	if e := b.editor(z); e != nil && b.on {
-		switch s {
-		case "esc":
-			b.blurAll()
-			return true, false, nil
-		case "tab":
-			if z == zkQuery {
-				b.cur++
-				b.focusZone(p, zkVars)
-				return true, false, nil
-			}
-			if z == zkVars {
-				b.cur--
-				b.focusZone(p, zkQuery)
-				return true, false, nil
-			}
-		}
-		if e.update(m) {
+		b.fit(p, z)
+		res := e.Update(m)
+		changed := false
+		if res.Changed {
 			b.write(p, z)
-			return true, true, nil
+			changed = true
 		}
-		return true, false, nil
+		if res.Event.Kind == vimtext.Leave {
+			b.blurAll()
+			return true, changed, res.Cmd
+		}
+		if res.Event.Kind == vimtext.Unhandled {
+			// GraphQL: Tab and Shift-Tab (normal mode) switch between the
+			// query and the variables.
+			switch {
+			case res.Event.Key.String() == "tab" && z == zkQuery:
+				b.cur++
+				b.focusZone(p, zkVars, "")
+				return true, changed, res.Cmd
+			case res.Event.Key.String() == "shift+tab" && z == zkVars:
+				b.cur--
+				b.focusZone(p, zkQuery, "")
+				return true, changed, res.Cmd
+			}
+		}
+		return true, changed, batch(res.Cmd, forward(e, res.Event))
 	}
 
 	switch z {
@@ -352,7 +454,7 @@ func (b *bodyView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 	case "down":
 		if b.cur+1 < len(lay) {
 			b.cur++
-			b.focusZone(p, lay[b.cur])
+			b.focusZone(p, lay[b.cur], "")
 			return true, false, nil
 		}
 		return true, false, nil
@@ -380,8 +482,12 @@ func (b *bodyView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 		}
 	case zkRaw, zkQuery, zkVars:
 		switch s {
-		case "enter", "i":
-			b.focusZone(p, z)
+		case "enter", "i", "a", "A", "I":
+			start := ""
+			if s != "enter" {
+				start = s
+			}
+			b.focusZone(p, z, start)
 			return true, false, nil
 		case "f":
 			if z == zkRaw {
@@ -473,8 +579,7 @@ func (b *bodyView) format(p *Pane) bool {
 		return false
 	}
 	p.req.Body.Raw = out
-	b.raw.ta.SetValue(out)
-	b.raw.ta.MoveToBegin()
+	b.raw.Set(out)
 	b.revalidate(p)
 	return true
 }
@@ -499,11 +604,7 @@ func (b *bodyView) hints(p *Pane) []ui.Hint {
 	z := lay[min(b.cur, len(lay)-1)]
 	switch {
 	case b.on:
-		hs := []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}}
-		if z == zkQuery || z == zkVars {
-			hs = append(hs, ui.Hint{Key: "Tab", Label: "Query/Variables", Priority: 3})
-		}
-		return hs
+		return fieldHints(b.editor(z), "Done")
 	case z == zkTable:
 		return b.kv(p).hints(p)
 	case z == zkMode:
@@ -511,7 +612,7 @@ func (b *bodyView) hints(p *Pane) []ui.Hint {
 	case z == zkLang:
 		return []ui.Hint{{Key: "←→", Label: "Language", Priority: 1}, {Key: "f", Label: "Format JSON", Priority: 2}}
 	}
-	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "f", Label: "Format JSON", Priority: 3}, {Key: "Space o", Label: "$EDITOR", Priority: 4}}
+	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "i", Label: "Insert", Priority: 2}, {Key: "f", Label: "Format JSON", Priority: 3}, {Key: "Space o", Label: "$EDITOR", Priority: 4}}
 }
 
 func (b *bodyView) view(p *Pane, w, h int) string {
@@ -531,7 +632,7 @@ func (b *bodyView) view(p *Pane, w, h int) string {
 	case model.BodyNone:
 		content = th.Render(ui.TextQuiet, th.Truncate("This request has no body. Choose a type above to add one.", w))
 	case model.BodyRaw:
-		content = b.raw.render(w, room-1) + "\n" + b.rawStatus(p, w)
+		content = b.raw.Render(w, room-1) + "\n" + b.rawStatus(p, w)
 	case model.BodyURLEncoded, model.BodyFormData:
 		content = b.kv(p).view(p, w, room)
 	case model.BodyBinary:
@@ -569,8 +670,8 @@ func (b *bodyView) rawStatus(p *Pane, w int) string {
 		tok = ui.StatusSuccess
 		text = th.Glyphs.Check + " " + text
 	case b.on:
-		l, c := b.raw.pos()
-		text = "Line " + itoa(l) + ", column " + itoa(c)
+		row, col := b.raw.Cursor()
+		text = "Line " + itoa(row+1) + ", column " + itoa(col+1)
 	default:
 		text = "Press Enter to edit"
 	}
@@ -588,8 +689,7 @@ func (b *bodyView) fileView(p *Pane, w, cur int) string {
 
 func (b *bodyView) graphqlView(p *Pane, w, h, cur int) string {
 	th := p.th
-	qh := max(2, (h-2)*2/3)
-	vh := max(1, h-2-qh)
+	qh, vh := gqHeights(h)
 	label := func(text string, on bool) string {
 		tok := ui.TextSecondary
 		if on {
@@ -597,8 +697,8 @@ func (b *bodyView) graphqlView(p *Pane, w, h, cur int) string {
 		}
 		return th.Render(tok, text)
 	}
-	return label("Query", cur == 1 && p.zone == zBody) + "\n" + b.gq.render(w, qh) + "\n" +
-		label("Variables (JSON)", cur == 2 && p.zone == zBody) + "\n" + b.gv.render(w, vh)
+	return label("Query", cur == 1 && p.zone == zBody) + "\n" + b.gq.Render(w, qh) + "\n" +
+		label("Variables (JSON)", cur == 2 && p.zone == zBody) + "\n" + b.gv.Render(w, vh)
 }
 
 // external implements externalEditable for the raw and GraphQL editors.
@@ -642,4 +742,17 @@ func (b *bodyView) applyExternal(p *Pane, text string) {
 	case model.BodyURLEncoded:
 		b.kv(p).applyExternal(p, text)
 	}
+}
+
+// fieldExternal implements fieldEditable: only the urlencoded and form-data
+// tables have single-line cells; the editors go through external.
+func (b *bodyView) fieldExternal(p *Pane) (string, func(*Pane, string), string) {
+	if p.req == nil {
+		return "", nil, ""
+	}
+	switch p.req.Body.Mode {
+	case model.BodyURLEncoded, model.BodyFormData:
+		return b.kv(p).fieldExternal(p)
+	}
+	return "", nil, ""
 }

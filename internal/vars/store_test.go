@@ -4,6 +4,8 @@ import (
 	"math/rand"
 	"reflect"
 	"regexp"
+	"sort"
+	"strings"
 	"testing"
 
 	"github.com/shubham/postctl/internal/model"
@@ -90,5 +92,21 @@ func TestClearRecordsAndRemovesInOrder(t *testing.T) {
 	changes := store.Changes()[Collection]
 	if len(changes) != 2 || changes[0].Key != "one" || changes[1].Key != "two" {
 		t.Fatalf("clear changes = %#v", changes)
+	}
+}
+
+func TestDynamicNamesAreSortedAndResolve(t *testing.T) {
+	names := DynamicNames()
+	if len(names) < 50 || !sort.StringsAreSorted(names) {
+		t.Fatalf("names = %d entries, sorted = %v", len(names), sort.StringsAreSorted(names))
+	}
+	store := New(nil, nil, nil, nil)
+	for _, name := range names {
+		if !strings.HasPrefix(name, "$") {
+			t.Fatalf("%q has no $ prefix", name)
+		}
+		if got := store.Replace("{{" + name + "}}"); got == "{{"+name+"}}" {
+			t.Fatalf("%q listed but not resolved", name)
+		}
 	}
 }

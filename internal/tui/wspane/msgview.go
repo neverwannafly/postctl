@@ -106,7 +106,7 @@ func (p *Pane) composerView(w, h int) string {
 	right := th.Render(ui.TextSecondary, label)
 	switch {
 	case p.format() == model.WSText:
-		right += "  " + th.Render(ui.TextQuiet, ui.FormatSize(int64(len(p.comp.text()))))
+		right += "  " + th.Render(ui.TextQuiet, ui.FormatSize(int64(len(p.comp.Text()))))
 	case p.compErr != "":
 		msg := th.Truncate(th.Glyphs.Warn+" "+p.compErr, max(8, room-ui.Width(label)-2))
 		right += "  " + th.Render(ui.StatusWarning, msg)
@@ -114,7 +114,7 @@ func (p *Pane) composerView(w, h int) string {
 		right += "  " + th.Render(ui.StatusSuccess, th.Glyphs.Check+" valid")
 	}
 	head := p.sectionHead("Message", "", p.hasCursor(sComposer), right, w)
-	return head + "\n" + p.comp.render(w, max(1, h-1))
+	return head + "\n" + p.comp.Render(w, max(1, h-1))
 }
 
 // ---- saved messages -------------------------------------------------------------------

@@ -1,4 +1,4 @@
-  POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1 Sending                   
+  POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1                   Sending 
   ... Waiting for response 0ms                                                  
 Params(2)  Auth  Headers(1)  Body *  Pre-request  Tests  Settings               
 =========-----------------------------------------------------------------------

@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -40,12 +41,27 @@ func (p *Pane) editable() bool {
 }
 
 // setZone moves the cursor between the URL bar, the tab bar and the content.
+// The URL bar is a field: arriving there puts the cursor in it in normal mode.
 func (p *Pane) setZone(z zone) {
 	if p.zone == zBar && z != zBar {
-		p.urlE = false
+		p.url.Blur()
+		p.endField()
 	}
 	p.zone = z
 	p.urlE = z == zBar
+	if p.urlE {
+		p.focusURL("")
+	}
+}
+
+// focusURL gives the URL field the keyboard: start is "" for normal mode or
+// "i", "a", "A", "I" to begin that insert command.
+func (p *Pane) focusURL(start string) {
+	p.fitURL()
+	p.url.Begin(start)
+	if !p.focused {
+		p.url.Blur() // the cursor shows once the pane has focus
+	}
 }
 
 func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
@@ -73,11 +89,16 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 			return p.redoStep()
 		}
 	case "esc":
-		if p.oauth != nil {
-			return p.cancelOAuth()
-		}
-		if p.isSending() {
-			return p.cancelSend()
+		// The bottom of the Esc ladder: a field gets it first (insert to
+		// normal, normal to leaving the field); only with no field open does
+		// it cancel a sign-in or a running send.
+		if !p.Editing() {
+			if p.oauth != nil {
+				return p.cancelOAuth()
+			}
+			if p.isSending() {
+				return p.cancelSend()
+			}
 		}
 	}
 	switch p.zone {
@@ -89,37 +110,43 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 	return p.bodyKey(m)
 }
 
-func (p *Pane) stopViews() {
-	for _, v := range p.views {
-		v.stop()
-	}
-}
-
 // ---- URL bar --------------------------------------------------------------
 
 func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
 	if p.msel != nil {
 		return p.methodKey(m)
 	}
-	switch m.String() {
-	case "enter":
-		return p.sendNow()
-	case "esc":
+	s := m.String()
+	if s == "down" && !p.url.Completing() {
 		p.setZone(zTabs)
 		return nil
-	case "tab", "down":
+	}
+	p.fitURL()
+	before := p.req.Clone()
+	res := p.url.Update(m)
+	var cmds []tea.Cmd
+	cmds = append(cmds, res.Cmd)
+	if res.Changed {
+		cmds = append(cmds, p.urlEdited(before))
+	}
+	switch res.Event.Kind {
+	case vimtext.Submit: // Enter sends from the URL bar in normal and insert mode
+		cmds = append(cmds, p.sendNow())
+	case vimtext.Leave:
 		p.setZone(zTabs)
-		return nil
-	case "shift+tab":
-		p.msel = newMethodSel(p.req.Method)
-		return nil
+	case vimtext.Unhandled:
+		switch res.Event.Key.String() {
+		case "tab":
+			p.setZone(zTabs)
+		case "shift+tab":
+			p.msel = newMethodSel(p.req.Method)
+		default:
+			cmds = append(cmds, forward(p.url, res.Event))
+		}
+	default:
+		cmds = append(cmds, forward(p.url, res.Event))
 	}
-	before := p.url.Text()
-	pre := p.req.Clone()
-	if !p.url.Update(m) || p.url.Text() == before {
-		return nil
-	}
-	return p.urlEdited(pre)
+	return tea.Batch(cmds...)
 }
 
 // urlEdited copies the field into the request, keeping disabled parameters
@@ -127,7 +154,7 @@ func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
 func (p *Pane) urlEdited(pre *model.Request) tea.Cmd {
 	applyRawURL(&p.req.URL, p.url.Text())
 	p.views[tabParams].reload(p)
-	return p.record(pre, false)
+	return p.recordIn(p.url, pre)
 }
 
 // applyRawURL sets u from raw text. Disabled query rows stay where they are;
@@ -233,7 +260,7 @@ func (p *Pane) tabsKey(m tea.KeyPressMsg) tea.Cmd {
 
 func (p *Pane) bodyKey(m tea.KeyPressMsg) tea.Cmd {
 	v := p.views[p.tab]
-	wasEditing := v.editing()
+	wasField := v.field()
 	pre := p.req.Clone()
 	handled, changed, cmd := v.key(p, m)
 	var cmds []tea.Cmd
@@ -241,10 +268,15 @@ func (p *Pane) bodyKey(m tea.KeyPressMsg) tea.Cmd {
 		cmds = append(cmds, cmd)
 	}
 	if changed {
-		s := m.String()
-		structural := !wasEditing || s == "tab" || s == "enter" || s == "esc" || s == "up" || s == "down"
-		cmds = append(cmds, p.record(pre, structural))
+		if wasField != nil {
+			cmds = append(cmds, p.recordIn(wasField, pre))
+		} else {
+			cmds = append(cmds, p.record(pre, true))
+		}
 		p.afterEdit()
+	}
+	if v.field() != wasField {
+		p.endField() // the field was left or another one opened
 	}
 	if handled {
 		return tea.Batch(cmds...)
@@ -282,10 +314,9 @@ func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
 		}
 	}
 	if inBar && p.msel == nil {
-		before := p.url.Text()
 		pre := p.req.Clone()
-		p.url.Update(m)
-		if p.url.Text() != before {
+		p.fitURL()
+		if p.url.Paste(m).Changed {
 			return p.urlEdited(pre)
 		}
 		return nil
@@ -323,10 +354,10 @@ func (p *Pane) KeyHints() []ui.Hint {
 	var hs []ui.Hint
 	switch p.zone {
 	case zBar:
-		hs = []ui.Hint{
-			{Key: "Enter", Label: "Send", Priority: 1},
-			{Key: "Shift-Tab", Label: "Method", Priority: 3},
-			{Key: "Esc", Label: "Tabs", Priority: 2},
+		hs = fieldHints(p.url, "Tabs")
+		hs = append(hs, ui.Hint{Key: "Enter", Label: "Send", Priority: 1})
+		if !p.url.Typing() {
+			hs = append(hs, ui.Hint{Key: "Shift-Tab", Label: "Method", Priority: 3})
 		}
 		hs = append(hs, send)
 	case zTabs:

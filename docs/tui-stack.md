@@ -92,6 +92,15 @@ It adds no dependency: Chroma, Lip Gloss, `x/ansi`, and `uniseg` were already
 in the module graph. The supported bindings are the **Text fields** rows in
 the [design-language key map](design-language.md#key-map).
 
+Two small packages sit on top of it for the request and WebSocket panes.
+`internal/tui/vimfield` wraps one editor as a pane field (open in normal or
+insert mode, fit to a size, paste, a pure copy-based `Render`, and `Popup` /
+`Overlay` so a one-line field can show its completion menu over the rows
+below). `internal/tui/complete` supplies the completers: `Vars` lists `{{var}}`
+and `{{$dynamic}}` names from the scope chain with the nearest layer winning
+and secrets shown as the mask glyph only, and `PM` lists `pm.*` members from
+one static table in `pm.go` that a test checks against `docs/scripting.md`.
+
 Vim semantics are checked by the opt-in `TestDifferentialNvim` oracle. Set
 `VIMTEXT_NVIM=1` to compare the eligible keystroke corpus and 500 seeded,
 3–12-key generated cases with `nvim --clean --headless -n`. Each case runs in
@@ -116,15 +125,18 @@ allowlist is kept in `internal/tui/vimtext/deviations.go`.
 
 `internal/tui/request` (Request pane), `internal/tui/envedit` (Ctrl-E, palette "Edit environments") and `internal/tui/cookies` (palette "Cookies") plug in through `Options.NewRequestPane`, `NewEnvEditor` and `NewCookieManager`; `cmd/postctl/wire.go` fills them in. Panes edit the live workspace on the Update goroutine and persist through `tui.SaveMsg` (debounced 500 ms, flushed on blur, selection change and close). Anything slow (curl build, OAuth, secret reads, `$EDITOR`) runs in a `tea.Cmd` on snapshots.
 
-Request pane keys (arrows and standard keys only):
+Request pane keys. Every text field (URL bar, table cells, form rows, bodies, scripts) is a `vimtext` editor wrapped by `internal/tui/vimfield`; the footer shows its mode first. The full list is in [keys.md](keys.md).
 
 | Where | Keys |
 | --- | --- |
-| Anywhere in the pane | `Ctrl-S` send (also `Ctrl-Enter` with an enhanced keyboard), `Ctrl-Z` / `Ctrl-Y` undo / redo, `Ctrl-O` open in `$EDITOR`, `Ctrl-L` focus the URL, `Esc` cancel send or OAuth |
-| URL bar | `Enter` send, `Shift-Tab` method, `Tab` / `Down` to the tabs |
-| Tab row | `←` `→` switch tab, `↑` URL, `↓` / `Enter` into the tab, `m` method, `y` copy as curl (secrets masked), `Y` copy with secrets |
-| Key-value tables | `a` add, `Enter` edit, `Tab` / `Shift-Tab` next / previous field, `Space` toggle, `d` delete, `Alt-↑` `Alt-↓` (or `Shift`) move, `b` bulk edit, `t` text / file (form-data) |
-| Body / Scripts / Auth | `f` format JSON; `s` or `Ctrl-G` snippets; `r` reveal secrets (`Ctrl-R` while typing), `g` get OAuth token, `c` copy sign-in link |
+| Anywhere in the pane | `Ctrl-S` send (also `Ctrl-Enter` with an enhanced keyboard; works in insert, normal and visual mode), `Ctrl-Z` / `Ctrl-Y` undo / redo of the request, `u` / `Ctrl-r` the same when no field is open, `Space o` open in `$EDITOR` (URL, cell, form row, body or script), `gu` focus the URL, `Esc` cancel send or OAuth once no field is open |
+| Text fields | `Enter` opens a field in normal mode, `i` `a` `I` `A` open it typing; `Esc` insert to normal, normal to leaving the field. `Space`, `:`, `q`, `g`+letter, `[` `]` in normal mode go to the shell (`tui.ForwardKeyMsg`, `tui.ForwardSeqMsg`); in insert and visual mode they are text. `{{` completes variables (masked secrets), `pm.` completes the script API |
+| URL bar | `Enter` send (normal and insert), `Shift-Tab` method, `Tab` / `Down` to the tabs |
+| Tab row | `←` `→` switch tab, `↑` URL, `↓` / `Enter` into the tab, `m` method, `Space y` copy as curl (secrets masked), `Space Y` copy with secrets |
+| Key-value tables | `a` add, `Enter` / `i` edit, `Tab` / `Shift-Tab` next / previous field, `x` toggle, `d` delete, `Alt-↑` `Alt-↓` (or `Shift`) move, `b` bulk edit, `t` text / file (form-data) |
+| Body / Scripts / Auth | `f` format JSON; `Space i` snippets; `Space v` reveal secrets (`Ctrl-R` while typing), `g` get OAuth token, `c` copy sign-in link |
+
+A one-line field has no rows to spare, so its completion menu is drawn by the owner over the neighbouring rows (`vimfield.Field.Popup`, `vimfield.Overlay`). Each visit to a field is one request-level undo step (`recordIn`); inside the field the editor has its own undo. `internal/tui/textin` and the Bubbles `textarea` wrapper are gone from the request pane; the WebSocket pane keeps `textin` only for its log search and rename prompts.
 
 Environment editor: `[` `]` or `1` `2` `3` switch Environments / Globals / Collections. List: `n` new, `r` rename, `c` duplicate, `d` delete (asks, defaults to Cancel), `p` production, `Enter` / `Tab` to the variables, `Esc` close. Variables: `a` add, `Enter` edit, `Space` enable, `d` delete, `Alt-↑` `Alt-↓` move, `s` toggle secret (secret to plain asks first), `r` reveal (reads the Keychain in a command), `Esc` back.
 

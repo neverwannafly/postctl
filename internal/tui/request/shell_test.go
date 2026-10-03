@@ -23,6 +23,7 @@ type shellRig struct {
 	inbox chan tea.Msg
 	clip  []string
 	token string
+	quit  bool // the shell asked to quit
 }
 
 const shellBearer = "shell-test-bearer-0001"
@@ -86,6 +87,7 @@ func (r *shellRig) send(msg tea.Msg) {
 		}
 		return
 	case tea.QuitMsg:
+		r.quit = true
 		return
 	}
 	var cmd tea.Cmd
@@ -175,7 +177,7 @@ func TestSpaceOOpensTheEditor(t *testing.T) {
 func TestSpaceIInsertsASnippet(t *testing.T) {
 	r := newShellRig(t, "")
 	r.keys("g", "t")
-	r.keys("esc") // the script editor starts in insert; Space is text there
+	r.keys("esc") // the script editor starts in normal mode; Esc leaves it
 	r.keys("space", "i")
 	r.mustHave("Insert a snippet")
 	r.keys("enter")
@@ -183,4 +185,38 @@ func TestSpaceIInsertsASnippet(t *testing.T) {
 		t.Fatal("Enter inserts the snippet and closes the picker")
 	}
 	r.mustHave("Status code is 200")
+}
+
+// ---- keys from a field in normal mode ---------------------------------------------------
+
+func TestShellKeysWorkFromAFieldInNormalMode(t *testing.T) {
+	r := newShellRig(t, "")
+	r.keys("g", "u") // the URL field, in normal mode
+	r.mustHave("NORMAL")
+	r.keys("space", "?")
+	r.mustHave("Everywhere") // the help overlay
+	r.keys("esc")
+	r.keys(":")
+	r.mustHave("Command")
+	r.keys("esc")
+	r.keys("g", "b") // the Body tab
+	r.mustHave("Body")
+	if r.quit {
+		t.Fatal("none of those keys quits")
+	}
+	r.keys("g", "u", "q")
+	if !r.quit {
+		t.Fatal("q from a field in normal mode should reach the shell's quit")
+	}
+}
+
+func TestShellKeysAreTextInInsertMode(t *testing.T) {
+	r := newShellRig(t, "")
+	r.keys("g", "u", "A")
+	r.mustHave("INSERT")
+	r.keys("space", ":", "q", "g", "b")
+	r.mustHave(" :qgb")
+	if r.quit {
+		t.Fatal("q in insert mode is text")
+	}
 }

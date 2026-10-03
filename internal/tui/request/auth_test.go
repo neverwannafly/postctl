@@ -45,9 +45,9 @@ func TestAuthSwitchTypeAndFillBearer(t *testing.T) {
 	if h.req.Auth == nil || h.req.Auth.Type != model.AuthBearer || h.req.Auth.Bearer == nil {
 		t.Fatalf("auth = %+v", h.req.Auth)
 	}
-	h.key("down", "enter")
+	h.key("down", "i")
 	h.typ("abc123")
-	h.key("esc")
+	h.key("esc", "esc")
 	if h.req.Auth.Bearer.Token != "abc123" {
 		t.Fatalf("token = %q", h.req.Auth.Bearer.Token)
 	}
@@ -73,10 +73,10 @@ func TestAuthSecretMaskedWhileTypingAndRevealWithAction(t *testing.T) {
 	h := newHarness(t)
 	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Username: "bob"}}
 	h.gotoTab(tabAuth)
-	h.key("down", "down", "down", "enter") // Password
+	h.key("down", "down", "down", "i") // Password
 	h.typ("hunter2")
 	h.mustNotHave("hunter2")
-	h.key("esc")
+	h.key("esc", "esc")
 	if h.req.Auth.Basic.Password != "hunter2" {
 		t.Fatal("password not stored")
 	}
@@ -413,7 +413,7 @@ func TestPasteCurlCancelAndPasteAsText(t *testing.T) {
 
 func TestPastePlainTextGoesToURL(t *testing.T) {
 	h := newHarness(t)
-	h.key("up", "end")
+	h.key("up", "A")
 	h.paste("/extra")
 	if !strings.HasSuffix(h.req.URL.Raw, "/extra") || h.p.confirm != nil {
 		t.Fatalf("raw = %q", h.req.URL.Raw)

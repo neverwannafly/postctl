@@ -1,8 +1,8 @@
-  POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1 Send                      
+  POST    {{baseUrl}}/v1/charges/:id?limit=10&debug=1                   Send    
                                                                                 
 Params(2)  Auth  Headers(1)  Body *  Pre-request *  Tests *  Settings           
 -------------------------------------=============------------------------------
-   1                                                                            
+1                                                                               
                                                                                 
                                                                                 
                                                                                 

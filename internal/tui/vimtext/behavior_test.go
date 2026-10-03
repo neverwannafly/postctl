@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -319,4 +320,23 @@ func deepCopyModel(m *Model) Model {
 		out.changeStart = &s
 	}
 	return out
+}
+
+func TestMaskHidesTheBufferWithoutChangingIt(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{SingleLine: true})
+	m.SetValue("sentinel-text")
+	m.SetSize(20, 1)
+	_ = m.Focus()
+	m.SetMask(true)
+	view := ansi.Strip(m.View())
+	if strings.Contains(view, "sentinel") || !strings.Contains(view, "••••") {
+		t.Fatalf("masked view leaked or lost its glyphs: %q", view)
+	}
+	if m.Value() != "sentinel-text" {
+		t.Fatal("masking changed the buffer")
+	}
+	m.SetMask(false)
+	if !strings.Contains(ansi.Strip(m.View()), "sentinel") {
+		t.Fatal("unmasked view lost the text")
+	}
 }

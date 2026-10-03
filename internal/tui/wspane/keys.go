@@ -3,13 +3,27 @@ package wspane
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
 // setZone moves the cursor between the URL bar, the tab bar and the content.
+// The URL bar and the composer are fields: arriving there puts the cursor in
+// them in normal mode.
 func (p *Pane) setZone(z zone) {
+	if p.zone == zBar && z != zBar {
+		p.url.Blur()
+	}
 	p.zone = z
 	p.urlE = z == zBar
+	if p.urlE {
+		p.fitURL()
+		p.url.Begin("")
+	}
+	if z == zBody && p.tab == tabMessages && p.sect == sComposer {
+		p.fitComposer()
+		p.comp.Begin("")
+	}
 	p.syncFocus()
 }
 
@@ -42,7 +56,10 @@ func (p *Pane) dispatch(m tea.KeyPressMsg) tea.Cmd {
 	case "ctrl+s", "ctrl+enter":
 		return p.primary()
 	case "esc":
-		if l := p.peek(); l != nil && l.state == stConnecting && !p.searching && p.rename == nil {
+		// The bottom of the Esc ladder: a field gets it first (insert to
+		// normal, normal to leaving the field); only with no field open does
+		// it cancel a connection attempt.
+		if l := p.peek(); l != nil && l.state == stConnecting && !p.searching && p.rename == nil && p.activeField() == nil {
 			return p.cancelConnect()
 		}
 	}
@@ -71,18 +88,31 @@ func (p *Pane) primary() tea.Cmd {
 // ---- URL bar ---------------------------------------------------------------------
 
 func (p *Pane) barKey(m tea.KeyPressMsg) tea.Cmd {
-	switch m.String() {
-	case "enter":
-		return p.toggleConnect()
-	case "esc", "tab", "down":
+	if m.String() == "down" && !p.url.Completing() {
 		p.setZone(zTabs)
 		return nil
 	}
-	before := p.url.Text()
-	if !p.url.Update(m) || p.url.Text() == before {
-		return nil
+	p.fitURL()
+	res := p.url.Update(m)
+	cmds := []tea.Cmd{res.Cmd}
+	if res.Changed {
+		cmds = append(cmds, p.urlEdited())
 	}
-	return p.urlEdited()
+	switch res.Event.Kind {
+	case vimtext.Submit: // Enter connects or disconnects in normal and insert mode
+		cmds = append(cmds, p.toggleConnect())
+	case vimtext.Leave:
+		p.setZone(zTabs)
+	case vimtext.Unhandled:
+		if res.Event.Key.String() == "tab" {
+			p.setZone(zTabs)
+		} else {
+			cmds = append(cmds, forward(p.url, res.Event))
+		}
+	default:
+		cmds = append(cmds, forward(p.url, res.Event))
+	}
+	return tea.Batch(cmds...)
 }
 
 // urlEdited copies the field into the request, keeping disabled parameters
@@ -153,25 +183,26 @@ func (p *Pane) tabsKey(m tea.KeyPressMsg) tea.Cmd {
 
 func (p *Pane) bodyKey(m tea.KeyPressMsg) tea.Cmd {
 	var handled, changed, editing bool
+	var fcmd tea.Cmd
 	switch p.tab {
 	case tabMessages:
 		return p.messagesKey(m)
 	case tabParams:
-		handled, changed = p.params.key(p, m)
+		handled, changed, fcmd = p.params.key(p, m)
 		editing = p.params.editing()
 	case tabHeaders:
-		handled, changed = p.headers.key(p, m)
+		handled, changed, fcmd = p.headers.key(p, m)
 		editing = p.headers.editing()
 	case tabAuth:
-		handled, changed = p.auth.key(p, m)
+		handled, changed, fcmd = p.auth.key(p, m)
 		editing = p.auth.editing()
 	default:
-		handled, changed = p.settings.key(p, m)
+		handled, changed, fcmd = p.settings.key(p, m)
 		editing = p.settings.editing()
 	}
-	var cmd tea.Cmd
+	cmd := fcmd
 	if changed {
-		cmd = p.touched()
+		cmd = batch(fcmd, p.touched())
 		p.syncURL()
 	}
 	if handled || editing {
@@ -196,9 +227,8 @@ func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
 	}
 	switch {
 	case p.zone == zBar:
-		before := p.url.Text()
-		p.url.Update(m)
-		if p.url.Text() != before {
+		p.fitURL()
+		if p.url.Paste(m).Changed {
 			return p.urlEdited()
 		}
 		return nil
@@ -218,8 +248,11 @@ func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
 	var changed bool
 	switch p.tab {
 	case tabMessages:
-		if p.sect == sComposer && p.comp.update(m) {
-			return p.composerEdited()
+		if p.sect == sComposer {
+			p.fitComposer()
+			if p.comp.Paste(m).Changed {
+				return p.composerEdited()
+			}
 		}
 		return nil
 	case tabParams:
@@ -272,7 +305,7 @@ func (p *Pane) KeyHints() []ui.Hint {
 		if state == stOpen {
 			label = "Disconnect"
 		}
-		hs = []ui.Hint{{Key: "Enter", Label: label, Priority: 1}, {Key: "Esc", Label: "Tabs", Priority: 2}, primary}
+		hs = append(fieldHints(p.url, "Tabs"), ui.Hint{Key: "Enter", Label: label, Priority: 1}, primary)
 	case zTabs:
 		label := "Connect"
 		if state == stOpen {
@@ -307,13 +340,15 @@ func (p *Pane) bodyHints(state connState) []ui.Hint {
 		if len(p.messages()) > 0 {
 			next = "Saved"
 		}
-		return []ui.Hint{
-			{Key: "Esc", Label: "Tabs", Priority: 2},
-			{Key: "Tab", Label: next, Priority: 3},
-			{Key: "Ctrl-T", Label: "Format", Priority: 4},
-			{Key: "Ctrl-R", Label: "Format JSON", Priority: 5},
-			{Key: "Ctrl-X", Label: "Save message", Priority: 4},
+		hs := fieldHints(p.comp, "Tabs")
+		if !p.comp.Typing() {
+			hs = append(hs, ui.Hint{Key: "Tab", Label: next, Priority: 3})
+		} else {
+			hs = append(hs, ui.Hint{Key: "Ctrl-R", Label: "Format JSON", Priority: 5})
 		}
+		return append(hs,
+			ui.Hint{Key: "Ctrl-T", Label: "Format", Priority: 4},
+			ui.Hint{Key: "Ctrl-X", Label: "Save message", Priority: 4})
 	case sSaved:
 		if p.rename != nil {
 			return []ui.Hint{{Key: "Enter", Label: "Save name", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}

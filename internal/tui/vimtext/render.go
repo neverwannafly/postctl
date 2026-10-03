@@ -50,7 +50,18 @@ func (m *Model) View() string {
 		}
 		cursorX := gutter + displayColumn(m.lines[m.row], m.col, m.opts.TabText) -
 			displayColumn(m.lines[m.row], m.left, m.opts.TabText)
-		cursorX = min(max(0, cursorX), max(0, m.width-8))
+		// Slide the menu left when the cursor is near the right edge, so its
+		// widest row (label and detail) stays readable.
+		need := 0
+		for i := 0; i < popupRows; i++ {
+			item := m.completions[(m.completeSel+i)%len(m.completions)]
+			w := 2 + ui.Width(item.Label)
+			if item.Detail != "" {
+				w += 2 + ui.Width(item.Detail)
+			}
+			need = max(need, w)
+		}
+		cursorX = min(max(0, cursorX), max(0, m.width-max(8, need)))
 		for i := 0; i < popupRows; i++ {
 			idx := (m.completeSel + i) % len(m.completions)
 			item := m.completions[idx]
@@ -83,6 +94,9 @@ func (m *Model) renderLine(row, width int) string {
 		if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
 		}
+		if m.mask {
+			cell = m.maskCell()
+		}
 		cw := max(1, uniseg.StringWidth(cell))
 		if used+cw > width {
 			break
@@ -105,6 +119,14 @@ func (m *Model) renderLine(row, width int) string {
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
 	}
 	return b.String()
+}
+
+// maskCell is the single-cell glyph that stands in for hidden text.
+func (m *Model) maskCell() string {
+	if r := []rune(m.th.Glyphs.Mask); len(r) > 0 {
+		return string(r[0])
+	}
+	return "*"
 }
 
 func (m *Model) styleAt(row, _ int, byteOff int) lipgloss.Style {

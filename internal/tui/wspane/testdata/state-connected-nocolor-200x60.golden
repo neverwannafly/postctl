@@ -1,9 +1,9 @@
-  WS      {{baseUrl}}/stream?channel=btc Disconnect                                                                                                                                                     
+  WS      {{baseUrl}}/stream?channel=btc                                                                                                                                                      Disconnect
   ● Connected · ↑ 1 sent · ↓ 4 received                                                                                                                                                                 
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                                                                                                      
 ━━━━━━━━━━━─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 › Message                                              Text  0 B │   Log  7                                                                                                                             
-Type a message. Ctrl-S sends it.                                 │   03:04:05.000 • info  Connecting                                                                                                    
+                                                                 │   03:04:05.000 • info  Connecting                                                                                                    
                                                                  │   03:04:05.000 • open  Connected (101)                                                                                               
                                                                  │   03:04:05.000 ↓ text  {"type":"welcome","session":"a1b2c3","heartbeat":30}                                                      52 B
                                                                  │   03:04:05.000 ↑ text  {"type":"subscribe","channel":"btc"}                                                                      36 B

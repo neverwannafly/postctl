@@ -119,6 +119,7 @@ type Model struct {
 	preferred   int
 	mode        Mode
 	focused     bool
+	mask        bool
 	width       int
 	height      int
 	top         int
@@ -227,6 +228,16 @@ func (m *Model) Blur() {
 	m.completions = nil
 	m.clearPending()
 }
+
+// SetMask hides the buffer behind the theme's mask glyph (one per cell) while
+// it is drawn. The text itself is unchanged and still edited normally. Fields
+// holding secrets use it; they should also set Options.Redact and leave
+// Options.Completer nil.
+func (m *Model) SetMask(on bool) { m.mask = on }
+
+// Completing reports whether the completion popup is open, so a parent can
+// leave Up, Down, Enter and Tab to it.
+func (m *Model) Completing() bool { return len(m.completions) > 0 }
 
 // Focused reports whether the editor has focus.
 func (m *Model) Focused() bool { return m.focused }

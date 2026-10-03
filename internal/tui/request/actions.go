@@ -198,10 +198,8 @@ func (p *Pane) confirmKey(m tea.KeyPressMsg) tea.Cmd {
 			return p.importCurl(o.pc)
 		}
 		if o.inBar {
-			before := p.url.Text()
 			pre := p.req.Clone()
-			p.url.Insert(o.text)
-			if p.url.Text() != before {
+			if p.url.Paste(tea.PasteMsg{Content: o.text}).Changed {
 				return p.urlEdited(pre)
 			}
 		}
@@ -284,13 +282,13 @@ func (p *Pane) canReveal() bool {
 
 // revealer is a tab with masked secret fields. toggleReveal reports whether it
 // changed anything.
-type revealer interface{ toggleReveal() bool }
+type revealer interface{ toggleReveal(p *Pane) bool }
 
 // toggleReveal is the request.reveal action: show or hide secret fields of the
 // open tab. Reveal resets whenever the cursor moves back to the tab.
 func (p *Pane) toggleReveal() tea.Cmd {
 	if r, ok := p.views[p.tab].(revealer); ok {
-		r.toggleReveal()
+		r.toggleReveal(p)
 	}
 	return nil
 }
@@ -312,7 +310,7 @@ func (p *Pane) openSnippets() tea.Cmd {
 		return nil
 	}
 	p.setZone(zBody)
-	sv.ed.set(sv.source(p))
+	sv.ed.Set(sv.source(p))
 	sv.openSnippets()
 	return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
 }

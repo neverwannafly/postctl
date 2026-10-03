@@ -108,8 +108,8 @@ func TestGoldenStates(t *testing.T) {
 		{"log-search-empty", func(h *harness) { feed(h); h.key("tab", "tab", "/"); h.typ("zzz") }},
 		{"detail-json", func(h *harness) { feed(h); h.key("tab", "tab", "up", "up", "up", "enter") }},
 		{"detail-binary", func(h *harness) { feed(h); h.key("tab", "tab", "enter") }},
-		{"composer-json", func(h *harness) { h.key("down", "ctrl+t"); h.typ(`{"op":"sub","ids":[1,2]}`) }},
-		{"composer-invalid", func(h *harness) { h.key("down", "ctrl+t"); h.typ(`{"op":`) }},
+		{"composer-json", func(h *harness) { h.key("down", "ctrl+t", "i"); h.typ(`{"op":"sub","ids":[1,2]}`) }},
+		{"composer-invalid", func(h *harness) { h.key("down", "ctrl+t", "i"); h.typ(`{"op":`) }},
 		{"saved-list", func(h *harness) { h.key("down", "tab", "down") }},
 		{"delete-confirm", func(h *harness) { h.key("down", "tab", "d") }},
 		{"refused", func(h *harness) {

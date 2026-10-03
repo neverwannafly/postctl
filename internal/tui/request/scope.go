@@ -1,7 +1,6 @@
 package request
 
 import (
-	"github.com/shubham/postctl/internal/tui/textin"
 	"regexp"
 	"strings"
 
@@ -137,13 +136,29 @@ func (s *scope) resolve(raw string) (string, []string) {
 	return out, missing
 }
 
+// known reports whether name resolves in the scope; a nil scope resolves
+// nothing.
+func (s *scope) known(name string) bool {
+	if s == nil {
+		return false
+	}
+	_, _, ok := s.store.Get(name)
+	return ok
+}
+
+// span is a highlighted run of a line: [From, To) in runes.
+type span struct {
+	From, To int
+	Tok      ui.Token
+}
+
 // highlight returns spans for every {{variable}} in s: info for resolved
 // names, warning for unresolved ones. Indices are runes.
-func (s *scope) highlight(str string) []textin.Span {
+func (s *scope) highlight(str string) []span {
 	if !strings.Contains(str, "{{") {
 		return nil
 	}
-	var spans []textin.Span
+	var spans []span
 	for _, loc := range varRE.FindAllStringSubmatchIndex(str, -1) {
 		name := str[loc[2]:loc[3]]
 		tok := ui.SyntaxKey
@@ -155,7 +170,7 @@ func (s *scope) highlight(str string) []textin.Span {
 			tok = ui.TextPrimary
 		}
 		from := len([]rune(str[:loc[0]]))
-		spans = append(spans, textin.Span{From: from, To: from + len([]rune(str[loc[0]:loc[1]])), Tok: tok})
+		spans = append(spans, span{From: from, To: from + len([]rune(str[loc[0]:loc[1]])), Tok: tok})
 	}
 	return spans
 }

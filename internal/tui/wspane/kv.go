@@ -5,7 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
-	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -77,7 +78,7 @@ type kvView struct {
 	cur, top int
 	edit     bool
 	col      int // 0 key, 1 value
-	in       *textin.Input
+	in       *vimfield.Field
 	draft    bool // the current row was just added and is still empty
 }
 
@@ -92,24 +93,41 @@ func (k *kvView) items(p *Pane) []kvItem {
 
 func (k *kvView) reload(p *Pane) { k.cur = min(k.cur, max(0, len(k.items(p))-1)) }
 func (k *kvView) editing() bool  { return k.edit }
-func (k *kvView) stop()          { k.edit, k.draft = false, false }
+
+// field is the focused cell editor, or nil.
+func (k *kvView) field() *vimfield.Field {
+	if k.edit {
+		return k.in
+	}
+	return nil
+}
+
+// cellWidth is the width of the edit field under the table.
+func cellWidth(p *Pane) int {
+	w, _ := p.bodySize()
+	return max(4, w-12)
+}
+func (k *kvView) stop() { k.edit, k.draft = false, false }
 
 func (k *kvView) paste(p *Pane, m tea.PasteMsg) bool {
 	if !k.edit || k.in == nil {
 		return false
 	}
-	k.in.Update(m)
+	if !k.in.Paste(m).Changed {
+		return false
+	}
 	return k.applyText(p)
 }
 
-func (k *kvView) field(it kvItem, col int) string {
+func (k *kvView) cellText(it kvItem, col int) string {
 	if col == 0 {
 		return it.Key
 	}
 	return it.Value
 }
 
-func (k *kvView) beginEdit(p *Pane, items []kvItem, col int) {
+// beginEdit opens a cell. start is "" for normal mode or "i", "a", "A", "I".
+func (k *kvView) beginEdit(p *Pane, items []kvItem, col int, start string) {
 	if k.cur >= len(items) {
 		return
 	}
@@ -118,9 +136,10 @@ func (k *kvView) beginEdit(p *Pane, items []kvItem, col int) {
 	}
 	k.edit = true
 	k.col = col
-	k.in = textin.New(k.field(items[k.cur], col))
-	k.in.Placeholder = [...]string{"name", "value"}[col]
-	k.in.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
+	k.in = p.newField(fieldSpec{single: true, placeholder: [...]string{"name", "value"}[col]})
+	k.in.Set(k.cellText(items[k.cur], col))
+	k.in.Fit(cellWidth(p), 1)
+	k.in.Begin(start)
 }
 
 // applyText writes the input into the current row.
@@ -196,10 +215,10 @@ func (k *kvView) addRow(p *Pane, items []kvItem) {
 	storeItems(k.kind, p.req, items)
 	k.cur = at
 	k.draft = true
-	k.beginEdit(p, items, 0)
+	k.beginEdit(p, items, 0, "i")
 }
 
-func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
+func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool, cmd tea.Cmd) {
 	items := k.items(p)
 	if k.edit {
 		return k.editKey(p, m, items)
@@ -210,33 +229,37 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 	case "up":
 		if k.cur > 0 {
 			k.cur--
-			return true, false
+			return true, false, nil
 		}
 	case "down":
 		k.cur = min(k.cur+1, max(0, len(items)-1))
-		return true, false
+		return true, false, nil
 	case "pgup":
 		k.cur = max(0, k.cur-rowsH)
-		return true, false
+		return true, false, nil
 	case "pgdown":
 		k.cur = min(max(0, len(items)-1), k.cur+rowsH)
-		return true, false
+		return true, false, nil
 	case "home":
 		k.cur = 0
-		return true, false
+		return true, false, nil
 	case "end":
 		k.cur = max(0, len(items)-1)
-		return true, false
+		return true, false, nil
 	case "a", "insert":
 		k.addRow(p, items)
-		return true, true
-	case "enter", "i": // i edits the cell in insert, like Enter
+		return true, true, nil
+	case "enter", "i", "I", "A": // Enter edits the cell in normal mode, the rest in insert
 		if len(items) == 0 {
 			k.addRow(p, items)
-			return true, true
+			return true, true, nil
 		}
-		k.beginEdit(p, items, 1)
-		return true, false
+		start := ""
+		if m.String() != "enter" {
+			start = m.String()
+		}
+		k.beginEdit(p, items, 1, start)
+		return true, false, nil
 	case "x", "space", " ":
 		if k.cur < len(items) && !items[k.cur].path {
 			items[k.cur].Disabled = !items[k.cur].Disabled
@@ -244,9 +267,9 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 			if k.kind == kvParams {
 				p.syncURL()
 			}
-			return true, true
+			return true, true, nil
 		}
-		return true, false
+		return true, false, nil
 	case "d", "delete":
 		if k.cur < len(items) && !items[k.cur].path {
 			items = append(items[:k.cur], items[k.cur+1:]...)
@@ -255,69 +278,100 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 			if k.kind == kvParams {
 				p.syncURL()
 			}
-			return true, true
+			return true, true, nil
 		}
-		return true, false
+		return true, false, nil
 	}
-	return false, false
+	return false, false, nil
 }
 
-func (k *kvView) editKey(p *Pane, m tea.KeyPressMsg, items []kvItem) (bool, bool) {
+// editKey handles a key while a cell is open. Tab and Shift-Tab move between
+// cells, Up and Down between rows, Enter (Submit) and Esc from normal mode
+// (Leave) commit the cell; what the field does not own in normal mode goes to
+// the shell.
+func (k *kvView) editKey(p *Pane, m tea.KeyPressMsg, items []kvItem) (bool, bool, tea.Cmd) {
 	s := m.String()
-	switch s {
-	case "esc", "enter":
-		return true, k.finish(p)
-	case "tab":
-		if k.col+1 < 2 {
-			k.beginEdit(p, items, k.col+1)
-			return true, false
-		}
-		// Past the last column: on to the next row, adding one at the end.
-		wasDraft := k.draft
-		changed := k.finish(p)
-		items = k.items(p)
-		if wasDraft && changed {
-			return true, changed // the empty row was dropped; stay put
-		}
-		if k.cur+1 < len(items) {
-			k.cur++
-			k.beginEdit(p, items, 0)
-			return true, changed
-		}
-		k.addRow(p, items)
-		return true, true
-	case "shift+tab":
-		if k.col > 0 && (!items[k.cur].path || k.col != 1) {
-			k.beginEdit(p, items, k.col-1)
-		}
-		return true, false
-	case "up", "down":
-		col := k.col
-		changed := k.finish(p)
-		items = k.items(p)
-		next := k.cur + 1
-		if s == "up" {
-			next = k.cur - 1
-		}
-		if next >= 0 && next < len(items) {
-			k.cur = next
-			k.beginEdit(p, items, col)
-		}
-		return true, changed
+	if (s == "up" || s == "down") && !k.in.Completing() {
+		return k.moveRow(p, s == "up")
 	}
-	if k.in.Update(m) {
-		return true, k.applyText(p)
+	k.in.Fit(cellWidth(p), 1)
+	res := k.in.Update(m)
+	var changed bool
+	if res.Changed {
+		changed = k.applyText(p)
 	}
-	return true, false
+	switch res.Event.Kind {
+	case vimtext.Submit, vimtext.Leave:
+		return true, k.finish(p) || changed, res.Cmd
+	case vimtext.Unhandled:
+		switch res.Event.Key.String() {
+		case "tab":
+			ch, cmd := k.nextCell(p, items)
+			return true, changed || ch, batch(res.Cmd, cmd)
+		case "shift+tab":
+			if k.col > 0 && (!items[k.cur].path || k.col != 1) {
+				k.beginEdit(p, items, k.col-1, k.resumeKey())
+			}
+			return true, changed, res.Cmd
+		}
+	}
+	return true, changed, batch(res.Cmd, forward(k.in, res.Event))
+}
+
+// resumeKey is the vim command that reopens a neighbouring cell the way the
+// current one is being used: append in insert mode, plain normal otherwise.
+func (k *kvView) resumeKey() string {
+	if k.in != nil && k.in.Typing() {
+		return "A"
+	}
+	return ""
+}
+
+// nextCell moves to the next cell, the next row after the last column, adding
+// a row at the end.
+func (k *kvView) nextCell(p *Pane, items []kvItem) (bool, tea.Cmd) {
+	start := k.resumeKey()
+	if k.col+1 < 2 {
+		k.beginEdit(p, items, k.col+1, start)
+		return false, nil
+	}
+	wasDraft := k.draft
+	changed := k.finish(p)
+	items = k.items(p)
+	if wasDraft && changed {
+		return changed, nil // the empty row was dropped; stay put
+	}
+	if k.cur+1 < len(items) {
+		k.cur++
+		k.beginEdit(p, items, 0, start)
+		return changed, nil
+	}
+	k.addRow(p, items)
+	return true, nil
+}
+
+// moveRow commits the cell and opens the same column of the next (or
+// previous) row.
+func (k *kvView) moveRow(p *Pane, up bool) (bool, bool, tea.Cmd) {
+	col, start := k.col, k.resumeKey()
+	changed := k.finish(p)
+	items := k.items(p)
+	next := k.cur + 1
+	if up {
+		next = k.cur - 1
+	}
+	if next >= 0 && next < len(items) {
+		k.cur = next
+		k.beginEdit(p, items, col, start)
+	}
+	return true, changed, nil
 }
 
 func (k *kvView) hints() []ui.Hint {
 	if k.edit {
-		return []ui.Hint{
-			{Key: "Esc", Label: "Done", Priority: 1},
-			{Key: "Tab", Label: "Next field", Priority: 2},
-			{Key: "↑↓", Label: "Row", Priority: 4},
-		}
+		return append(fieldHints(k.in, "Done"),
+			ui.Hint{Key: "Tab", Label: "Next field", Priority: 2},
+			ui.Hint{Key: "↑↓", Label: "Row", Priority: 4})
 	}
 	return []ui.Hint{
 		{Key: "Enter", Label: "Edit", Priority: 2},
@@ -359,7 +413,15 @@ func (k *kvView) view(p *Pane, w, h int) string {
 	table := th.KVTable(rows, ui.KVTableOptions{Width: w, Focus: focus, Header: true})
 	tl := strings.Count(table, "\n") + 1
 	pad := strings.Repeat("\n", max(0, rowsH+1-tl))
-	return table + pad + "\n" + k.statusLine(p, items, w)
+	out := table + pad + "\n" + k.statusLine(p, items, w)
+	if k.edit && k.in != nil {
+		// The completion menu of the cell draws over the rows above the edit line.
+		if pop := k.in.Popup(max(4, w-12)); len(pop) > 0 {
+			lines := strings.Split(out, "\n")
+			out = strings.Join(vimfield.Overlay(lines, len(lines)-1, 12, pop), "\n")
+		}
+	}
+	return out
 }
 
 // statusLine is the edit line while a cell is being edited, otherwise a quiet
@@ -368,7 +430,7 @@ func (k *kvView) statusLine(p *Pane, items []kvItem, w int) string {
 	th := p.th
 	if k.edit && k.in != nil {
 		label := [...]string{"Name", "Value"}[k.col]
-		return "\n" + th.Render(ui.TextSecondary, th.Fit(label, 12)) + k.in.View(th, w-12, true)
+		return "\n" + th.Render(ui.TextSecondary, th.Fit(label, 12)) + k.in.Render(w-12, 1)
 	}
 	off, n := 0, 0
 	for _, it := range items {

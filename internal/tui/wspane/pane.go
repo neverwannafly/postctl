@@ -7,6 +7,7 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -66,14 +67,15 @@ type Pane struct {
 	zone zone
 	tab  tabID
 	sect section
-	url  *textin.Input
+	url  *vimfield.Field
 	urlE bool // the URL field has input focus
 
 	params, headers *kvView
 	auth            *authView
 	settings        *settingsView
 
-	comp     *textEditor
+	comp     *vimfield.Field
+	compLang string // the lexer comp was built with: "" or "json"
 	compErr  string // why the composer's message cannot be sent, or ""
 	savedCur int
 	savedTop int
@@ -107,19 +109,64 @@ func New(env tui.PaneEnv, d Deps) *Pane {
 		lives:    map[model.ID]*live{},
 		saves:    map[model.ID]*saveState{},
 	}
-	p.url = textin.New("")
-	p.url.Placeholder = "Enter a ws:// or wss:// URL"
+	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter a ws:// or wss:// URL"})
 	p.search = textin.New("")
 	p.search.Placeholder = "search messages"
-	p.comp = newTextEditor(env.Theme)
-	p.comp.ta.Placeholder = "Type a message. Ctrl-S sends it."
-	p.applyTheme()
+	p.buildComposer("")
 	return p
 }
 
+// buildComposer creates the composer field for the current format (JSON
+// highlighting for JSON messages) holding text.
+func (p *Pane) buildComposer(text string) {
+	p.compLang = ""
+	if p.req != nil && p.format() == model.WSJSON {
+		p.compLang = "json"
+	}
+	p.comp = p.newField(fieldSpec{lang: p.compLang, placeholder: "Type a message. Ctrl-S sends it."})
+	p.comp.Set(text)
+	p.fitComposer()
+}
+
+// syncComposer rebuilds the composer when the message format changed the
+// lexer it needs, keeping its text.
+func (p *Pane) syncComposer() {
+	want := ""
+	if p.req != nil && p.format() == model.WSJSON {
+		want = "json"
+	}
+	if want != p.compLang {
+		p.buildComposer(p.comp.Text())
+	}
+}
+
+// applyTheme rebuilds the fields, which draw with the theme they were built
+// with, keeping their text.
 func (p *Pane) applyTheme() {
-	p.url.Highlight = func(s string) []textin.Span { return p.sc.highlight(s) }
-	p.comp.setTheme(p.th)
+	text := p.url.Text()
+	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter a ws:// or wss:// URL"})
+	p.url.Set(text)
+	p.buildComposer(p.comp.Text())
+	p.stopEditing()
+	if p.zone == zBar {
+		p.zone = zTabs
+	}
+	p.fitURL()
+}
+
+// urlWidth is the width of the URL field in the bar.
+func (p *Pane) urlWidth() int {
+	return max(4, p.w-2-badgeW-2-ui.Width(p.actionLabel())-1)
+}
+
+// fitURL sizes the URL field. Sizes follow the cursor in Update paths only.
+func (p *Pane) fitURL() { p.url.Fit(p.urlWidth(), 1) }
+
+// fitComposer sizes the composer to the area the Messages tab draws it in.
+func (p *Pane) fitComposer() {
+	w, h := p.bodySize()
+	g := msgLayout(w, h, len(p.messages()))
+	p.comp.Fit(g.compW, max(1, g.compH-1))
 }
 
 // Title implements tui.Titled.
@@ -168,17 +215,31 @@ func (p *Pane) Editing() bool {
 // SetSize implements tui.Pane.
 func (p *Pane) SetSize(w, h int) {
 	p.w, p.h = w, h
+	p.fitURL()
+	p.fitComposer()
 	p.rebuildDetail()
 }
 
-// Focus implements tui.Pane.
+// Focus implements tui.Pane: the field that was being edited gets the
+// keyboard back, in the mode it was left in.
 func (p *Pane) Focus() tea.Cmd {
 	p.focused = true
+	p.syncFocus()
+	if f := p.activeField(); f != nil {
+		f.Focus()
+	}
 	return nil
 }
 
-// Blur implements tui.Pane.
-func (p *Pane) Blur() { p.focused = false }
+// Blur implements tui.Pane. The field stops drawing its cursor; the shell
+// writes unsaved edits through BlurCmd.
+func (p *Pane) Blur() {
+	p.focused = false
+	p.syncFocus()
+	if f := p.activeField(); f != nil {
+		f.Blur()
+	}
+}
 
 // Update implements tui.Pane.
 func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
@@ -265,9 +326,10 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	p.refreshChain()
 	p.reloadAll()
 	if m.Open && p.req != nil && p.req.URL.Raw == "" {
-		// A brand-new request: start at the URL.
-		p.zone = zBar
-		p.urlE = true
+		// A brand-new request: start at the URL, typing.
+		p.setZone(zBar)
+		p.url.Begin("i")
+		p.syncFocus()
 	}
 	return cmd
 }
@@ -307,26 +369,30 @@ func (p *Pane) rebuildScope() {
 // stopEditing leaves every edit mode.
 func (p *Pane) stopEditing() {
 	p.urlE = false
+	p.url.Blur()
 	p.params.stop()
 	p.headers.stop()
 	p.auth.stop()
 	p.settings.stop()
-	p.comp.blur()
+	p.comp.Blur()
 }
 
 // reloadAll refreshes every widget from the request.
 func (p *Pane) reloadAll() {
 	if p.req == nil {
 		p.url.Set("")
-		p.comp.set("")
+		p.comp.Set("")
 		return
 	}
 	p.url.Set(p.req.URL.Raw)
+	p.fitURL()
 	p.params.reload(p)
 	p.headers.reload(p)
 	p.auth.reload()
 	p.settings.reload()
-	p.comp.set(p.draft().Body)
+	p.syncComposer()
+	p.comp.Set(p.draft().Body)
+	p.fitComposer()
 	p.revalidate()
 	p.clampSaved()
 }

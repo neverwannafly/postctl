@@ -3,6 +3,7 @@ package request
 import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -87,17 +88,22 @@ func newAuthView() *authView {
 func (a *authView) reload(p *Pane) {
 	a.f.reset()
 }
-func (a *authView) stop()         { a.f.reset() }
-func (a *authView) editing() bool { return a.f.edit }
-func (a *authView) enter(p *Pane) { a.f.reveal = false }
+func (a *authView) stop()                  { a.f.reset() }
+func (a *authView) editing() bool          { return a.f.edit }
+func (a *authView) enter(p *Pane)          { a.f.reveal = false }
+func (a *authView) field() *vimfield.Field { return a.f.field() }
+func (a *authView) setTheme(*Pane)         { a.f.in, a.f.edit = nil, false }
 
 // toggleReveal shows or hides masked secret fields (the request.reveal
-// action); it is a no-op while a field is being edited.
-func (a *authView) toggleReveal() bool {
-	if a.f.edit {
-		return false
+// action), also while a secret field is being edited.
+func (a *authView) toggleReveal(p *Pane) bool {
+	rows := a.rows(p)
+	a.f.clamp(rows)
+	var r formRow
+	if len(rows) > 0 {
+		r = rows[a.f.cur]
 	}
-	a.f.reveal = !a.f.reveal
+	a.f.setReveal(!a.f.reveal, r)
 	return true
 }
 func (a *authView) atTop() bool { return a.f.cur == 0 && !a.f.edit }
@@ -266,11 +272,16 @@ func (a *authView) hints(p *Pane) []ui.Hint {
 	case p.oauth != nil:
 		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}, {Key: "c", Label: "Copy link", Priority: 2}}
 	case a.f.edit:
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Tab", Label: "Next field", Priority: 3}}
+		return append(fieldHints(a.f.in, "Done"), ui.Hint{Key: "Tab", Label: "Next field", Priority: 3})
 	}
 	hs := []ui.Hint{{Key: "←→", Label: "Change", Priority: 2}, {Key: "Enter", Label: "Edit", Priority: 2}, {Key: "Space v", Label: "Reveal", Priority: 4}}
 	if a.curType(p) == model.AuthOAuth2 {
 		hs = append(hs, ui.Hint{Key: "Enter", Label: "on Get new token", Priority: 2})
 	}
 	return hs
+}
+
+// fieldExternal implements fieldEditable for the open auth row.
+func (a *authView) fieldExternal(p *Pane) (string, func(*Pane, string), string) {
+	return a.f.fieldExternal(p, func() []formRow { return a.rows(p) })
 }

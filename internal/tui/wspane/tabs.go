@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 	"github.com/shubham/postctl/internal/wsx"
 )
@@ -104,10 +105,11 @@ func newAuthView() *authView {
 	return &authView{stash: map[model.ID]map[model.AuthType]*model.Auth{}}
 }
 
-func (a *authView) reload()       { a.f.reset() }
-func (a *authView) stop()         { a.f.reset() }
-func (a *authView) editing() bool { return a.f.edit }
-func (a *authView) enter()        { a.f.reveal = false }
+func (a *authView) reload()                { a.f.reset() }
+func (a *authView) stop()                  { a.f.reset() }
+func (a *authView) editing() bool          { return a.f.edit }
+func (a *authView) enter()                 { a.f.reveal = false }
+func (a *authView) field() *vimfield.Field { return a.f.field() }
 
 // setType switches the auth type, remembering what was entered for the type
 // being left so switching back restores it.
@@ -217,7 +219,7 @@ func supportedAuth(t model.AuthType) bool {
 	return false
 }
 
-func (a *authView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
+func (a *authView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool, cmd tea.Cmd) {
 	return a.f.key(p, func() []formRow { return a.rows(p) }, m)
 }
 
@@ -225,7 +227,7 @@ func (a *authView) view(p *Pane, w, h int) string { return a.f.view(p, a.rows(p)
 
 func (a *authView) hints() []ui.Hint {
 	if a.f.edit {
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Tab", Label: "Next field", Priority: 3}, {Key: "Ctrl-R", Label: "Reveal", Priority: 4}}
+		return append(fieldHints(a.f.in, "Done"), ui.Hint{Key: "Tab", Label: "Next field", Priority: 3}, ui.Hint{Key: "Ctrl-R", Label: "Reveal", Priority: 4})
 	}
 	return []ui.Hint{{Key: "←→", Label: "Change", Priority: 2}, {Key: "Enter", Label: "Edit", Priority: 2}, {Key: "r", Label: "Reveal", Priority: 4}}
 }
@@ -241,10 +243,11 @@ type settingsView struct {
 
 func newSettingsView() *settingsView { return &settingsView{} }
 
-func (s *settingsView) reload()       { s.f.reset() }
-func (s *settingsView) stop()         { s.f.reset() }
-func (s *settingsView) editing() bool { return s.f.edit }
-func (s *settingsView) enter()        { s.f.reveal = false }
+func (s *settingsView) reload()                { s.f.reset() }
+func (s *settingsView) stop()                  { s.f.reset() }
+func (s *settingsView) editing() bool          { return s.f.edit }
+func (s *settingsView) enter()                 { s.f.reveal = false }
+func (s *settingsView) field() *vimfield.Field { return s.f.field() }
 
 func onOff(b bool) string {
 	if b {
@@ -425,7 +428,7 @@ func (s *settingsView) rows(p *Pane) []formRow {
 	}
 }
 
-func (s *settingsView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
+func (s *settingsView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool, cmd tea.Cmd) {
 	return s.f.key(p, func() []formRow { return s.rows(p) }, m)
 }
 
@@ -433,7 +436,7 @@ func (s *settingsView) view(p *Pane, w, h int) string { return s.f.view(p, s.row
 
 func (s *settingsView) hints() []ui.Hint {
 	if s.f.edit {
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Tab", Label: "Next field", Priority: 3}}
+		return append(fieldHints(s.f.in, "Done"), ui.Hint{Key: "Tab", Label: "Next field", Priority: 3})
 	}
 	return []ui.Hint{
 		{Key: "Enter", Label: "Toggle or edit", Priority: 2},

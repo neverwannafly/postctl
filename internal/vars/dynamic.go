@@ -2,6 +2,7 @@ package vars
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -189,6 +190,17 @@ const (
 var loremWords = []string{
 	"adipiscing", "amet", "consectetur", "dolor", "elit", "ipsum", "lorem",
 	"mauris", "nunc", "porta", "semper", "sit", "tempor", "vitae",
+}
+
+// DynamicNames returns the sorted names of the supported {{$dynamic}}
+// variables, each with its leading "$". Editors use it for completion.
+func DynamicNames() []string {
+	names := make([]string, 0, len(dynamicVariables))
+	for name := range dynamicVariables {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (s *MemStore) dynamic(name string) (string, bool) {
