@@ -47,7 +47,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | FIX-IMP import fixes (script loss, secret-by-name, empty-input warnings, `env set --secret` stdin) | Sonnet 5.5 | Done, merged to main | fix/import | 2026-09-30 13:40 IST |
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
-| UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Review fixes done on branch, gate green, not merged | ws/ux-v0-shell | 2026-10-03 19:35 IST |
+| UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done, merged to main | ws/ux-v0-shell | 2026-10-03 19:44 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
@@ -840,3 +840,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green, `task tui:smoke` PASS.
 - Next: orchestrator merge.
 
+### 2026-10-03 19:44 IST · UX-V0 · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-v0-shell merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: two review rounds (key-map conformance; invariants and regressions). Accepted all findings. Decision recorded in the design language: "always" keys work in panes and non-modal overlays (palette, switcher, help, which-key); modal dialogs and prompts ignore them; full-screen screens keep their own keys. Known gap until V2b: overlay inputs close on Esc instead of entering normal mode.
+- Tests: `task agents:check` green on main after merge; `task tui:smoke` PASS (3 checks); `postctl --help` starts.
+- Next: V1 (oracle round), H1 (security re-review pending), then phase 2 briefs.
