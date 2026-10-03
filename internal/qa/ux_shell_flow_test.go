@@ -2,6 +2,7 @@ package qa_test
 
 import (
 	"bytes"
+	tea "charm.land/bubbletea/v2"
 	"fmt"
 	"io/fs"
 	"os"
@@ -41,6 +42,23 @@ func (r *uxRig) must(marker, what string) {
 	if !strings.Contains(r.screen(), marker) {
 		r.t.Fatalf("step %q did not reach its view (no %q on a frame of %s)", what, marker, frameShape(r.screen()))
 	}
+}
+
+// mouseYank drags the left button across width cells starting offset cells
+// after the first screen match for anchor, then presses y. The drag must
+// have copied something (the selection happened) and the clipboard text is
+// swept with every other write.
+func (r *uxRig) mouseYank(what, anchor string, offset, width int) {
+	r.t.Helper()
+	x, y, ok := r.find(anchor)
+	if !ok {
+		r.t.Fatalf("mouse selection %q: %q is not on a frame of %s", what, anchor, frameShape(r.screen()))
+	}
+	n := len(r.clips)
+	r.drag(x+offset, x+offset+width, y)
+	r.snap("mouse selection " + what)
+	r.keys("y")
+	r.mustClip(n, "mouse selection of the "+what)
 }
 
 // mustClip fails when the step wrote nothing to the clipboard since n writes
@@ -278,6 +296,24 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.keys("space", "o")
 	r.snap("ws editor refused")
 	r.keys("esc", "esc")
+
+	r.begin("mouse selection")
+	r.open("literal")
+	r.keys("g", "a")
+	r.mouseYank("Password row of a request", "••••", 0, 3)
+	r.open("socket")
+	r.keys("g", "a")
+	r.mouseYank("Token row of a WebSocket request", "••••", 0, 3)
+	r.keys("esc", "esc", "space", "E", "enter")
+	// A first click on the cell opens it; the drag then selects inside the
+	// cell's field on the bottom line.
+	if x, y, ok := r.find("accessToken"); ok {
+		r.send(tea.MouseClickMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
+		r.send(tea.MouseReleaseMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
+		r.pump(100 * time.Millisecond)
+	}
+	r.mouseYank("env editor secret cell", "Value (secret) ", 15, 3)
+	r.keys("esc", "esc", "esc", "esc")
 
 	r.begin("editor files")
 	r.open("ech")

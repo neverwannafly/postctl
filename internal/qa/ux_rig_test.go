@@ -397,3 +397,25 @@ func (r *uxRig) waitFor(text string, d time.Duration) bool {
 	}
 	return false
 }
+
+// find returns the screen cell where text starts (first match), or ok false.
+func (r *uxRig) find(text string) (x, y int, ok bool) {
+	for row, line := range strings.Split(r.screen(), "\n") {
+		if i := strings.Index(line, text); i >= 0 {
+			return ansi.StringWidth(line[:i]), row, true
+		}
+	}
+	return 0, 0, false
+}
+
+// drag presses the left button at (x0, y), moves to (x1, y) and releases, as
+// a person selecting text with the mouse.
+func (r *uxRig) drag(x0, x1, y int) {
+	r.t.Helper()
+	r.send(tea.MouseClickMsg{X: x0, Y: y, Button: tea.MouseLeft})
+	r.pump(60 * time.Millisecond)
+	r.send(tea.MouseMotionMsg{X: x1, Y: y, Button: tea.MouseLeft})
+	r.pump(60 * time.Millisecond)
+	r.send(tea.MouseReleaseMsg{X: x1, Y: y, Button: tea.MouseLeft})
+	r.pump(60 * time.Millisecond)
+}
