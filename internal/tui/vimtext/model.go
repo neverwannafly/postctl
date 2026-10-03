@@ -137,10 +137,12 @@ type Model struct {
 	lastFindKey string
 	lastFindPos int
 
-	anchor    position
-	visualEOL bool
-	reg       string
-	regLine   bool
+	anchor             position
+	visualEOL          bool
+	visualLineStart    bool
+	visualObjectFailed bool
+	reg                string
+	regLine            bool
 
 	undo []snapshot
 	redo []snapshot
@@ -153,6 +155,7 @@ type Model struct {
 	insertKind    string
 	insertSession string
 	insertStart   position
+	insertBreak   bool
 
 	searching  bool
 	searchDir  int

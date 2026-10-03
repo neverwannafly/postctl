@@ -14,8 +14,6 @@ func (m *Model) enterInsert(key tea.KeyPressMsg, kind string, count int) (tea.Cm
 		return nil, Event{}
 	}
 	before := m.snap()
-	m.changeStart = &before
-	m.changeKeys = countedKeys(count, kind[0])
 	m.insertCount, m.insertKind, m.insertSession = max(1, count), kind, ""
 	switch kind {
 	case "a":
@@ -35,6 +33,12 @@ func (m *Model) enterInsert(key tea.KeyPressMsg, kind string, count int) (tea.Cm
 		m.col = len(clusters(indent))
 	}
 	m.insertStart = position{m.row, m.col}
+	if kind == "a" || kind == "A" {
+		before.pos = position{m.row, max(0, m.col-1)}
+	}
+	m.changeStart = &before
+	m.changeKeys = countedKeys(count, kind[0])
+	m.insertBreak = false
 	m.mode = Insert
 	m.ensureVisible()
 	return nil, Event{}
@@ -47,18 +51,42 @@ func (m *Model) lineTail(key tea.KeyPressMsg, kind byte, count int) (tea.Cmd, Ev
 		m.reg, m.regLine = text, true
 		return m.clipboard(text), Event{}
 	}
+	if count > 1 && m.row == len(m.lines)-1 {
+		return nil, Event{}
+	}
 	cs := clusters(m.lines[m.row])
-	if len(cs) == 0 || m.col >= len(cs) {
+	if (len(cs) == 0 || m.col >= len(cs)) && count == 1 {
 		if kind == 'C' {
 			return m.enterInsert(key, "A", 1)
 		}
 		return nil, Event{}
 	}
 	endRow := min(len(m.lines)-1, m.row+count-1)
-	text := m.rangeText(position{m.row, m.col}, position{endRow, m.lineLen(endRow)}, false)
+	end := position{endRow, m.lineLen(endRow)}
+	if endRow+1 < len(m.lines) {
+		end = position{endRow + 1, 0}
+	}
+	text := m.rangeText(position{m.row, m.col}, end, false)
 	m.reg, m.regLine = text, false
 	m.beginChange(key)
-	m.deleteRange(position{m.row, m.col}, position{endRow, m.lineLen(endRow)}, false)
+	cs = clusters(m.lines[m.row])
+	prefix := joinClusters(cs[:min(m.col, len(cs))])
+	m.lines[m.row] = prefix
+	if endRow+1 < len(m.lines) {
+		if kind == 'D' && count > 1 && prefix == "" {
+			m.lines = append(m.lines[:m.row], m.lines[endRow+1:]...)
+			m.row = min(m.row, len(m.lines)-1)
+		} else {
+			m.lines = append(m.lines[:m.row+1], m.lines[endRow+1:]...)
+		}
+	} else {
+		if kind == 'D' && count > 1 && prefix == "" && m.row > 0 {
+			m.lines = m.lines[:m.row]
+			m.row--
+		} else {
+			m.lines = m.lines[:m.row+1]
+		}
+	}
 	m.col = min(m.col, max(0, m.lineLen(m.row)-1))
 	if kind == 'C' {
 		m.col = m.lineLen(m.row)
@@ -88,20 +116,34 @@ func (m *Model) simpleDelete(key tea.KeyPressMsg, kind string, count int) (tea.C
 	} else {
 		cs := clusters(m.lines[m.row])
 		if m.col >= len(cs) {
+			if kind == "s" {
+				m.mode = Insert
+				m.insertStart = position{m.row, m.col}
+				m.changeStart = &before
+				m.changeKeys = countedKeys(count, 's')
+				m.insertCount, m.insertKind, m.insertSession = 1, "s", ""
+			}
 			return nil, Event{}
 		}
+		insertCol := m.col
 		end := min(len(cs), m.col+count)
 		text = joinClusters(cs[m.col:end])
 		m.lines[m.row] = joinClusters(append(cs[:m.col], cs[end:]...))
 		m.col = min(m.col, max(0, m.lineLen(m.row)-1))
+		if kind == "s" {
+			m.col = min(insertCol, m.lineLen(m.row))
+		}
 	}
 	m.reg, m.regLine = text, false
 	if kind == "s" {
 		m.mode = Insert
+		m.insertStart = position{m.row, m.col}
 		m.changeStart = &before
 		m.changeKeys = countedKeys(count, 's')
 		m.insertCount, m.insertKind, m.insertSession = 1, "s", ""
 	} else {
+		before.redoPos = position{m.row, m.col}
+		before.hasRedoPos = true
 		m.pushUndo(before)
 		m.redo = nil
 		m.lastChange = countedKeys(count, kind[0])
@@ -129,14 +171,12 @@ func (m *Model) pasteRegister(key tea.KeyPressMsg, before bool, count int) (tea.
 		m.lines = append(m.lines[:at], append(inserted, m.lines[at:]...)...)
 		m.row, m.col = at, firstWordColumn(m.lines[at])
 	} else {
-		for range max(1, count) {
-			text := strings.TrimSuffix(m.reg, "\n")
-			if !before && m.lineLen(m.row) > 0 {
-				m.col++
-			}
-			m.insertText(text)
-			m.col = max(0, m.col-1)
+		text := strings.Repeat(strings.TrimSuffix(m.reg, "\n"), max(1, count))
+		if !before && m.lineLen(m.row) > 0 {
+			m.col++
 		}
+		m.insertText(text)
+		m.col = max(0, m.col-1)
 	}
 	m.finishChange()
 	m.lastChange = countedKeys(count, map[bool]byte{true: 'P', false: 'p'}[before])
@@ -169,12 +209,12 @@ func (m *Model) toggleCase(key tea.KeyPressMsg, count int) (tea.Cmd, Event) {
 		}
 		changed = true
 	}
+	m.col = min(m.col+count, max(0, len(cs)-1))
 	if !changed {
 		m.changeStart = nil
 		return nil, Event{}
 	}
 	m.lines[m.row] = joinClusters(cs)
-	m.col = min(m.col+count, max(0, len(cs)-1))
 	m.finishChange()
 	return nil, Event{Kind: Changed}
 }
@@ -230,6 +270,7 @@ func (m *Model) finishCountedInsert() {
 }
 
 func (m *Model) afterEdit() {
+	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
 	m.rehighlightRow(m.row)
 	m.refreshCompletion()
 	m.ensureVisible()

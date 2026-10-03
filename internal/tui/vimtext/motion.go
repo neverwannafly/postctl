@@ -124,6 +124,12 @@ func (m *Model) bufferCells() []bufferCell {
 
 func (m *Model) objectRange(inner bool, object byte, count int) (position, position, bool, bool, bool) {
 	cs := clusters(m.lines[m.row])
+	if len(cs) == 0 && (object == 'w' || object == 'W') {
+		if !inner && m.row+1 < len(m.lines) {
+			return position{m.row, 0}, position{m.row + 1, 0}, true, false, false
+		}
+		return position{}, position{}, false, false, false
+	}
 	if len(cs) == 0 {
 		if object != '(' && object != ')' && object != 'b' && object != '{' && object != '}' &&
 			object != 'B' && object != '[' && object != ']' {
@@ -158,8 +164,10 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 		}
 		for range max(1, count) - 1 {
 			next := end + 1
-			for next < len(cs) && isSpaceCluster(cs[next]) {
-				next++
+			if !inner {
+				for next < len(cs) && isSpaceCluster(cs[next]) {
+					next++
+				}
 			}
 			if next >= len(cs) {
 				break
@@ -198,26 +206,14 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 		return position{}, position{}, false, false, false
 	}
 	if open == close {
-		left, right := -1, -1
-		for i := 0; i < len(cs); {
-			if cs[i] != open || quoteInsideWord(cs, i, object) {
-				i++
-				continue
+		quotes := make([]int, 0, 4)
+		for i := range cs {
+			if cs[i] == open && !quoteInsideWord(cs, i, object) && !escapedAt(cs, i) {
+				quotes = append(quotes, i)
 			}
-			j := i + 1
-			for j < len(cs) && (cs[j] != close || quoteInsideWord(cs, j, object)) {
-				j++
-			}
-			if j >= len(cs) {
-				break
-			}
-			if m.col >= i && m.col <= j || i >= m.col {
-				left, right = i, j
-				break
-			}
-			i = j + 1
 		}
-		if left < 0 {
+		left, right, ok := quoteBounds(quotes, m.col)
+		if !ok {
 			return position{}, position{}, false, false, false
 		}
 		if inner {
@@ -245,61 +241,41 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 	if cursor < 0 {
 		return position{}, position{}, false, false, false
 	}
+	pairs := m.bracketPairs(cells, open, close)
 	left, right := -1, -1
-	searchAt := cursor
-	if cells[cursor].text == close {
-		searchAt--
+	for _, pair := range pairs {
+		if pair[0] <= cursor && cursor <= pair[1] && pair[0] > left {
+			left, right = pair[0], pair[1]
+		}
 	}
-	for range max(1, count) {
-		depth := 0
-		left = -1
-	leftScan:
-		for i := searchAt; i >= 0; i-- {
-			switch cells[i].text {
-			case close:
-				depth++
-			case open:
-				if depth == 0 {
-					left = i
-					break leftScan
-				}
-				depth--
+	if left < 0 {
+		for _, pair := range pairs {
+			if pair[0] > cursor && (left < 0 || pair[0] < left) {
+				left, right = pair[0], pair[1]
 			}
 		}
-		if left < 0 {
-			for i := cursor + 1; i < len(cells); i++ {
-				if cells[i].text == open {
-					left = i
-					break
-				}
-			}
-			if left < 0 {
-				return position{}, position{}, false, false, false
-			}
-		}
-		depth = 0
-		right = -1
-	rightScan:
-		for i := left + 1; i < len(cells); i++ {
-			switch cells[i].text {
-			case open:
-				depth++
-			case close:
-				if depth == 0 {
-					right = i
-					break rightScan
-				}
-				depth--
+	}
+	if left < 0 {
+		return position{}, position{}, false, false, false
+	}
+	for range max(1, count) - 1 {
+		parentLeft, parentRight := -1, -1
+		for _, pair := range pairs {
+			if pair[0] < left && right < pair[1] && pair[0] > parentLeft {
+				parentLeft, parentRight = pair[0], pair[1]
 			}
 		}
-		if right < 0 || cursor > right {
-			return position{}, position{}, false, false, false
+		if parentLeft < 0 {
+			break
 		}
-		searchAt = left - 1
+		left, right = parentLeft, parentRight
 	}
 	a, b := cells[left].pos, cells[right].pos
 	if inner {
-		if a.row != b.row && b.row-a.row > 1 {
+		openTail := joinClusters(clusters(m.lines[a.row])[a.col+1:])
+		closeHead := joinClusters(clusters(m.lines[b.row])[:b.col])
+		if a.row != b.row && b.row-a.row > 1 &&
+			strings.TrimSpace(openTail) == "" && strings.TrimSpace(closeHead) == "" {
 			innerRow := a.row + 1
 			startCol := firstWordColumn(m.lines[innerRow])
 			endRow := b.row - 1
@@ -314,6 +290,85 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 
 func quoteInsideWord(cs []string, i int, quote byte) bool {
 	return quote == '\'' && i > 0 && i+1 < len(cs) && isSmallWord(cs[i-1]) && isSmallWord(cs[i+1])
+}
+
+func quoteBounds(quotes []int, cursor int) (int, int, bool) {
+	for i, quote := range quotes {
+		if quote == cursor {
+			if i%2 == 0 && i+1 < len(quotes) {
+				return quote, quotes[i+1], true
+			}
+			if i > 0 {
+				return quotes[i-1], quote, true
+			}
+		}
+	}
+	left, right := -1, -1
+	for _, quote := range quotes {
+		if quote < cursor {
+			left = quote
+		} else if quote > cursor {
+			right = quote
+			break
+		}
+	}
+	if left >= 0 && right >= 0 {
+		return left, right, true
+	}
+	if left < 0 && len(quotes) >= 2 {
+		return quotes[0], quotes[1], true
+	}
+	if right < 0 && len(quotes) >= 2 {
+		return quotes[len(quotes)-2], quotes[len(quotes)-1], true
+	}
+	return 0, 0, false
+}
+
+func escapedAt(cs []string, at int) bool {
+	backslashes := 0
+	for at--; at >= 0 && cs[at] == `\`; at-- {
+		backslashes++
+	}
+	return backslashes%2 != 0
+}
+
+func (m *Model) bracketPairs(cells []bufferCell, open, close string) [][2]int {
+	var pairs [][2]int
+	var stack []int
+	quote := ""
+	for i, cell := range cells {
+		if cell.text == "\n" {
+			if quote != "`" {
+				quote = ""
+			}
+			continue
+		}
+		cs := clusters(m.lines[cell.pos.row])
+		escaped := escapedAt(cs, cell.pos.col)
+		if quote != "" {
+			if cell.text == quote && !escaped {
+				quote = ""
+			}
+			continue
+		}
+		if (cell.text == `"` || cell.text == "'" || cell.text == "`") && !escaped &&
+			(cell.text != "'" || !quoteInsideWord(cs, cell.pos.col, '\'')) {
+			quote = cell.text
+			continue
+		}
+		switch cell.text {
+		case open:
+			stack = append(stack, i)
+		case close:
+			if len(stack) == 0 {
+				continue
+			}
+			left := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			pairs = append(pairs, [2]int{left, i})
+		}
+	}
+	return pairs
 }
 
 func nextPosition(m *Model, p position) position {
@@ -392,10 +447,11 @@ func graphemeAtByte(s string, off int) int {
 	}
 	n, used := 0, 0
 	for _, c := range clusters(s) {
-		if used >= off {
-			break
+		next := used + len(c)
+		if off < next {
+			return n
 		}
-		used += len(c)
+		used = next
 		n++
 	}
 	return n

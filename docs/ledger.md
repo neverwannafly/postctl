@@ -48,7 +48,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
-| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done (nvim oracle review) | ws/ux-v1-vimtext | 2026-10-03 19:33 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done (honest oracle + mutation checked) | ws/ux-v1-vimtext | 2026-10-03 20:05 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
@@ -812,5 +812,23 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
 - Decisions: The oracle compares 460 eligible corpus cases and 500 seeded 3–12-key generated cases. Nvim uses two-space `expandtab` settings to match the documented `TabText` default. The only allowlisted difference is literal search versus Nvim regular-expression search.
 - Tests: `VIMTEXT_NVIM=1 go test ./internal/tui/vimtext -run TestDifferentialNvim` passed with `corpus=460 random=500 mismatches=0 allowed=1`; `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` passed. Six goldens regenerated with no diff. Apple M3 Pro: `G`/`gg` 6.95–7.18 µs per three-key cycle, 100 typed keys 1.06–1.08 ms total, highlight recompute 0.862–0.871 ms/key.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.
+
+### 2026-10-03 19:45 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Reworked the oracle after the independent mutation audit: original keys now use typed `nvim_feedkeys`, each case has fresh process state and a timeout, final mode is compared, corpus inclusion/exclusion counts are pinned, and the seeded generator emits one to three grammar commands over 13 buffers while asserting operator coverage. Added the reviewer regressions to the permanent corpus and began fixing newly exposed semantics.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Process-per-case isolation is stronger than chunk reset and remains fast enough for the opt-in test. Literal non-regex search remains the sole allowlisted deviation.
+- Tests: Intermediate honest-oracle run exposed 115 mismatches, including the planted last-line `dd` behavior; iterative runs reduced that count without adding deviations.
+- Blockers / questions: none.
+- Next: reach zero mismatches, mutation-check all three planted faults, rerun goldens, benchmarks, and the repository gate.
+
+### 2026-10-03 20:05 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Completed the honest nvim oracle and fixed the exposed editing semantics: counted line/tail operations, text-object counts, Han word classes, operator `ge`, failed repeat-find, insertion undo boundaries, replacement, visual object/mode/cursor behavior, and final-line deletion. The permanent corpus now has 488 cases.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: The oracle compares all 476 eligible corpus cases and exactly 500 seeded random cases; exclusions are pinned as 9 single-line, 2 read-only, and 1 clipboard-paste case. The only allowlist entry is literal search because Vim regex syntax is out of scope.
+- Tests: Honest differential summary `corpus=476 random=500 mismatches=0 allowed=1`. Random operator distribution: `<<=27 >>=26 C=26 D=25 J=33 P=26 X=26 c=25 d=27 p=21 r=23 s=23 x=25 y=81 ~=35` (visual `<`/`>` also generated). First keys covered 32 forms; most frequent were `0=189`, `y=53`, `4=43`, `2=41`, `3=32`. Mutation copies failed as required: `e` one-short (10 mismatches), `ci(` delimiters included (11), last-line `dd` retained (3). `task agents:check` green; six goldens regenerated with no diff. Apple M3 Pro benchmarks: `G`/`gg` 6.83–6.91 µs/op, 100 typed keys 1.55–1.57 ms total, highlight recompute 1.19–1.22 ms/op.
 - Blockers / questions: none.
 - Next: orchestrator re-review and merge.

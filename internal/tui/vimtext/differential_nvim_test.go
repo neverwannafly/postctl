@@ -8,7 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,15 +20,17 @@ import (
 )
 
 type differentialCase struct {
-	Name     string   `json:"name"`
-	Source   string   `json:"-"`
-	Text     string   `json:"-"`
-	Lines    []string `json:"lines"`
-	Row      int      `json:"row"`
-	ByteCol  int      `json:"byteCol"`
-	Keys     string   `json:"-"`
-	NvimKeys string   `json:"keys"`
-	Allow    string   `json:"-"`
+	Name      string   `json:"name"`
+	Source    string   `json:"-"`
+	Text      string   `json:"-"`
+	Lines     []string `json:"lines"`
+	Row       int      `json:"row"`
+	ByteCol   int      `json:"byteCol"`
+	Keys      string   `json:"-"`
+	NvimKeys  string   `json:"keys"`
+	Allow     string   `json:"-"`
+	Operators []string `json:"-"`
+	Commands  int      `json:"-"`
 }
 
 type differentialResult struct {
@@ -33,6 +38,7 @@ type differentialResult struct {
 	Lines   []string `json:"lines"`
 	Row     int      `json:"row"`
 	ByteCol int      `json:"byteCol"`
+	Mode    string   `json:"mode"`
 	Error   string   `json:"error,omitempty"`
 }
 
@@ -47,11 +53,15 @@ func TestDifferentialNvim(t *testing.T) {
 		t.Skip("nvim is not on PATH")
 	}
 	cases := differentialCorpusCases()
+	assertDifferentialCorpusCoverage(t, cases)
 	cases = append(cases, newDifferentialCase(
 		"deviation/literal-search", "deviation", "ab.", 0, 0, "/.<CR>", "literal-search",
 	))
-	cases = append(cases, differentialRandomCases(500)...)
-	results := runNvimBatch(t, nvim, cases)
+	randomCases := differentialRandomCases(500)
+	assertRandomCoverage(t, randomCases)
+	logRandomDistribution(t, randomCases)
+	cases = append(cases, randomCases...)
+	results := runNvimCases(t, nvim, cases)
 	if len(results) != len(cases) {
 		t.Fatalf("nvim returned %d results for %d cases", len(results), len(cases))
 	}
@@ -64,7 +74,7 @@ func TestDifferentialNvim(t *testing.T) {
 		case "corpus":
 			corpusCompared++
 		}
-		gotText, gotRow, gotCol := runVimtextCase(t, tc)
+		gotText, gotRow, gotCol, gotMode := runVimtextCase(t, tc)
 		want := results[i]
 		if want.Error != "" || want.Row < 0 || want.Row >= len(want.Lines) {
 			mismatches = append(mismatches, fmt.Sprintf("%s [%s]: nvim oracle error", tc.Name, tc.Source))
@@ -72,13 +82,13 @@ func TestDifferentialNvim(t *testing.T) {
 		}
 		wantText := strings.Join(want.Lines, "\n")
 		wantCol := graphemeAtByte(want.Lines[want.Row], want.ByteCol)
-		if want.Error == "" && gotText == wantText && gotRow == want.Row && gotCol == wantCol {
+		if want.Error == "" && gotText == wantText && gotRow == want.Row && gotCol == wantCol && gotMode == want.Mode {
 			continue
 		}
 		line := fmt.Sprintf(
-			"%s [%s] keys=%q: textBytes=%d/%d lines=%d/%d cursor=(%d,%d)/(%d,%d) nvimError=%t",
+			"%s [%s] keys=%q: textBytes=%d/%d lines=%d/%d cursor=(%d,%d)/(%d,%d) mode=%s/%s nvimError=%t",
 			tc.Name, tc.Source, tc.Keys, len(gotText), len(wantText), len(strings.Split(gotText, "\n")),
-			len(want.Lines), gotRow, gotCol, want.Row, wantCol, want.Error != "",
+			len(want.Lines), gotRow, gotCol, want.Row, wantCol, gotMode, want.Mode, want.Error != "",
 		)
 		if tc.Allow != "" {
 			if differentialDeviationReasons[tc.Allow] == "" {
@@ -116,9 +126,7 @@ func TestDifferentialNvim(t *testing.T) {
 func differentialCorpusCases() []differentialCase {
 	var out []differentialCase
 	for _, tc := range allCorpusCases() {
-		if tc.opts.SingleLine || tc.opts.ReadOnly || tc.opts.StartInsert ||
-			tc.opts.Completer != nil || tc.opts.Highlighter != nil ||
-			tc.wantEvents != nil || strings.Contains(tc.keys, "<Paste:") {
+		if differentialExclusion(tc) != "" {
 			continue
 		}
 		out = append(out, newDifferentialCase("corpus/"+tc.name, "corpus", tc.start, tc.row, tc.col, tc.keys, ""))
@@ -126,28 +134,69 @@ func differentialCorpusCases() []differentialCase {
 	return out
 }
 
+func differentialExclusion(tc corpusCase) string {
+	switch {
+	case tc.opts.SingleLine:
+		return "single-line"
+	case tc.opts.ReadOnly:
+		return "read-only"
+	case tc.opts.StartInsert:
+		return "start-insert"
+	case tc.opts.Completer != nil:
+		return "completion"
+	case tc.opts.Highlighter != nil:
+		return "highlighting"
+	case tc.wantEvents != nil:
+		return "routing-events"
+	case strings.Contains(tc.keys, "<Paste:"):
+		return "clipboard-paste"
+	default:
+		return ""
+	}
+}
+
+func assertDifferentialCorpusCoverage(t *testing.T, included []differentialCase) {
+	t.Helper()
+	const (
+		wantTotal    = 488
+		wantEligible = 476
+	)
+	all := allCorpusCases()
+	if len(all) != wantTotal {
+		t.Fatalf("corpus case count = %d, want pinned %d", len(all), wantTotal)
+	}
+	if len(included) != wantEligible {
+		t.Fatalf("eligible corpus count = %d, want pinned %d", len(included), wantEligible)
+	}
+	got := map[string]int{}
+	for _, tc := range all {
+		if reason := differentialExclusion(tc); reason != "" {
+			got[reason]++
+		}
+	}
+	want := map[string]int{"single-line": 9, "read-only": 2, "clipboard-paste": 1}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("corpus exclusion categories = %v, want %v", got, want)
+	}
+}
+
 func differentialRandomCases(count int) []differentialCase {
 	buffers := []string{
-		"{\n  \"a\": [1, 2]\n}",
-		"function f() {\n  return (a + b)\n}",
+		"{\n  \"a\": [1, {\"b\": 2}]\n}",
+		"function f() {\n  return call(a[0], \"[\")\n}",
 		`"one" "two"` + "\n" + "it's 'x'",
 		"  alpha\n    beta\ngamma",
 		"a\n\nb\n   \nc",
-		"word",
+		"x",
 		"",
 		"(\n  [x]\n)",
 		"one two.three\nfour",
 		"first\nsecond\nthird",
+		"café déjà",
+		"世界 alpha\nbeta 世界",
+		"👩‍💻 dev\né界",
 	}
-	cores := []string{
-		"10h", "10l", "10j", "10k", "10w", "10e", "10W", "10E",
-		"2gg", "10G", "d%u", "d0u", "d^u", "d$u",
-		"dwu", "dWu", "deu", "dbu", "dlu", "ddu", "dju", "diw", "daw", "di(", "da[",
-		"iX<Esc>", "aY<Esc>", "oZ<Esc>", "OQ<Esc>",
-		"iX<Esc>u", "iX<Esc>u<C-r>", "iX<Esc>.", "Vdu", "viwy", "vawd",
-		"10x", "1>>", "1<LT><LT>", "1fa", "1tz", "1F(", "1T]",
-		"/a<CR>", "?x<CR>", "/a<CR>n", "/a<CR>2n", "d/a<CR>",
-	}
+	requiredOperators := randomRequiredOperators()
 	rng := rand.New(rand.NewSource(0x56494d))
 	out := make([]differentialCase, 0, count)
 	for i := range count {
@@ -159,14 +208,157 @@ func differentialRandomCases(count int) []differentialCase {
 		if n := len(clusters(lines[row])); n > 0 {
 			col = rng.Intn(n)
 		}
-		notation := cores[rng.Intn(len(cores))]
-		if n := notationKeyCount(notation); n < 3 || n > 12 {
+		var generated generatedKeys
+		if i < len(requiredOperators)*20 {
+			generated = randomOperatorCommand(rng, requiredOperators[i%len(requiredOperators)])
+		} else {
+			generated = randomGrammarCommand(rng)
+		}
+		for notationKeyCount(generated.Keys) < 3 && generated.Commands < 3 {
+			generated.Keys = "0" + generated.Keys
+			generated.Commands++
+		}
+		if n := notationKeyCount(generated.Keys); n < 3 || n > 12 {
 			panic(fmt.Sprintf("random notation has %d keys", n))
 		}
 		name := fmt.Sprintf("random/%03d/buf%d/r%d/c%d", i, bufferIndex, row, col)
-		out = append(out, newDifferentialCase(name, "random", text, row, col, notation, ""))
+		tc := newDifferentialCase(name, "random", text, row, col, generated.Keys, "")
+		tc.Operators, tc.Commands = generated.Operators, generated.Commands
+		out = append(out, tc)
 	}
 	return out
+}
+
+type generatedKeys struct {
+	Keys      string
+	Operators []string
+	Commands  int
+}
+
+func randomRequiredOperators() []string {
+	return []string{"d", "c", "y", "p", "P", "J", "r", "~", "x", "X", "s", "D", "C", ">>", "<<"}
+}
+
+func randomGrammarCommand(rng *rand.Rand) generatedKeys {
+	switch rng.Intn(6) {
+	case 0, 1:
+		ops := randomRequiredOperators()
+		return randomOperatorCommand(rng, ops[rng.Intn(len(ops))])
+	case 2:
+		return generatedKeys{Keys: randomMotion(rng), Commands: 1}
+	case 3:
+		return randomVisualCommand(rng)
+	case 4:
+		return randomInsertCommand(rng)
+	default:
+		return randomSearchOrHistoryCommand(rng)
+	}
+}
+
+func randomOperatorCommand(rng *rand.Rand, op string) generatedKeys {
+	count := randomCount(rng)
+	switch op {
+	case "d", "y":
+		return generatedKeys{
+			Keys: count + op + randomOperatorTarget(rng), Operators: []string{op}, Commands: 1,
+		}
+	case "c":
+		return generatedKeys{
+			Keys:      count + "c" + randomOperatorTarget(rng) + "Q<Esc>",
+			Operators: []string{"c"}, Commands: 1,
+		}
+	case "p", "P":
+		return generatedKeys{
+			Keys: "yiw" + count + op, Operators: []string{"y", op}, Commands: 2,
+		}
+	case "J":
+		return generatedKeys{Keys: count + "J", Operators: []string{"J"}, Commands: 1}
+	case "r":
+		replacement := []string{"Z", "é", "<CR>"}[rng.Intn(3)]
+		return generatedKeys{Keys: count + "r" + replacement, Operators: []string{"r"}, Commands: 1}
+	case "~", "x", "X", "D":
+		return generatedKeys{Keys: count + op, Operators: []string{op}, Commands: 1}
+	case "s", "C":
+		return generatedKeys{
+			Keys: count + op + "Q<Esc>", Operators: []string{op}, Commands: 1,
+		}
+	case ">>":
+		return generatedKeys{Keys: count + ">>", Operators: []string{">>"}, Commands: 1}
+	default:
+		return generatedKeys{Keys: count + "<LT><LT>", Operators: []string{"<<"}, Commands: 1}
+	}
+}
+
+func randomCount(rng *rand.Rand) string {
+	if rng.Intn(2) == 0 {
+		return ""
+	}
+	return strconv.Itoa(2 + rng.Intn(3))
+}
+
+func randomOperatorTarget(rng *rand.Rand) string {
+	targets := []string{
+		"w", "b", "e", "W", "B", "E", "ge", "0", "^", "$",
+		"fa", "fz", "ta", "tz", "Fa", "Fz", "Ta", "Tz", ";", ",", "%",
+		"gg", "G", "j", "k", "h", "l",
+		"iw", "aw", "iW", "aW", `i"`, `a"`, "i'", "a'", "i(", "a(", "i[", "a[", "i{", "a{",
+	}
+	return targets[rng.Intn(len(targets))]
+}
+
+func randomMotion(rng *rand.Rand) string {
+	motions := []string{
+		"w", "b", "e", "W", "B", "E", "ge", "0", "^", "$",
+		"fa", "fz", "ta", "tz", "Fa", "Fz", "Ta", "Tz", ";", ",", "%",
+		"gg", "G", "j", "k", "h", "l",
+	}
+	return randomCount(rng) + motions[rng.Intn(len(motions))]
+}
+
+func randomVisualCommand(rng *rand.Rand) generatedKeys {
+	mode := []string{"v", "V"}[rng.Intn(2)]
+	targets := []string{
+		"w", "b", "e", "W", "B", "E", "0", "^", "$", "fa", "fz", "ta", "tz",
+		"%", "gg", "G", "j", "k", "h", "l",
+		"iw", "aw", "iW", "aW", `i"`, `a"`, "i'", "a'", "i(", "a(", "i[", "a[", "i{", "a{",
+	}
+	op := []string{"d", "c", "y", ">", "<", "~", "J"}[rng.Intn(7)]
+	opKeys := op
+	if op == "<" {
+		opKeys = "<LT>"
+	}
+	keys := mode + targets[rng.Intn(len(targets))] + opKeys
+	if op == "c" {
+		keys += "Q<Esc>"
+	}
+	return generatedKeys{Keys: keys, Operators: []string{op}, Commands: 1}
+}
+
+func randomInsertCommand(rng *rand.Rand) generatedKeys {
+	open := []string{"i", "a", "I", "A", "o", "O"}[rng.Intn(6)]
+	body := []string{
+		"Q", "é", "界", "x<Left>y", "x<Right>y", "xy<BS>", "one two<C-w>",
+	}[rng.Intn(7)]
+	keys := open + body + "<Esc>"
+	if rng.Intn(3) == 0 {
+		keys += "."
+		return generatedKeys{Keys: keys, Commands: 2}
+	}
+	return generatedKeys{Keys: keys, Commands: 1}
+}
+
+func randomSearchOrHistoryCommand(rng *rand.Rand) generatedKeys {
+	commands := []generatedKeys{
+		{Keys: "/a<CR>", Commands: 1},
+		{Keys: "?x<CR>", Commands: 1},
+		{Keys: "/a<CR>n", Commands: 2},
+		{Keys: "?x<CR>N", Commands: 2},
+		{Keys: "iQ<Esc>u", Commands: 2},
+		{Keys: "iQ<Esc>u<C-r>", Commands: 3},
+		{Keys: "xu<C-r>", Operators: []string{"x"}, Commands: 3},
+		{Keys: "Ju<C-r>", Operators: []string{"J"}, Commands: 3},
+	}
+	return commands[rng.Intn(len(commands))]
 }
 
 func notationKeyCount(notation string) int {
@@ -186,6 +378,67 @@ func notationKeyCount(notation string) int {
 	return count
 }
 
+func assertRandomCoverage(t *testing.T, cases []differentialCase) {
+	t.Helper()
+	if len(cases) != 500 {
+		t.Fatalf("random case count = %d, want 500", len(cases))
+	}
+	operators := map[string]int{}
+	for _, tc := range cases {
+		n := notationKeyCount(tc.Keys)
+		if n < 3 || n > 12 {
+			t.Fatalf("%s has %d keys, want 3..12", tc.Name, n)
+		}
+		if tc.Commands < 1 || tc.Commands > 3 {
+			t.Fatalf("%s has %d commands, want 1..3", tc.Name, tc.Commands)
+		}
+		for _, op := range tc.Operators {
+			operators[op]++
+		}
+	}
+	for _, op := range randomRequiredOperators() {
+		if operators[op] < 20 {
+			t.Fatalf("random operator %q appears %d times, want at least 20", op, operators[op])
+		}
+	}
+}
+
+func logRandomDistribution(t *testing.T, cases []differentialCase) {
+	t.Helper()
+	first, operators := map[string]int{}, map[string]int{}
+	for _, tc := range cases {
+		first[firstNotationKey(tc.Keys)]++
+		for _, op := range tc.Operators {
+			operators[op]++
+		}
+	}
+	t.Logf("random first-key distribution: %s", formatDistribution(first))
+	t.Logf("random operator distribution: %s", formatDistribution(operators))
+}
+
+func firstNotationKey(notation string) string {
+	if strings.HasPrefix(notation, "<") {
+		if end := strings.IndexByte(notation, '>'); end >= 0 {
+			return notation[:end+1]
+		}
+	}
+	cluster, _, _, _ := uniseg.FirstGraphemeClusterInString(notation, -1)
+	return cluster
+}
+
+func formatDistribution(counts map[string]int) string {
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, counts[key]))
+	}
+	return strings.Join(parts, " ")
+}
+
 func newDifferentialCase(name, source, text string, row, col int, keys, allow string) differentialCase {
 	lines := strings.Split(text, "\n")
 	row = min(max(0, row), len(lines)-1)
@@ -196,7 +449,7 @@ func newDifferentialCase(name, source, text string, row, col int, keys, allow st
 	}
 }
 
-func runVimtextCase(t *testing.T, tc differentialCase) (string, int, int) {
+func runVimtextCase(t *testing.T, tc differentialCase) (string, int, int, string) {
 	t.Helper()
 	m := New(ui.NewTheme(true, true, false), Options{})
 	m.SetValue(tc.Text)
@@ -206,14 +459,13 @@ func runVimtextCase(t *testing.T, tc differentialCase) (string, int, int) {
 		_, _ = m.Update(msg)
 	}
 	row, col := m.Cursor()
-	return m.Value(), row, col
+	return m.Value(), row, col, m.Mode().String()
 }
 
-func runNvimBatch(t *testing.T, nvim string, cases []differentialCase) []differentialResult {
+func runNvimCases(t *testing.T, nvim string, cases []differentialCase) []differentialResult {
 	t.Helper()
 	dir := t.TempDir()
 	inputPath := filepath.Join(dir, "cases.json")
-	outputPath := filepath.Join(dir, "results.json")
 	scriptPath := filepath.Join(dir, "oracle.lua")
 	data, err := json.Marshal(cases)
 	if err != nil {
@@ -225,29 +477,56 @@ func runNvimBatch(t *testing.T, nvim string, cases []differentialCase) []differe
 	if err := os.WriteFile(scriptPath, []byte(nvimOracleLua), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, nvim, "--clean", "--headless", "-n", "-l", scriptPath)
-	cmd.Env = append(os.Environ(), "VIMTEXT_INPUT="+inputPath, "VIMTEXT_OUTPUT="+outputPath)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		if ctx.Err() != nil {
-			t.Fatalf("nvim oracle timed out after 2m")
-		}
-		t.Fatalf("nvim oracle failed: %v (output bytes=%d)", err, len(output))
+	results := make([]differentialResult, len(cases))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	const workers = 4
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				results[i] = runNvimCase(nvim, scriptPath, inputPath, dir, i)
+			}
+		}()
 	}
-	resultData, err := os.ReadFile(outputPath)
-	if err != nil {
-		t.Fatal(err)
+	for i := range cases {
+		jobs <- i
 	}
-	var results []differentialResult
-	if err := json.Unmarshal(resultData, &results); err != nil {
-		t.Fatal(err)
-	}
+	close(jobs)
+	wg.Wait()
 	return results
 }
 
+func runNvimCase(nvim, scriptPath, inputPath, dir string, index int) differentialResult {
+	outputPath := filepath.Join(dir, fmt.Sprintf("result-%04d.json", index))
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, nvim, "--clean", "--headless", "-n", "-l", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"VIMTEXT_INPUT="+inputPath,
+		"VIMTEXT_OUTPUT="+outputPath,
+		"VIMTEXT_INDEX="+strconv.Itoa(index+1),
+	)
+	output, err := cmd.CombinedOutput()
+	if ctx.Err() != nil {
+		return differentialResult{Error: "oracle timeout"}
+	}
+	if err != nil {
+		return differentialResult{Error: fmt.Sprintf("oracle exit error; outputBytes=%d", len(output))}
+	}
+	resultData, err := os.ReadFile(outputPath)
+	if err != nil {
+		return differentialResult{Error: "oracle result missing"}
+	}
+	var result differentialResult
+	if err := json.Unmarshal(resultData, &result); err != nil {
+		return differentialResult{Error: "oracle result invalid"}
+	}
+	return result
+}
+
 func nvimKeys(notation string) string {
-	notation = insertArrowUndoBreaks(notation)
 	replacer := strings.NewReplacer(
 		"<LT>", "<", "<CR>", "<CR>", "<Esc>", "<Esc>", "<C-r>", "<C-r>",
 		"<C-w>", "<C-w>", "<C-u>", "<C-u>", "<Tab>", "<Tab>", "<BS>", "<BS>",
@@ -256,94 +535,53 @@ func nvimKeys(notation string) string {
 	return replacer.Replace(notation)
 }
 
-func insertArrowUndoBreaks(notation string) string {
-	var out strings.Builder
-	insert, visual, changePending, objectPending := false, false, false, false
-	for notation != "" {
-		token := notation[:1]
-		notation = notation[1:]
-		if token == "<" {
-			end := strings.IndexByte(notation, '>')
-			if end >= 0 {
-				token += notation[:end+1]
-				notation = notation[end+1:]
-			}
-		}
-		if insert && (token == "<Left>" || token == "<Right>" || token == "<Up>" || token == "<Down>") {
-			out.WriteString("<C-g>u")
-		}
-		out.WriteString(token)
-		if token == "<Esc>" {
-			insert, visual, changePending, objectPending = false, false, false, false
-			continue
-		}
-		if insert || len(token) != 1 {
-			continue
-		}
-		if objectPending {
-			insert, changePending, objectPending = true, false, false
-			continue
-		}
-		if changePending {
-			if token == "i" || token == "a" {
-				objectPending = true
-			} else {
-				insert, changePending = true, false
-			}
-			continue
-		}
-		switch token {
-		case "v", "V":
-			visual = true
-		case "c":
-			if visual {
-				insert, visual = true, false
-			} else {
-				changePending = true
-			}
-		case "i", "I", "a", "A", "o", "O", "s", "S", "C":
-			insert = true
-		}
-	}
-	return out.String()
-}
-
 const nvimOracleLua = `
 local input = os.getenv("VIMTEXT_INPUT")
 local output = os.getenv("VIMTEXT_OUTPUT")
+local index = tonumber(os.getenv("VIMTEXT_INDEX"))
 local cases = vim.json.decode(table.concat(vim.fn.readfile(input), "\n"))
-local results = {}
+local case = cases[index]
+local result = { name = case.name }
 vim.o.autoindent = true
 vim.o.expandtab = true
 vim.o.shiftwidth = 2
 vim.o.softtabstop = 2
-for _, case in ipairs(cases) do
-  local result = { name = case.name }
-  local ok, err = pcall(function()
-    local buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_set_current_buf(buf)
-    vim.fn.setreg("/", "")
-    vim.bo[buf].undolevels = -1
-    vim.api.nvim_buf_set_lines(buf, 0, -1, false, case.lines)
-    vim.bo[buf].undolevels = 1000
-    vim.api.nvim_win_set_cursor(0, { case.row + 1, case.byteCol })
-    local keys = vim.api.nvim_replace_termcodes(case.keys, true, false, true)
-    vim.api.nvim_feedkeys(keys, "nx", false)
-    result.lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
-    local cursor = vim.api.nvim_win_get_cursor(0)
-    result.row = cursor[1] - 1
-    result.byteCol = cursor[2]
-    vim.api.nvim_buf_delete(buf, { force = true })
-  end)
-  if not ok then
-    result.error = tostring(err)
-    result.lines = {}
-    result.row = 0
-    result.byteCol = 0
+local ok, err = pcall(function()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_set_current_buf(buf)
+  for _, register in ipairs({ '"', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-' }) do
+    vim.fn.setreg(register, {})
   end
-  table.insert(results, result)
+  vim.fn.setreg("/", "")
+  vim.bo[buf].undolevels = -1
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, case.lines)
+  vim.bo[buf].undolevels = 1000
+  vim.api.nvim_win_set_cursor(0, { case.row + 1, case.byteCol })
+  local keys = vim.api.nvim_replace_termcodes(case.keys, true, false, true)
+  vim.api.nvim_feedkeys(keys, "ntx", false)
+  result.lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  result.row = cursor[1] - 1
+  result.byteCol = cursor[2]
+  local mode = vim.api.nvim_get_mode().mode
+  if mode:sub(1, 1) == "i" then
+    result.mode = "INSERT"
+  elseif mode == "v" or mode == "\22" then
+    result.mode = "VISUAL"
+  elseif mode == "V" then
+    result.mode = "VISUAL LINE"
+  else
+    result.mode = "NORMAL"
+  end
+end)
+if not ok then
+  result.error = tostring(err)
+  result.lines = {}
+  result.row = 0
+  result.byteCol = 0
+  result.mode = "NORMAL"
 end
-vim.fn.writefile({ vim.json.encode(results) }, output)
+vim.fn.writefile({ vim.json.encode(result) }, output)
 vim.cmd("qa!")
 `
 
@@ -364,17 +602,26 @@ func TestNvimKeyTranslation(t *testing.T) {
 	if uniseg.GraphemeClusterCount("👩‍💻") != 1 {
 		t.Fatal("grapheme test precondition failed")
 	}
+	for _, tc := range []struct {
+		name string
+		text string
+		off  int
+		want int
+	}{
+		{name: "inside accent", text: "éx", off: 1, want: 0},
+		{name: "accent boundary", text: "éx", off: len("é"), want: 1},
+		{name: "inside ZWJ", text: "👩‍💻x", off: 4, want: 0},
+		{name: "ZWJ boundary", text: "👩‍💻x", off: len("👩‍💻"), want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := graphemeAtByte(tc.text, tc.off); got != tc.want {
+				t.Fatalf("graphemeAtByte offset %d = %d, want %d", tc.off, got, tc.want)
+			}
+		})
+	}
 }
 
 func TestDifferentialRandomCaseShape(t *testing.T) {
 	cases := differentialRandomCases(500)
-	if len(cases) != 500 {
-		t.Fatalf("random case count = %d, want 500", len(cases))
-	}
-	for _, tc := range cases {
-		n := notationKeyCount(tc.Keys)
-		if n < 3 || n > 12 {
-			t.Fatalf("%s has %d keys, want 3..12", tc.Name, n)
-		}
-	}
+	assertRandomCoverage(t, cases)
 }

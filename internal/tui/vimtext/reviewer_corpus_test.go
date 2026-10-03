@@ -187,6 +187,24 @@ func reviewerRegressionCases() []corpusCase {
 		{name: "oracle G keeps column", start: "abc\n  def", col: 1, keys: "G", want: "abc\n  def", wantRow: 1, wantCol: 1},
 		{name: "oracle dd keeps column", start: "abc\n  def", col: 1, keys: "dd", want: "  def", wantCol: 1},
 		{name: "oracle shift keeps column", start: "abc", col: 1, keys: ">>", want: "  abc", wantCol: 1},
+
+		// Independent oracle-audit regressions.
+		{name: "oracle dd last line two", start: "a\nb", row: 1, keys: "dd", want: "a"},
+		{name: "oracle dd last line three", start: "a\nb\nc", row: 2, keys: "dd", want: "a\nb", wantRow: 1},
+		{name: "oracle counted dd last line two", start: "a\nb\nc", row: 2, keys: "2dd", want: "a\nb\nc", wantRow: 2},
+		{name: "oracle counted dd last line three", start: "a\nb\nc", row: 2, keys: "3dd", want: "a\nb\nc", wantRow: 2},
+		{name: "oracle outer paren after closed inner", start: "f(a,\n (b),\n c)", row: 2, col: 2, keys: "ci(X<Esc>", want: "f(X)", wantCol: 2},
+		{name: "oracle quote between pairs", start: `"a" "b"`, col: 3, keys: `ci"X<Esc>`, want: `"a"X"b"`, wantCol: 3},
+		{name: "oracle brackets ignore quoted close", start: `x = ["a]", 1]`, col: 6, keys: "ci[Q<Esc>", want: "x = [Q]", wantCol: 5},
+		{name: "oracle dot after insert arrow", start: "ab\ncd", keys: "ix<Down>y<Esc>j.", want: "xab\ncyyd", wantRow: 1, wantCol: 1},
+		{name: "oracle undo insert cursor", start: "abc", keys: "A12<Esc>u", want: "abc", wantCol: 2},
+		{name: "oracle undo redo delete cursor", start: "abc def", keys: "xwxuu<C-r>", want: "bc def"},
+		{name: "oracle undo redo join cursor", start: "a\nb", keys: "Ju<C-r>", want: "a b"},
+		{name: "oracle three put before cursor", start: "abcd", col: 1, keys: "x3P", want: "abbbcd", wantCol: 3},
+		{name: "oracle multiline inner brace cursor", start: "{\n  a\n}", row: 1, col: 1, keys: "di{", want: "{\n}", wantRow: 1},
+		{name: "oracle multiline inner bracket cursor", start: "[\n  a\n]", row: 1, col: 1, keys: "di[", want: "[\n]", wantRow: 1},
+		{name: "oracle replace newline empty line", keys: "r<CR>", want: ""},
+		{name: "oracle insert arrow at eol keeps repeat", start: "👩‍💻 dev\né界", row: 1, keys: "Ax<Right>y<Esc>.", want: "👩‍💻 dev\né界xyxy", wantRow: 1, wantCol: 5},
 	}
 
 	for n := 1; n <= 20; n++ {

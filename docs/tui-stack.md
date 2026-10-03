@@ -94,8 +94,12 @@ the [design-language key map](design-language.md#key-map).
 
 Vim semantics are checked by the opt-in `TestDifferentialNvim` oracle. Set
 `VIMTEXT_NVIM=1` to compare the eligible keystroke corpus and 500 seeded,
-3–12-key generated cases with `nvim --clean --headless -n`; the harness uses
-two-space `expandtab` settings to match `Options.TabText`'s documented default.
+3–12-key generated cases with `nvim --clean --headless -n`. Each case runs in
+an isolated process with a per-case timeout, cleared registers and search
+state, and the original keys fed in typed mode; text, grapheme cursor position,
+and final mode are compared. The harness pins corpus inclusion and exclusion
+counts, asserts generated command/operator coverage, and uses two-space
+`expandtab` settings to match `Options.TabText`'s documented default.
 The sole intentional compatibility deviation is search syntax: vimtext treats
 the pattern literally, while Nvim treats it as a regular expression. The
 allowlist is kept in `internal/tui/vimtext/deviations.go`.

@@ -16,7 +16,10 @@ func (m *Model) beginChange(msg tea.Msg) {
 	s := m.snap()
 	m.changeStart = &s
 	m.changeKeys = nil
-	if msg != nil {
+	if m.mode == Insert {
+		m.changeKeys = append(m.changeKeys, runeKey('i'))
+		m.insertBreak = false
+	} else if msg != nil {
 		m.changeKeys = append(m.changeKeys, msg)
 	}
 }
@@ -81,7 +84,13 @@ func appendBounded[T any](items []T, item T) []T {
 	return append(items, item)
 }
 
-func (m *Model) pushUndo(s snapshot) { m.undo = appendBounded(m.undo, s) }
+func (m *Model) pushUndo(s snapshot) {
+	if !s.hasRedoPos {
+		s.redoPos = position{m.row, m.col}
+		s.hasRedoPos = true
+	}
+	m.undo = appendBounded(m.undo, s)
+}
 func (m *Model) pushRedo(s snapshot) { m.redo = appendBounded(m.redo, s) }
 
 func (m *Model) insertText(s string) bool {
@@ -231,6 +240,12 @@ func sameWordClass(a, b string, big bool) bool {
 	if big {
 		return !isSpaceCluster(a) && !isSpaceCluster(b)
 	}
+	ar, _ := utf8.DecodeRuneInString(a)
+	br, _ := utf8.DecodeRuneInString(b)
+	aHan, bHan := unicode.In(ar, unicode.Han), unicode.In(br, unicode.Han)
+	if aHan || bHan {
+		return aHan == bHan
+	}
 	return isSmallWord(a) == isSmallWord(b) && isSpaceCluster(a) == isSpaceCluster(b)
 }
 
@@ -253,7 +268,11 @@ func (m *Model) moveVertical(delta int) {
 	if m.opts.SingleLine {
 		return
 	}
-	m.row = min(max(0, m.row+delta), len(m.lines)-1)
+	next := min(max(0, m.row+delta), len(m.lines)-1)
+	if next == m.row {
+		return
+	}
+	m.row = next
 	switch m.preferred {
 	case -1:
 		m.col = max(0, m.lineLen(m.row)-boolInt(m.mode == Insert))
@@ -508,9 +527,9 @@ func (m *Model) findChar(kind byte, target string, count int) bool {
 	return true
 }
 
-func (m *Model) repeatFind(reverse bool, count int) {
+func (m *Model) repeatFind(reverse bool, count int) bool {
 	if m.lastFind == 0 {
-		return
+		return false
 	}
 	kind := m.lastFind
 	if reverse {
@@ -522,5 +541,5 @@ func (m *Model) repeatFind(reverse bool, count int) {
 	case 'T':
 		m.col = max(0, m.col-1)
 	}
-	m.findChar(kind, m.lastFindKey, count)
+	return m.findChar(kind, m.lastFindKey, count)
 }
