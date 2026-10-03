@@ -6,15 +6,93 @@ import (
 	"testing"
 
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/ui"
 )
+
+func TestCleanURLPath(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{"leading template with path and query", "{{baseUrl}}/a/b?x={{t}}", "/a/b"},
+		{"scheme with userinfo host path query fragment", "https://user:pass@host.example.test/p?q=1#f", "/p"},
+		{"schemeless host path with query", "host.example.test/p?q", "/p"},
+		{"localhost with port and path", "localhost:8080/p", "/p"},
+		{"localhost schemeless path", "localhost/p", "/p"},
+		{"template only with query", "{{baseUrl}}?token=X", "/"},
+		{"template only", "{{baseUrl}}", "/"},
+		{"empty input", "", ""},
+		{"whitespace input", "   ", ""},
+		{"path with template variable", "/p/{{id}}/x", "/p/{{id}}/x"},
+		{"schemeless host multi-segment path", "host.example.test/p/q?x=1", "/p/q"},
+		{"schemeless host only", "host.example.test", "/"},
+		{"localhost port only", "localhost:8080", "/"},
+		{"template with ? inside variable", "{{base}}/p/{{a?b}}/c?x=1", "/p/{{a?b}}/c"},
+		{"template with # inside variable", "{{base}}/p/{{a#b}}/c#frag", "/p/{{a#b}}/c"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := cleanURLPath(tc.raw)
+			if got != tc.want {
+				t.Errorf("cleanURLPath(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSanitizeTextWithEmbeddedESC(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"ANSI color escapes", "\x1b[31mCharge\x1b[0m", "Charge"},
+		{"OSC title sequence", "\x1b]0;title\x07Clean", "Clean"},
+		{"C0 control characters", "User\x00Name\r\n", "UserName"},
+		{"ANSI clear escape", "Bad\x1b[0mName", "BadName"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeText(tc.in)
+			if got != tc.want {
+				t.Errorf("sanitizeText(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+
+	// Verify sanitized text behaves properly inside switcher
+	req := model.NewRequest("\x1b[31mDangerous\x1b[0m Name", "GET", "https://api.test/\x1b[32musers\x1b[0m")
+	ws := &model.Workspace{
+		ID:   "ws-esc",
+		Name: "ESC Test",
+		Collections: []*model.Collection{
+			{ID: "c1", Name: "\x1b[34mFolder\x1b[0m", Items: []model.Item{req}},
+		},
+	}
+	hh := newHarness(t, ws, 80, 24)
+	hh.msg(OpenSwitcherMsg{})
+	screen := hh.screen()
+	if strings.Contains(screen, "\x1b") {
+		t.Fatalf("rendered switcher contains escape sequences: %q", screen)
+	}
+	if !strings.Contains(screen, "Dangerous Name") {
+		t.Fatalf("rendered switcher missing stripped name: %q", screen)
+	}
+	if !strings.Contains(screen, "/users") {
+		t.Fatalf("rendered switcher missing stripped path: %q", screen)
+	}
+}
 
 func TestSwitcherRanking(t *testing.T) {
 	req1 := model.NewRequest("List invoices", "GET", "https://api.test/v1/invoices")
 	req2 := model.NewRequest("Pay invoice", "POST", "https://api.test/v1/invoices/pay")
 	req3 := model.NewRequest("Cancel plan", "DELETE", "https://api.test/v1/plans/cancel")
 	req4 := &model.Request{ID: model.NewID(), Name: "Stream events", Kind: model.KindWebSocket, URL: model.ParseURL("ws://api.test/events")}
-	req5 := model.NewRequest("Create customer", "PUT", "https://api.test/v2/customers")
-	req6 := model.NewRequest("Find customer", "GET", "https://api.test/v2/customers/find")
+	req5 := model.NewRequest("Get customer", "GET", "https://api.test/v1/customer")
+	req6 := model.NewRequest("Put customer", "PUT", "https://api.test/v1/customer")
 
 	ws := &model.Workspace{
 		ID:   "ws1",
@@ -84,7 +162,7 @@ func TestSwitcherRanking(t *testing.T) {
 		{
 			name:      "matches by folder name",
 			query:     "Invoices",
-			wantTopID: req1.ID, // req1 and req2 are under Invoices
+			wantTopID: req1.ID,
 		},
 		{
 			name:      "MRU acts as tie-breaker for equal scores",
@@ -160,6 +238,148 @@ func TestSwitcherOpenBehavior(t *testing.T) {
 	}
 	if len(hh.a.recent) == 0 || hh.a.recent[0] != ref.Request.ID {
 		t.Errorf("recent[0] = %v, want %v", hh.a.recent, ref.Request.ID)
+	}
+}
+
+func TestSwitcherTreeCursorMovesLeaveMRUUnchanged(t *testing.T) {
+	hh := newHarness(t, demo(), 80, 24)
+	if len(hh.a.recent) != 0 {
+		t.Fatalf("initial recent length = %d, want 0", len(hh.a.recent))
+	}
+
+	// Move cursor in tree
+	hh.keys("down", "down", "down", "up")
+	if len(hh.a.recent) != 0 {
+		t.Fatalf("tree cursor movement must leave MRU unchanged, got %v", hh.a.recent)
+	}
+
+	// Pressing Enter opens the request and updates MRU
+	hh.keys("enter")
+	if len(hh.a.recent) != 1 {
+		t.Fatalf("explicit open with Enter must record MRU, got %v", hh.a.recent)
+	}
+}
+
+func TestSwitcherLenientLoadProblemsExcluded(t *testing.T) {
+	be := newFake(demo())
+	be.problems = append(be.problems, brokenFile(be.root, "collections/payments/charges/broken.yaml", "syntax error"))
+	hh := newHarnessWith(t, be, 80, 24)
+
+	hh.msg(OpenSwitcherMsg{})
+	sw, ok := hh.a.ov.(*switcherOverlay)
+	if !ok {
+		t.Fatalf("expected *switcherOverlay, got %T", hh.a.ov)
+	}
+	for _, it := range sw.all {
+		if strings.Contains(it.name, "broken") || strings.Contains(it.urlPath, "broken") {
+			t.Fatalf("broken file request appeared in switcher items: %+v", it)
+		}
+	}
+}
+
+func TestSwitcherDeletedRequestPrunedFromMRU(t *testing.T) {
+	hh := newHarness(t, demo(), 80, 24)
+	deletedID := model.ID("deleted-request-id-999")
+	validID := hh.a.ws.Collections[0].Requests()[0].ID
+
+	hh.a.recent = []model.ID{deletedID, validID}
+
+	// Opening switcher must prune deleted ID
+	hh.msg(OpenSwitcherMsg{})
+	if containsID(hh.a.recent, deletedID) {
+		t.Fatalf("deleted ID not pruned from recent: %v", hh.a.recent)
+	}
+	if !containsID(hh.a.recent, validID) {
+		t.Fatalf("valid ID unexpectedly removed from recent: %v", hh.a.recent)
+	}
+
+	// recordRecent with a non-existent ID also ignores/prunes it
+	hh.a.recordRecent(deletedID)
+	if containsID(hh.a.recent, deletedID) {
+		t.Fatalf("recordRecent accepted non-existent ID: %v", hh.a.recent)
+	}
+}
+
+func TestSwitcherScrolling(t *testing.T) {
+	// Create workspace with 30 requests
+	var reqs []model.Item
+	for i := 1; i <= 30; i++ {
+		reqs = append(reqs, model.NewRequest(fmt.Sprintf("Request %02d", i), "GET", fmt.Sprintf("/v1/items/%02d", i)))
+	}
+	ws := &model.Workspace{
+		ID:   "ws-scroll",
+		Name: "Scroll Test",
+		Collections: []*model.Collection{
+			{ID: "c1", Name: "Items", Items: reqs},
+		},
+	}
+
+	hh := newHarness(t, ws, 80, 15) // small height so lastPage is small
+	hh.msg(OpenSwitcherMsg{})
+	sw, ok := hh.a.ov.(*switcherOverlay)
+	if !ok {
+		t.Fatalf("expected *switcherOverlay, got %T", hh.a.ov)
+	}
+
+	// Move down past page boundary
+	for range 20 {
+		hh.keys("down")
+	}
+	if sw.cursor != 20 {
+		t.Fatalf("cursor = %d, want 20", sw.cursor)
+	}
+	if sw.cursor < sw.top || sw.cursor >= sw.top+sw.lastPage {
+		t.Fatalf("cursor %d out of visible window [%d, %d)", sw.cursor, sw.top, sw.top+sw.lastPage)
+	}
+
+	// Test PageUp
+	hh.keys("pgup")
+	if sw.cursor < sw.top || sw.cursor >= sw.top+sw.lastPage {
+		t.Fatalf("after pgup, cursor %d out of visible window [%d, %d)", sw.cursor, sw.top, sw.top+sw.lastPage)
+	}
+
+	// Test PageDown
+	hh.keys("pgdown")
+	if sw.cursor < sw.top || sw.cursor >= sw.top+sw.lastPage {
+		t.Fatalf("after pgdown, cursor %d out of visible window [%d, %d)", sw.cursor, sw.top, sw.top+sw.lastPage)
+	}
+
+	// Render view should not panic and should stay bounded
+	view := sw.view(hh.a, 80, 15)
+	lines := strings.Split(view, "\n")
+	if len(lines) > 15 {
+		t.Fatalf("rendered lines count %d exceeds height 15", len(lines))
+	}
+}
+
+func TestSwitcherLongNameTruncatesNoWrap(t *testing.T) {
+	longName := "Very Long Request Name That Exceeds The Width Of A Standard Eighty Column Terminal By Far And Should Not Wrap Under Any Circumstances"
+	longFolder := "Deeply › Nested › Folder › Hierarchy › With › Many › Levels › Exceeding › Column › Limits"
+	longPath := "/v1/api/super/long/nested/path/resource/with/identifiers/and/subresources/never/wrap"
+
+	req := model.NewRequest(longName, "POST", "https://api.test"+longPath)
+	ws := &model.Workspace{
+		ID:   "ws-long",
+		Name: "Long Test",
+		Collections: []*model.Collection{
+			{ID: "c1", Name: longFolder, Items: []model.Item{req}},
+		},
+	}
+
+	hh := newHarness(t, ws, 80, 24)
+	hh.msg(OpenSwitcherMsg{})
+	sw, ok := hh.a.ov.(*switcherOverlay)
+	if !ok {
+		t.Fatalf("expected *switcherOverlay, got %T", hh.a.ov)
+	}
+
+	view := sw.view(hh.a, 80, 24)
+	lines := strings.Split(view, "\n")
+	for i, l := range lines {
+		w := ui.Width(l)
+		if w > 80 {
+			t.Errorf("line %d width = %d > 80: %q", i, w, l)
+		}
 	}
 }
 
@@ -297,7 +517,7 @@ func TestSwitcherEmptyWorkspace(t *testing.T) {
 		t.Run(mode.name, func(t *testing.T) {
 			hh := newHarness(t, ws, 80, 24, mode.opt)
 			hh.msg(OpenSwitcherMsg{})
-			hh.mustHave("No requests yet. Space a creates one.")
+			hh.mustHave("No requests yet. Press Esc, then n to create one.")
 			hh.mustHave("0 of 0")
 		})
 	}

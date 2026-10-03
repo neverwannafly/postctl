@@ -1,83 +1,167 @@
 package tui
 
 import (
-	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/ui"
 )
 
 // cleanURLPath extracts the URL path from a raw URL string, stripping
-// scheme, host, userinfo, query parameters and fragments.
+// scheme, authority/host (including userinfo and port), query parameters and fragments.
+// It is template-aware: '?' and '#' inside {{...}} are not treated as delimiters.
 func cleanURLPath(raw string) string {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return ""
 	}
-	base, _, _ := strings.Cut(raw, "?")
-	base, _, _ = strings.Cut(base, "#")
-	base = strings.TrimSpace(base)
+
+	// 1. Template-aware cutoff for query ('?') and fragment ('#').
+	cutoff := len(raw)
+	inTemplate := false
+	for i := 0; i < len(raw); i++ {
+		if !inTemplate && i+1 < len(raw) && raw[i] == '{' && raw[i+1] == '{' {
+			inTemplate = true
+			i++
+			continue
+		}
+		if inTemplate && i+1 < len(raw) && raw[i] == '}' && raw[i+1] == '}' {
+			inTemplate = false
+			i++
+			continue
+		}
+		if !inTemplate && (raw[i] == '?' || raw[i] == '#') {
+			cutoff = i
+			break
+		}
+	}
+	base := strings.TrimSpace(raw[:cutoff])
 	if base == "" {
 		return ""
 	}
 
-	// Scheme (e.g. http://, https://, ws://, wss://)
+	// 2. Scheme (e.g. http://, https://, ws://, wss://).
 	if i := strings.Index(base, "://"); i >= 0 {
 		rest := base[i+3:]
-		if slash := strings.IndexByte(rest, '/'); slash >= 0 {
+		slash := findFirstSlash(rest)
+		if slash >= 0 {
 			return rest[slash:]
 		}
 		return "/"
 	}
 
-	// Template host (e.g. {{baseUrl}}/path or {{host}})
+	// 3. Scheme-less:
+	// If it starts with '/', it is already a path.
+	if strings.HasPrefix(base, "/") {
+		return base
+	}
+
+	// Leading template {{...}} represents a host/base variable.
 	if strings.HasPrefix(base, "{{") {
-		if end := strings.Index(base, "}}"); end >= 0 {
+		end := strings.Index(base, "}}")
+		if end >= 0 {
 			rest := base[end+2:]
-			if slash := strings.IndexByte(rest, '/'); slash >= 0 {
+			slash := findFirstSlash(rest)
+			if slash >= 0 {
 				return rest[slash:]
 			}
 			return "/"
 		}
 	}
 
-	// Leading slash is already a path
-	if strings.HasPrefix(base, "/") {
-		return base
+	// First segment before '/': check if it represents an authority (host[:port]).
+	slash := findFirstSlash(base)
+	var firstSeg string
+	if slash >= 0 {
+		firstSeg = base[:slash]
+	} else {
+		firstSeg = base
 	}
 
-	// Slash present: if the segment before slash looks like a host (domain, port, localhost), strip it.
-	if slash := strings.IndexByte(base, '/'); slash >= 0 {
-		head := base[:slash]
-		if strings.Contains(head, ".") || strings.Contains(head, ":") || head == "localhost" {
+	if isAuthority(firstSeg) {
+		if slash >= 0 {
 			return base[slash:]
 		}
-		return "/" + base
-	}
-
-	// No slash: if it looks like a host (domain, port, localhost), path is /
-	if strings.Contains(base, ".") || strings.Contains(base, ":") || base == "localhost" {
 		return "/"
 	}
 
 	return "/" + base
 }
 
-// recordRecent records an opened request ID in the MRU list (depth 50, newest first, deduplicated).
+// findFirstSlash returns the index of the first '/' outside of {{...}} templates.
+func findFirstSlash(s string) int {
+	inTemplate := false
+	for i := 0; i < len(s); i++ {
+		if !inTemplate && i+1 < len(s) && s[i] == '{' && s[i+1] == '{' {
+			inTemplate = true
+			i++
+			continue
+		}
+		if inTemplate && i+1 < len(s) && s[i] == '}' && s[i+1] == '}' {
+			inTemplate = false
+			i++
+			continue
+		}
+		if !inTemplate && s[i] == '/' {
+			return i
+		}
+	}
+	return -1
+}
+
+// isAuthority reports whether a leading segment looks like a host[:port].
+func isAuthority(seg string) bool {
+	if seg == "" {
+		return false
+	}
+	if seg == "localhost" || strings.HasPrefix(seg, "localhost:") {
+		return true
+	}
+	return strings.Contains(seg, ".") || strings.Contains(seg, ":")
+}
+
+// sanitizeText strips ANSI escape sequences and C0/C1 control characters.
+func sanitizeText(s string) string {
+	s = ansi.Strip(s)
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if !unicode.IsControl(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// recordRecent records an opened request ID in the MRU list (depth 50, newest first, deduplicated),
+// pruning any IDs that are no longer in the workspace.
 func (a *app) recordRecent(id model.ID) {
 	if id == "" {
 		return
 	}
+	if a.ws != nil {
+		if _, req := findRequest(a.ws, id); req == nil {
+			return
+		}
+	}
 	out := make([]model.ID, 0, min(len(a.recent)+1, 50))
 	out = append(out, id)
 	for _, r := range a.recent {
-		if r != id && len(out) < 50 {
-			out = append(out, r)
+		if r == id || len(out) >= 50 {
+			continue
 		}
+		if a.ws != nil {
+			if _, req := findRequest(a.ws, r); req == nil {
+				continue
+			}
+		}
+		out = append(out, r)
 	}
 	a.recent = out
 }
@@ -91,11 +175,47 @@ func (a *app) openSwitcher() tea.Cmd {
 
 // switcherItem is one request candidate in the switcher.
 type switcherItem struct {
-	id      model.ID
-	name    string
-	method  string
-	folder  string
-	urlPath string
+	id          model.ID
+	name        string
+	method      string
+	folder      string
+	urlPath     string
+	searchLabel string
+	nameLen     int
+	folderStart int
+	folderLen   int
+	methodStart int
+	methodLen   int
+	pathStart   int
+	pathLen     int
+}
+
+func newSwitcherItem(id model.ID, name, method, folder, urlPath string) switcherItem {
+	name = sanitizeText(name)
+	folder = sanitizeText(folder)
+	urlPath = sanitizeText(urlPath)
+
+	nameR := []rune(name)
+	folderR := []rune(folder)
+	methodR := []rune(method)
+	pathR := []rune(urlPath)
+
+	it := switcherItem{
+		id:          id,
+		name:        name,
+		method:      method,
+		folder:      folder,
+		urlPath:     urlPath,
+		nameLen:     len(nameR),
+		folderStart: len(nameR) + 1,
+		folderLen:   len(folderR),
+		methodStart: len(nameR) + 1 + len(folderR) + 1,
+		methodLen:   len(methodR),
+		pathStart:   len(nameR) + 1 + len(folderR) + 1 + len(methodR) + 1,
+		pathLen:     len(pathR),
+		searchLabel: name + " " + folder + " " + method + " " + urlPath,
+	}
+	return it
 }
 
 // switcherMatch is one scored result in the switcher.
@@ -154,19 +274,22 @@ func newSwitcherOverlay(a *app) (*switcherOverlay, tea.Cmd) {
 				if folder == "" && c != nil {
 					folder = c.Name
 				}
-				item := switcherItem{
-					id:      r.ID,
-					name:    r.Name,
-					method:  methodBadge(r),
-					folder:  folder,
-					urlPath: cleanURLPath(r.URL.Raw),
-				}
+				item := newSwitcherItem(r.ID, r.Name, methodBadge(r), folder, cleanURLPath(r.URL.Raw))
 				treeItems = append(treeItems, item)
 				itemByID[r.ID] = item
 				return nil
 			})
 		}
 	}
+
+	// Prune IDs no longer in workspace from MRU
+	var validRecent []model.ID
+	for _, id := range a.recent {
+		if _, ok := itemByID[id]; ok {
+			validRecent = append(validRecent, id)
+		}
+	}
+	a.recent = validRecent
 
 	var all []switcherItem
 	seen := make(map[model.ID]bool)
@@ -206,87 +329,35 @@ func (s *switcherOverlay) refilter() {
 		return
 	}
 
-	var matches []switcherMatch
-	for i, item := range s.all {
-		m, ok := matchSwitcherItem(q, item)
-		if ok {
-			m.index = i
-			matches = append(matches, m)
-		}
-	}
-	sort.SliceStable(matches, func(a, b int) bool {
-		return matches[a].score > matches[b].score
-	})
-	s.res = matches
-	s.cursor, s.top = 0, 0
-}
+	rankedList := rankBy(q, len(s.all), func(i int) string {
+		return s.all[i].searchLabel
+	}, 0)
 
-func matchSwitcherItem(q string, item switcherItem) (switcherMatch, bool) {
-	sName, posName, okName := fuzzyMatch(q, item.name)
-	sMethod, posMethod, okMethod := fuzzyMatch(q, item.method)
-	sFolder, posFolder, okFolder := fuzzyMatch(q, item.folder)
-	sPath, posPath, okPath := fuzzyMatch(q, item.urlPath)
-
-	comb := item.method + " " + item.name + " " + item.folder + " " + item.urlPath
-	sComb, _, okComb := fuzzyMatch(q, comb)
-
-	if !okName && !okMethod && !okFolder && !okPath && !okComb {
-		return switcherMatch{}, false
-	}
-
-	bestScore := -1 << 30
-	if okName && sName > bestScore {
-		bestScore = sName
-	}
-	if okMethod && sMethod > bestScore {
-		bestScore = sMethod
-	}
-	if okFolder && sFolder > bestScore {
-		bestScore = sFolder
-	}
-	if okPath && sPath > bestScore {
-		bestScore = sPath
-	}
-	if okComb && sComb > bestScore {
-		bestScore = sComb
-	}
-
-	// For multi-word queries, also match words to provide per-field highlights
-	if !okName || !okMethod || !okFolder || !okPath {
-		words := strings.Fields(q)
-		if len(words) > 1 {
-			for _, w := range words {
-				if len(posName) == 0 {
-					if _, p, ok := fuzzyMatch(w, item.name); ok {
-						posName = p
-					}
-				}
-				if len(posMethod) == 0 {
-					if _, p, ok := fuzzyMatch(w, item.method); ok {
-						posMethod = p
-					}
-				}
-				if len(posFolder) == 0 {
-					if _, p, ok := fuzzyMatch(w, item.folder); ok {
-						posFolder = p
-					}
-				}
-				if len(posPath) == 0 {
-					if _, p, ok := fuzzyMatch(w, item.urlPath); ok {
-						posPath = p
-					}
-				}
+	s.res = make([]switcherMatch, len(rankedList))
+	for idx, r := range rankedList {
+		it := s.all[r.index]
+		var posName, posFolder, posMethod, posPath []int
+		for _, p := range r.pos {
+			if p < it.nameLen {
+				posName = append(posName, p)
+			} else if p >= it.folderStart && p < it.folderStart+it.folderLen {
+				posFolder = append(posFolder, p-it.folderStart)
+			} else if p >= it.methodStart && p < it.methodStart+it.methodLen {
+				posMethod = append(posMethod, p-it.methodStart)
+			} else if p >= it.pathStart && p < it.pathStart+it.pathLen {
+				posPath = append(posPath, p-it.pathStart)
 			}
 		}
+		s.res[idx] = switcherMatch{
+			index:     r.index,
+			score:     r.score,
+			posName:   posName,
+			posFolder: posFolder,
+			posMethod: posMethod,
+			posPath:   posPath,
+		}
 	}
-
-	return switcherMatch{
-		score:     bestScore,
-		posName:   posName,
-		posMethod: posMethod,
-		posFolder: posFolder,
-		posPath:   posPath,
-	}, true
+	s.cursor, s.top = 0, 0
 }
 
 func (s *switcherOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
@@ -338,7 +409,7 @@ func (s *switcherOverlay) openItem(a *app, it switcherItem) tea.Cmd {
 		return a.toastWarn("That request no longer exists.")
 	}
 	a.layoutPanes()
-	return tea.Batch(a.syncSelection(true), a.setFocus(SlotRequest))
+	return a.syncSelection(true)
 }
 
 func (s *switcherOverlay) scroll() {
@@ -369,7 +440,7 @@ func (s *switcherOverlay) view(a *app, w, h int) string {
 
 	lines := []string{topLine, s.input.View(), t.Rule(w)}
 	if len(s.res) == 0 {
-		msg := "No requests yet. Space a creates one."
+		msg := "No requests yet. Press Esc, then n to create one."
 		if strings.TrimSpace(s.input.Value()) != "" {
 			msg = "No matches for \"" + strings.TrimSpace(s.input.Value()) + "\"."
 		}
