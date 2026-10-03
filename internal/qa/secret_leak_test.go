@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/engine"
@@ -20,6 +21,7 @@ import (
 	"github.com/shubham/postctl/internal/report"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/diffview"
 	tuihistory "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
 	"github.com/shubham/postctl/internal/tui/response"
@@ -80,6 +82,29 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	folder := model.NewFolder("Folder secrets")
 	folder.Variables = []model.Variable{{Key: "folderToken", Value: folderSentinel, Type: model.VarSecret}}
 	folder.Items = []model.Item{folderRequest}
+	literal := model.NewRequest("Literal template", http.MethodPost,
+		"https://user:"+sentinel+"@example.test/literal?api_key="+sentinel+"&x="+sentinel)
+	literal.Headers = []model.KV{
+		{Key: "Authorization", Value: "Bearer " + sentinel},
+		{Key: "X-Plain", Value: "pre-" + sentinel + "-post"},
+	}
+	literal.Body = model.Body{
+		Mode: model.BodyRaw,
+		Raw:  `{"password":"` + sentinel + `"}`,
+	}
+	literal.Scripts.PreRequest = &model.Script{Source: `pm.request.headers.add({key: "X-Script", value: pm.environment.get("accessToken")});`}
+	literalURLEncoded := model.NewRequest("Literal urlencoded template", http.MethodPost, server.URL+"/literal-urlencoded")
+	literalURLEncoded.Body = model.Body{
+		Mode:       model.BodyURLEncoded,
+		URLEncoded: []model.KV{{Key: "note", Value: sentinel}},
+	}
+	literalFormData := model.NewRequest("Literal form-data template", http.MethodPost, server.URL+"/literal-form-data")
+	literalFormData.Body = model.Body{
+		Mode: model.BodyFormData,
+		FormData: []model.FormPart{{
+			Key: "comment", Value: sentinel,
+		}},
+	}
 	coll := model.NewCollection("Secrets")
 	coll.Items = []model.Item{bearer, oauth, folder}
 	ws.Collections = []*model.Collection{coll}
@@ -93,6 +118,8 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	}
 	coll, env = ws.Collections[0], ws.Environments[0]
 	bearer, oauth, folderRequest = coll.Requests()[0], coll.Requests()[1], coll.Requests()[2]
+	// Literal secrets stay in memory only so on-disk fixtures never hold the sentinel.
+	coll.Items = append(coll.Items, literal, literalURLEncoded, literalFormData)
 
 	log, err := history.Open(filepath.Join(st.StateDir(), "history"), history.Options{})
 	if err != nil {
@@ -122,6 +149,27 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 
 	folderOutcome, err := eng.Send(context.Background(), engine.SendInput{
 		Collection: coll, Request: folderRequest, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	literalOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: literal, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if literalOutcome.HistoryID == "" {
+		t.Fatal("literal send did not record history")
+	}
+	urlencodedOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: literalURLEncoded, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	formDataOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: literalFormData, Environment: env,
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -167,6 +215,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if entry.Template == nil {
+		t.Fatal("history entry has no restore template")
+	}
 	curl, err := tuihistory.DefaultCurl(context.Background(), entry)
 	if err != nil {
 		t.Fatal(err)
@@ -196,6 +247,33 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	frames := renderLeakSweepFrames(t, ws, env, coll, oauth, bearerOutcome, log)
 	for name, frame := range renderLeakSweepFrames(t, ws, env, coll, folderRequest, folderOutcome, log) {
 		frames["folder "+name] = frame
+	}
+	literalEntry, err := log.Get(literalOutcome.HistoryID)
+	if err != nil || literalEntry.Template == nil {
+		t.Fatal("literal history entry missing template")
+	}
+	urlencodedEntry, err := log.Get(urlencodedOutcome.HistoryID)
+	if err != nil || urlencodedEntry.Template == nil ||
+		len(urlencodedEntry.Template.BodyURLEncoded) != 1 ||
+		!urlencodedEntry.Template.BodyURLEncoded[0].Masked {
+		t.Fatal("literal urlencoded history template was not masked")
+	}
+	formDataEntry, err := log.Get(formDataOutcome.HistoryID)
+	if err != nil || formDataEntry.Template == nil ||
+		len(formDataEntry.Template.BodyFormData) != 1 ||
+		!formDataEntry.Template.BodyFormData[0].ValueMasked {
+		t.Fatal("literal form-data history template was not masked")
+	}
+	tmplRaw, _ := json.Marshal(literalEntry.Template)
+	assertAbsent(t, sentinel, "literal template JSON", tmplRaw)
+
+	restoreFrame, diffFrame := renderRestoreAndDiffFrames(t, ws, env, coll, bearer, entries, log)
+	frames["history restore"] = restoreFrame
+	frames["history diff"] = diffFrame
+	frames["literal restore"] = renderRestoreLiteralFrame(t, ws, coll, bearer, literalEntry)
+	coll.Items = coll.Items[:len(coll.Items)-1]
+	if err := persistRestoredRequest(t, st, ws, coll, bearer, literalEntry.Template); err != nil {
+		t.Fatal(err)
 	}
 
 	shell := tui.New(tui.Options{
@@ -234,6 +312,7 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 			}
 		}
 		assertWorkspaceFilesClean(t, root, secret)
+		assertMaskGlyphsAbsent(t, root)
 	}
 }
 
@@ -345,6 +424,51 @@ func renderLeakSweepFrames(
 	return frames
 }
 
+func renderRestoreAndDiffFrames(
+	t *testing.T,
+	ws *model.Workspace,
+	env *model.Environment,
+	coll *model.Collection,
+	req *model.Request,
+	entries []history.Entry,
+	log *history.Log,
+) (restore, diff string) {
+	t.Helper()
+	theme := ui.NewTheme(true, true, false)
+	paneEnv := tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}
+	full, err := log.Get(entries[0].ID)
+	if err != nil || full.Template == nil {
+		t.Fatal("need history entry with template")
+	}
+	rp := request.New(paneEnv, request.Deps{})
+	rp.SetSize(140, 40)
+	_, _ = rp.Update(tui.WorkspaceReloadedMsg{Workspace: ws})
+	_, _ = rp.Update(tui.EnvironmentChangedMsg{Env: env})
+	_, _ = rp.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: req, Path: []string{coll.Name, req.Name}}})
+	_, _ = rp.Update(tui.ApplyRequestPatchMsg{RequestID: req.ID, Template: *full.Template})
+	restore = rp.View()
+	if len(entries) < 2 {
+		return restore, ""
+	}
+	left, _ := log.Get(entries[1].ID)
+	right := full
+	dm := diffview.New(theme,
+		diffview.SideSummary{Label: "Marked", Status: "200"},
+		diffview.SideSummary{Label: "Current", Status: "200"},
+		responseBodyForDiff(left), responseBodyForDiff(right),
+	)
+	dm.SetSize(140, 40)
+	diff = dm.View()
+	return restore, diff
+}
+
+func responseBodyForDiff(e *history.Entry) string {
+	if e == nil || e.Response == nil {
+		return ""
+	}
+	return e.Response.Body
+}
+
 func assertWorkspaceFilesClean(t *testing.T, root, sentinel string) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -374,6 +498,77 @@ func assertAbsent(t *testing.T, sentinel, artifact string, raw []byte) {
 	if strings.Contains(string(raw), sentinel) {
 		t.Errorf("secret leaked to %s", artifact)
 	}
+}
+
+func assertMaskGlyphsAbsent(t *testing.T, root string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(raw)
+		if strings.Contains(path, filepath.Join(".postctl", "history")) {
+			return nil
+		}
+		if strings.Contains(text, history.Mask) || strings.Contains(text, "****") {
+			rel, _ := filepath.Rel(root, path)
+			t.Errorf("mask glyph persisted in workspace file %s", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func renderRestoreLiteralFrame(
+	t *testing.T,
+	ws *model.Workspace,
+	coll *model.Collection,
+	req *model.Request,
+	entry *history.Entry,
+) string {
+	t.Helper()
+	theme := ui.NewTheme(true, true, false)
+	paneEnv := tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}
+	rp := request.New(paneEnv, request.Deps{})
+	rp.SetSize(140, 40)
+	_, _ = rp.Update(tui.WorkspaceReloadedMsg{Workspace: ws})
+	_, cmd := rp.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: req, Path: []string{coll.Name, req.Name}}})
+	if cmd != nil {
+		_, _ = rp.Update(cmd())
+	}
+	_, cmd = rp.Update(tui.ApplyRequestPatchMsg{RequestID: req.ID, Template: *entry.Template})
+	if cmd != nil {
+		_, _ = rp.Update(cmd())
+	}
+	return rp.View()
+}
+
+func persistRestoredRequest(
+	t *testing.T,
+	st *store.Store,
+	ws *model.Workspace,
+	coll *model.Collection,
+	req *model.Request,
+	tmpl *history.RequestTemplate,
+) error {
+	t.Helper()
+	theme := ui.NewTheme(true, true, false)
+	rp := request.New(tui.PaneEnv{Theme: theme}, request.Deps{
+		After: func(_ time.Duration, msg tea.Msg) tea.Cmd { return func() tea.Msg { return msg } },
+	})
+	_, _ = rp.Update(tui.WorkspaceReloadedMsg{Workspace: ws})
+	_, _ = rp.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: req, Path: []string{coll.Name, req.Name}}})
+	_, cmd := rp.Update(tui.ApplyRequestPatchMsg{RequestID: req.ID, Template: *tmpl})
+	for cmd != nil {
+		_, cmd = rp.Update(cmd())
+	}
+	return st.SaveRequest(context.Background(), coll, req.ID)
 }
 
 type sweepBackend struct {

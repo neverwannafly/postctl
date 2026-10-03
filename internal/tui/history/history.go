@@ -13,6 +13,7 @@ import (
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/diffview"
 	"github.com/shubham/postctl/internal/tui/response"
 	"github.com/shubham/postctl/internal/tui/textin"
 	"github.com/shubham/postctl/internal/ui"
@@ -37,6 +38,8 @@ const (
 	phList phase = iota
 	phDetail
 	phConfirmClear
+	phConfirmRestore
+	phDiff
 )
 
 type statusFilter int
@@ -75,6 +78,14 @@ type Model struct {
 	notice string
 	fail   bool
 	loaded bool
+
+	markID       string
+	restoreNew   bool
+	diff         *diffview.Model
+	diffHeaders  *diffview.Model
+	diffBodyMode bool
+	diffGen      int
+	pendingG     bool
 }
 
 // New builds the history browser.
@@ -89,29 +100,49 @@ func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
 // KeyHints implements tui.Screen.
 func (m *Model) KeyHints() []ui.Hint {
 	switch m.phase {
-	case phConfirmClear:
+	case phConfirmClear, phConfirmRestore:
 		return []ui.Hint{{Key: "Enter", Label: "Choose", Priority: 1}, {Key: "←→", Label: "Switch", Priority: 2}, {Key: "Esc", Label: "Cancel", Priority: 1}}
-	case phDetail:
+	case phDiff:
 		return []ui.Hint{
-			{Key: "Tab", Label: "Section", Priority: 2},
-			{Key: "o", Label: "Open request", Priority: 1},
-			{Key: "s", Label: "Re-send", Priority: 1},
-			{Key: "c", Label: "Copy curl", Priority: 3},
+			{Key: "n/N", Label: "Hunk", Priority: 2},
+			{Key: "h", Label: "Headers/body", Priority: 2},
+			{Key: "j/k", Label: "Scroll", Priority: 3},
 			{Key: "Esc", Label: "Back", Priority: 1},
 		}
+	case phDetail:
+		hints := []ui.Hint{
+			{Key: "Tab", Label: "Section", Priority: 2},
+			{Key: "r", Label: "Restore", Priority: 1},
+			{Key: "o", Label: "Open request", Priority: 1},
+			{Key: "s", Label: "Re-send", Priority: 1},
+			{Key: "y", Label: "Copy curl", Priority: 3},
+			{Key: "Esc", Label: "Back", Priority: 1},
+		}
+		if m.detail != nil {
+			if hint := restoreDisabledReason(m.detail); hint != "" {
+				hints[1].Label = "Restore (unavailable)"
+			}
+		}
+		return hints
 	default:
 		if m.filtering {
 			return []ui.Hint{{Key: "Enter", Label: "Apply", Priority: 1}, {Key: "Esc", Label: "Clear", Priority: 1}}
 		}
-		return []ui.Hint{
+		hints := []ui.Hint{
 			{Key: "/", Label: "Filter", Priority: 1},
 			{Key: "f", Label: "Status filter", Priority: 2},
+			{Key: "m", Label: "Mark", Priority: 2},
+			{Key: "j/k", Label: "Move", Priority: 2},
 			{Key: "Enter", Label: "Detail", Priority: 1},
 			{Key: "o", Label: "Open", Priority: 2},
 			{Key: "s", Label: "Re-send", Priority: 2},
 			{Key: "c", Label: "Clear all", Priority: 4},
 			{Key: "Esc", Label: "Close", Priority: 1},
 		}
+		if m.markID != "" {
+			hints = append(hints, ui.Hint{Key: "d", Label: "Diff marked", Priority: 1})
+		}
+		return hints
 	}
 }
 
@@ -173,9 +204,19 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		_ = clipboard.WriteAll(v.text)
 		m.notice, m.fail = "Copied curl to clipboard.", false
 		return m, nil
+	case diffPairMsg:
+		return m.onDiffPair(v)
+	case diffReadyMsg:
+		return m.onDiffReady(v)
 	case tea.KeyPressMsg:
 		if m.phase == phConfirmClear {
 			return m.confirmKey(v)
+		}
+		if m.phase == phConfirmRestore {
+			return m.confirmRestoreKey(v)
+		}
+		if m.phase == phDiff {
+			return m.diffKey(v)
 		}
 		if m.phase == phDetail {
 			return m.detailKey(v)
@@ -243,23 +284,33 @@ func (m *Model) matchStatus(e history.Entry) bool {
 
 func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	m.notice = ""
+	if m.pendingG {
+		m.pendingG = false
+		if k.String() == "g" {
+			m.cur = 0
+			m.top = 0
+			return m, nil
+		}
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
-	case "up":
+	case "up", "k":
 		m.move(-1)
-	case "down":
+	case "down", "j":
 		m.move(1)
+	case "g":
+		m.pendingG = true
+	case "home":
+		m.cur = 0
+		m.top = 0
+	case "end", "G":
+		m.cur = max(0, len(m.items)-1)
+		m.clampTop()
 	case "pgup":
 		m.move(-m.listRows())
 	case "pgdown":
 		m.move(m.listRows())
-	case "home":
-		m.cur = 0
-		m.top = 0
-	case "end":
-		m.cur = max(0, len(m.items)-1)
-		m.clampTop()
 	case "/":
 		m.filtering = true
 	case "f":
@@ -277,6 +328,19 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		if e := m.current(); e != nil {
 			return m, func() tea.Msg { return tui.SendSavedRequestMsg{RequestID: e.RequestID} }
 		}
+	case "m":
+		if e := m.current(); e != nil {
+			if m.markID == e.ID {
+				m.markID = ""
+				m.notice = "Mark cleared."
+			} else {
+				m.markID = e.ID
+				m.notice = "Marked entry for diff."
+			}
+			m.fail = false
+		}
+	case "d":
+		return m.beginDiff()
 	case "c":
 		m.phase = phConfirmClear
 		m.conf = ui.Confirm{
@@ -322,6 +386,8 @@ func (m *Model) detailKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		return m, func() tea.Msg { return tui.SendSavedRequestMsg{RequestID: m.detail.RequestID} }
 	case "y", "c":
 		return m, m.copyCurl(m.detail)
+	case "r":
+		return m.beginRestore()
 	}
 	return m, nil
 }
@@ -414,8 +480,10 @@ func clamp(v, lo, hi int) int {
 // View implements tui.Screen.
 func (m *Model) View() string {
 	switch m.phase {
-	case phConfirmClear:
+	case phConfirmClear, phConfirmRestore:
 		return m.viewConfirm()
+	case phDiff:
+		return m.viewDiff()
 	case phDetail:
 		return m.viewDetail()
 	default:
@@ -487,11 +555,16 @@ func (m *Model) renderList(w, rows int) string {
 			day = d
 			lines = append(lines, t.Bold().Render(day))
 		}
-		mark := "  "
+		mark := m.markLabel(e)
 		tok := ui.TextPrimary
 		if i == m.cur {
 			mark = t.Render(ui.AccentPrimary, t.Glyphs.Select+" ")
+			if e.ID == m.markID {
+				mark = t.Render(ui.AccentPrimary, t.Glyphs.Select+"* ")
+			}
 			tok = ui.AccentPrimary
+		} else if e.ID == m.markID {
+			mark = "* "
 		}
 		line := mark + t.MethodBadge(e.Request.Method, 5) + " "
 		line += t.Render(tok, t.Truncate(e.RequestName, 18)) + "  "
@@ -554,6 +627,9 @@ func (m *Model) viewDetail() string {
 		body += response.Snapshot(t, res, response.SnapshotHeaders, m.w, contentH)
 	default:
 		body += response.Snapshot(t, res, response.SnapshotTests, m.w, contentH)
+	}
+	if hint := restoreHint(e); hint != "" {
+		body += "\n" + t.Render(ui.TextQuiet, hint)
 	}
 	if m.notice != "" {
 		body += "\n" + t.Render(ui.TextSecondary, m.notice)

@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	hist "github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
@@ -23,6 +24,7 @@ type shellRig struct {
 	inbox chan tea.Msg
 	clip  []string
 	token string
+	ws    *model.Workspace
 }
 
 const shellBearer = "shell-test-bearer-0001"
@@ -57,11 +59,21 @@ func newShellRig(t *testing.T, editor string) *shellRig {
 		NoWatch:        true,
 		NewRequestPane: Factory(deps),
 	})
+	r.ws = ws
 	r.send(tea.WindowSizeMsg{Width: 140, Height: 40})
 	r.run(r.m.Init())
 	r.pump(300 * time.Millisecond)
 	r.open("Create charge")
 	return r
+}
+
+func (r *shellRig) requestByName(name string) *model.Request {
+	for _, req := range r.ws.Collections[0].Requests() {
+		if req.Name == name {
+			return req
+		}
+	}
+	return nil
 }
 
 func (r *shellRig) run(cmd tea.Cmd) {
@@ -170,6 +182,43 @@ func TestSpaceOOpensTheEditor(t *testing.T) {
 	r.keys("g", "b")
 	r.keys("space", "o")
 	r.mustHave("Updated from the editor")
+}
+
+func TestShellPendingRestoreAppliesWhenRequestOpens(t *testing.T) {
+	r := newShellRig(t, "")
+	create := r.requestByName("Create charge")
+	if create == nil {
+		t.Fatal("demo request missing")
+	}
+	r.open("List charges")
+	r.send(tui.ApplyRequestPatchMsg{
+		RequestID: create.ID,
+		Template:  hist.RequestTemplate{Method: "TRACE", URL: create.URL.Raw},
+	})
+	r.pump(400 * time.Millisecond)
+	r.open("Create charge")
+	r.pump(400 * time.Millisecond)
+	if !strings.Contains(r.screen(), "TRACE") {
+		t.Fatal("restore should apply when the target request opens")
+	}
+}
+
+func TestShellPendingRestoreDropsOnFirstDifferentBinding(t *testing.T) {
+	r := newShellRig(t, "")
+	create := r.requestByName("Create charge")
+	if create == nil {
+		t.Fatal("demo request missing")
+	}
+	r.send(tui.SelectionMsg{})
+	r.send(tui.ApplyRequestPatchMsg{
+		RequestID: create.ID,
+		Template:  hist.RequestTemplate{Method: "TRACE", URL: create.URL.Raw},
+	})
+	r.open("List charges")
+	r.open("Create charge")
+	if create.Method == "TRACE" {
+		t.Fatal("stale restore applied after first binding selected another request")
+	}
 }
 
 func TestSpaceIInsertsASnippet(t *testing.T) {
