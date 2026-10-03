@@ -29,8 +29,10 @@ func TestSecretDoesNotLeakThroughUXFlows(t *testing.T) {
 			sec := newUXSecrets(t)
 			fx := newUXFixture(t, sec)
 			r := newUXRig(t, fx, size.w, size.h)
+			// The sweep runs even when a flow step stops early, so a leak
+			// that derails the flow is still reported by name.
+			defer checkUXRig(t, r, sec)
 			runUXFlow(t, r)
-			checkUXRig(t, r, sec)
 		})
 	}
 }
@@ -47,7 +49,8 @@ func (r *uxRig) must(marker, what string) {
 // mouseYank drags the left button across width cells starting offset cells
 // after the first screen match for anchor, then presses y. The drag must
 // have copied something (the selection happened) and the clipboard text is
-// swept with every other write.
+// swept with every other write. A sentinel's first 12 characters are searched,
+// so the drag must cover more than that.
 func (r *uxRig) mouseYank(what, anchor string, offset, width int) {
 	r.t.Helper()
 	x, y, ok := r.find(anchor)
@@ -87,6 +90,18 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.snap("environment picker")
 	r.keys("down", "enter")
 	r.must("Secret environment", "environment picked")
+
+	r.begin("mouse selection (env editor)")
+	r.keys("esc", "esc", "space", "E", "enter")
+	// A first click on the cell opens it; the drag then selects inside the
+	// cell's field on the bottom line.
+	if x, y, ok := r.find("accessToken"); ok {
+		r.send(tea.MouseClickMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
+		r.send(tea.MouseReleaseMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
+		r.pump(100 * time.Millisecond)
+	}
+	r.mouseYank("env editor secret cell", "Value (secret) ", 15, 16)
+	r.keys("esc", "esc", "esc", "esc")
 
 	r.begin("switcher")
 	r.keys("esc", "esc", "space", "space")
@@ -297,24 +312,13 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.snap("ws editor refused")
 	r.keys("esc", "esc")
 
-	r.begin("mouse selection")
+	r.begin("mouse selection (request rows)")
 	r.open("literal")
 	r.keys("g", "a")
-	r.mouseYank("Password row of a request", "••••", 0, 3)
+	r.mouseYank("Password row of a request", "••••", 0, 16)
 	r.open("socket")
 	r.keys("g", "a")
-	r.mouseYank("Token row of a WebSocket request", "••••", 0, 3)
-	r.keys("esc", "esc", "space", "E", "enter")
-	// A first click on the cell opens it; the drag then selects inside the
-	// cell's field on the bottom line.
-	if x, y, ok := r.find("accessToken"); ok {
-		r.send(tea.MouseClickMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
-		r.send(tea.MouseReleaseMsg{X: x + 14, Y: y, Button: tea.MouseLeft})
-		r.pump(100 * time.Millisecond)
-	}
-	r.mouseYank("env editor secret cell", "Value (secret) ", 15, 3)
-	r.keys("esc", "esc", "esc", "esc")
-
+	r.mouseYank("Token row of a WebSocket request", "••••", 0, 16)
 	r.begin("editor files")
 	r.open("ech")
 	for _, g := range []string{"u", "b", "s", "t", "h"} {
