@@ -534,14 +534,15 @@ func (a *app) editing() bool {
 }
 
 // insertActive reports whether a text field has the keyboard in a way that
-// makes Ctrl-C act as Esc: a pane or tree-filter field being edited, or an
-// overlay built around a text input (palette, prompts).
+// makes Ctrl-C act as Esc and keys like Backspace belong to the field: a pane
+// or tree-filter field being edited, or an overlay built around a text input
+// (palette, request switcher, prompts).
 func (a *app) insertActive() bool {
 	switch a.ov.(type) {
-	case *pickerOverlay, *promptOverlay:
+	case *pickerOverlay, *promptOverlay, *switcherOverlay:
 		return true
 	case nil:
-		return a.editing()
+		return a.editing() || (a.tree != nil && a.tree.filtering)
 	}
 	return false
 }
@@ -700,7 +701,7 @@ func (a *app) overlayAlways(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	case *screenOverlay:
 		if s == "ctrl+p" {
 			a.ov = nil
-			return nil, true
+			return a.afterScreen(), true // the same path as Esc: panes learn the environment again
 		}
 		return nil, false
 	case *pickerOverlay:
@@ -794,7 +795,7 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		return a.jump(-1), true
 	case a.enhanced && key.Matches(msg, a.keys.JumpForward):
 		return a.jump(1), true
-	case key.Matches(msg, a.keys.PaneLeft), s == "backspace":
+	case key.Matches(msg, a.keys.PaneLeft), s == "backspace" && !a.insertActive():
 		return a.movePane(DirLeft), true
 	case key.Matches(msg, a.keys.PaneDown):
 		return a.movePane(DirDown), true

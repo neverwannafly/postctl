@@ -306,3 +306,36 @@ func TestShellViewIsPureWithPrefixAndWhichKey(t *testing.T) {
 		t.Fatal("View mutated the which-key state")
 	}
 }
+
+// Backspace is Ctrl-h (pane left) only when no text input is active anywhere.
+func TestBackspaceMovesPanesOnlyWhenNothingIsBeingTyped(t *testing.T) {
+	h := newHarness(t, demo(), 160, 30)
+	h.keys("2", "backspace")
+	if h.a.focus != SlotSidebar {
+		t.Fatalf("backspace with no input active moves left, focus=%v", h.a.focus)
+	}
+
+	// Tree filter: Backspace edits the filter text.
+	h.keys("/")
+	h.typeText("cus")
+	h.keys("backspace")
+	if h.a.focus != SlotSidebar || !h.a.tree.filtering || h.a.tree.filter.Value() != "cu" {
+		t.Fatalf("backspace in the tree filter must edit it (focus=%v filtering=%v)", h.a.focus, h.a.tree.filtering)
+	}
+	h.keys("esc", "esc")
+
+	// Switcher: same.
+	h.keys("2", "space", "f")
+	sw, ok := h.a.ov.(*switcherOverlay)
+	if !ok {
+		t.Fatalf("switcher not open (ov=%T)", h.a.ov)
+	}
+	h.typeText("abc")
+	h.keys("backspace")
+	if h.a.ov != sw || sw.input.Value() != "ab" || h.a.focus != SlotRequest {
+		t.Fatalf("backspace in the switcher must edit its input (value=%q focus=%v)", sw.input.Value(), h.a.focus)
+	}
+	if !h.a.insertActive() {
+		t.Fatal("an open switcher counts as a text input")
+	}
+}

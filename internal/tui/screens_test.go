@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -193,4 +194,76 @@ func TestEnvEditorNeedsAWorkspace(t *testing.T) {
 	})
 	h.keys("space", "E")
 	h.mustNotHave("FAKE SCREEN")
+}
+
+// Ctrl-P closes a hosted screen through the same lifecycle as Esc: after an
+// environment is renamed or deleted in the editor, the active environment and
+// the panes are synced exactly the same way.
+func TestCtrlPClosesTheScreenLikeEsc(t *testing.T) {
+	type result struct {
+		activeEnv model.ID
+		lastEnv   string // name the pane was last told, "-" for none
+		toast     bool
+		saved     model.ID
+	}
+	run := func(closeKey, edit string) result {
+		pane := &msgPane{}
+		s := &fakeScreen{onKey: func(s *fakeScreen, k string) {
+			if k != edit {
+				return
+			}
+			ws := s.env.Workspace
+			for i, e := range ws.Environments {
+				if e.ID != s.env.ActiveEnv {
+					continue
+				}
+				if k == "x" {
+					ws.Environments = append(ws.Environments[:i:i], ws.Environments[i+1:]...)
+				} else {
+					e.Name = "renamed-env"
+				}
+				return
+			}
+		}}
+		h := newHarness(t, demo(), 120, 30, func(o *Options) {
+			o.NewEnvEditor = func(env ScreenEnv) Screen { s.env = env; return s }
+			o.NewRequestPane = func(PaneEnv) Pane { return pane }
+		})
+		h.keys("space", "e", "down", "enter")
+		if h.a.activeEnv == "" {
+			t.Fatal("no environment became active")
+		}
+		h.keys("space", "E", edit, closeKey)
+		h.mustNotHave("FAKE SCREEN")
+		var r result
+		r.activeEnv = h.a.activeEnv
+		r.toast = strings.Contains(h.screen(), "The active environment was deleted")
+		r.saved = h.be.savedState().ActiveEnvironment
+		r.lastEnv = "?"
+		pane.mu.Lock()
+		for _, m := range pane.msgs {
+			if c, ok := m.(EnvironmentChangedMsg); ok {
+				r.lastEnv = "-"
+				if c.Env != nil {
+					r.lastEnv = c.Env.Name
+				}
+			}
+		}
+		pane.mu.Unlock()
+		return r
+	}
+	for _, edit := range []string{"x", "r"} {
+		viaEsc, viaCtrlP := run("esc", edit), run("ctrl+p", edit)
+		if edit == "r" && viaEsc.lastEnv != "renamed-env" {
+			t.Fatalf("the pane must learn the renamed environment, got %q", viaEsc.lastEnv)
+		}
+		if edit == "x" && (viaEsc.activeEnv != "" || !viaEsc.toast || viaEsc.lastEnv != "-") {
+			t.Fatalf("deleting the active environment after Esc: %+v", viaEsc)
+		}
+		// Environment IDs are random per run, so compare what they mean.
+		if (viaEsc.activeEnv == "") != (viaCtrlP.activeEnv == "") || (viaEsc.saved == "") != (viaCtrlP.saved == "") ||
+			viaEsc.lastEnv != viaCtrlP.lastEnv || viaEsc.toast != viaCtrlP.toast {
+			t.Errorf("edit %q: Ctrl-P left different state than Esc: esc=%+v ctrl-p=%+v", edit, viaEsc, viaCtrlP)
+		}
+	}
 }

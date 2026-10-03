@@ -834,3 +834,9 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: none. Note for the orchestrator: the design-language line saying overlay inputs open in insert and Esc goes to normal first does not match the switcher or palette (Esc closes); left as is.
 - Next: orchestrator merge.
 
+### 2026-10-03 19:55 IST · UX-V0 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v0-shell · ~/work/postctl-wt/ux-v0-shell (not pushed)
+- Did: (1) Ctrl-P closing a hosted screen now returns `afterScreen()`, the path Esc takes, so a renamed or deleted active environment syncs the panes; `TestCtrlPClosesTheScreenLikeEsc` compares Esc and Ctrl-P after a rename and after a delete (it fails with the old direct close). (2) keys text and `genkeys` no longer say Ctrl-B works in overlays. (3) Backspace-as-Ctrl-h moves panes only when `insertActive()` is false; `insertActive()` now also covers the request switcher and a tree filter kept open from any pane; `TestBackspaceMovesPanesOnlyWhenNothingIsBeingTyped` covers the tree filter and the switcher.
+- Tests: `task agents:check` green, `task tui:smoke` PASS.
+- Next: orchestrator merge.
+

@@ -34,7 +34,7 @@ type Section struct {
 var KeyCatalog = []Section{
 	{
 		Title:       "Global Shortcuts",
-		Description: "Available everywhere unless a text field is being edited. Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter work even while typing, and in the palette, request switcher, help, environment switcher and which-key popup (the popup closes, then the key acts). Confirmation dialogs and prompts must be answered first and ignore them; full-screen screens (environments, history, runner, cookies) keep their own keys, except Ctrl-P, which closes them. Ctrl-Enter and Ctrl-i need a terminal with enhanced keyboard reporting.",
+		Description: "Available everywhere unless a text field is being edited. Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter work even while typing. Ctrl-P, Alt-1/2/3, Ctrl-S and Ctrl-Enter also work in the palette, request switcher, help, environment switcher and which-key popup (the popup closes, then the key acts); Ctrl-B does not. Confirmation dialogs and prompts must be answered first and ignore them; full-screen screens (environments, history, runner, cookies) keep their own keys, except Ctrl-P, which closes them. Ctrl-Enter and Ctrl-i need a terminal with enhanced keyboard reporting.",
 		Entries: []KeyEntry{
 			{"?", "Help", "Open the keyboard shortcut and context help overlay"},
 			{"Ctrl-P", "Command palette", "Open the fuzzy command palette (press again to close; inside the request switcher it moves the cursor up)"},
