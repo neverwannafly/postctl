@@ -57,7 +57,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 | UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Done (round 3), not merged | qa/ux | 2026-10-03 23:50 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Done (round 4), not merged | qa/ux | 2026-10-03 23:38 IST |
 
 ## Entries
 
@@ -1353,5 +1353,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: pane tests that asserted the inline text now assert the emitted toast (`mustToast` in both harnesses, `toastsIn` in `restore_test.go`). New `TestActionNoticesShowExactlyOnceAtEverySize` renders 80x24, 120x40 and 200x60 with the request and the response focused and counts one occurrence; proved by running it against the previous commit (count 2 at every size with the request focused, and at 200x60 with the response focused).
 - Goldens: only the 9 `internal/tui/wspane/testdata/state-log-filtered-*` files changed (3 sizes x dark, `NO_COLOR`, ASCII); the "Showing: Received" status row now shows the connection summary, which was hidden behind the notice. Read, nothing else moved.
 - Docs: `docs/design-language.md` Interaction language bullet.
+- Blockers / questions: none.
+- Next: orchestrator merges `qa/ux`.
+
+### 2026-10-03 23:38 IST · UX-QA · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: `qa/ux` · `/Users/shubham/work/postctl-wt/qa-ux`.
+- Did: the WebSocket pane shows a standing indicator while the log direction filter is not "all": the Log header reads `Log  6 of 7 · Showing: received only` (or `sent only`), in words with the dot glyph (ASCII `|`), no color needed. It shows even when the log is empty and goes when the filter returns to all. Changing the filter is announced once by the shell toast (`Showing: received only`, `Showing: sent only`, `Showing: all`).
+- Tests: new `TestLogFilterIndicatorShowsWhileFilteredAtEverySize` (3 looks x 3 sizes: indicator present while filtered, absent when unfiltered, exactly one toast per change; failed first on the old text). `TestLogFilterCyclesDirections` asserts the new text.
+- Goldens: only the 9 `wspane/testdata/state-log-filtered-*` files changed (header line only).
 - Blockers / questions: none.
 - Next: orchestrator merges `qa/ux`.

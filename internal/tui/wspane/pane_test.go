@@ -543,12 +543,13 @@ func TestLogFilterCyclesDirections(t *testing.T) {
 	if l.log.dir != filterIn || l.log.count() != 4 { // connecting + open + alpha + beta
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())
 	}
-	h.mustHave("Received")
+	h.mustHave("Showing: received only")
 	h.mustNotHave("text  gamma")
 	h.key("f")
 	if l.log.dir != filterOut || l.log.count() != 3 { // connecting + open + gamma
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())
 	}
+	h.mustHave("Showing: sent only")
 	h.key("f")
 	if l.log.dir != filterAll || l.log.count() != 5 {
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())

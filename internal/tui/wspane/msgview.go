@@ -195,21 +195,23 @@ func (p *Pane) logView(w, h int) string {
 	th := p.th
 	l := p.peek()
 	focused := p.hasCursor(sLog)
-	detail := ""
+	var parts []string
 	if l != nil && len(l.log.entries) > 0 {
 		lg := l.log
 		if lg.filtered() {
-			detail = itoa(lg.count()) + " of " + itoa(len(lg.entries))
+			parts = append(parts, itoa(lg.count())+" of "+itoa(len(lg.entries)))
 		} else {
-			detail = itoa(len(lg.entries))
-		}
-		if lg.dir != filterAll {
-			detail += " " + th.Glyphs.Dot + " " + lg.dir.label()
+			parts = append(parts, itoa(len(lg.entries)))
 		}
 		if !lg.follow && l.state == stOpen && p.detail == nil {
-			detail += " " + th.Glyphs.Dot + " paused, End resumes"
+			parts = append(parts, "paused, End resumes")
 		}
 	}
+	if l != nil && l.log.dir != filterAll {
+		// A standing sign that rows are hidden, in words, until the filter is "all".
+		parts = append(parts[:min(1, len(parts))], append([]string{"Showing: " + l.log.dir.phrase()}, parts[min(1, len(parts)):]...)...)
+	}
+	detail := strings.Join(parts, " "+th.Glyphs.Dot+" ")
 	head := p.sectionHead("Log", detail, focused, "", w)
 	if h <= 1 {
 		return head

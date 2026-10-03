@@ -2,7 +2,7 @@
   * Connected | > 1 sent | < 4 received                                                                                 
 Messages(3)  Params(1)  Headers(1)  Auth  Settings                                                                      
 ===========-------------------------------------------------------------------------------------------------------------
-  Message                                Text  0 B | > Log  6 of 7 | Received                                           
+  Message                                Text  0 B | > Log  6 of 7 | Showing: received only                             
 Type a message. Ctrl-S sends it.                   |   03:04:05.000 * info  Connecting                                  
                                                    |   03:04:05.000 * open  Connected (101)                             
                                                    |   03:04:05.000 < text  {"type":"welcome","session":"a1b2c3"... 52 B

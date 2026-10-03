@@ -65,14 +65,15 @@ const (
 	filterOut
 )
 
-func (f dirFilter) label() string {
+// phrase is the filter in a sentence: "all", "received only" or "sent only".
+func (f dirFilter) phrase() string {
 	switch f {
 	case filterIn:
-		return "Received"
+		return "received only"
 	case filterOut:
-		return "Sent"
+		return "sent only"
 	}
-	return "All"
+	return "all"
 }
 
 // msgLog is one connection's log with its filter and cursor. Entries are

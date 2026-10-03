@@ -12,7 +12,7 @@ Type a message. Ctrl-S sends it.
 > subscribe                   {"type":"subscribe","channel":"btc"}          JSON
   heartbeat                   ping                                          text
   auth                        {"type":"auth","token":"{{token}}"}           JSON
-> Log  6 of 7 | Received                                                        
+> Log  6 of 7 | Showing: received only                                          
   03:04:05.000 * info  Connecting                                               
   03:04:05.000 * open  Connected (101)                                          
   03:04:05.000 < text  {"type":"welcome","session":"a1b2c3","heartbeat":30} 52 B
