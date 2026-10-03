@@ -25,21 +25,25 @@ func (m *Model) enterInsert(key tea.KeyPressMsg, kind string, count int) (tea.Cm
 	case "A":
 		m.col = m.lineLen(m.row)
 	case "o":
-		m.lines = append(m.lines[:m.row+1], append([]string{""}, m.lines[m.row+1:]...)...)
+		indent := leadingIndent(m.lines[m.row])
+		m.lines = append(m.lines[:m.row+1], append([]string{indent}, m.lines[m.row+1:]...)...)
 		m.row++
-		m.col = 0
+		m.col = len(clusters(indent))
 	case "O":
-		m.lines = append(m.lines[:m.row], append([]string{""}, m.lines[m.row:]...)...)
-		m.col = 0
+		indent := leadingIndent(m.lines[m.row])
+		m.lines = append(m.lines[:m.row], append([]string{indent}, m.lines[m.row:]...)...)
+		m.col = len(clusters(indent))
 	}
+	m.insertStart = position{m.row, m.col}
 	m.mode = Insert
 	m.ensureVisible()
 	return nil, Event{}
 }
 
-func (m *Model) lineTail(key tea.KeyPressMsg, kind byte) (tea.Cmd, Event) {
+func (m *Model) lineTail(key tea.KeyPressMsg, kind byte, count int) (tea.Cmd, Event) {
 	if kind == 'Y' {
-		text := m.lineRange(m.row, m.row, false)
+		end := min(len(m.lines)-1, m.row+count-1)
+		text := m.lineRange(m.row, end, false)
 		m.reg, m.regLine = text, true
 		return m.clipboard(text), Event{}
 	}
@@ -50,10 +54,11 @@ func (m *Model) lineTail(key tea.KeyPressMsg, kind byte) (tea.Cmd, Event) {
 		}
 		return nil, Event{}
 	}
-	text := joinClusters(cs[m.col:])
+	endRow := min(len(m.lines)-1, m.row+count-1)
+	text := m.rangeText(position{m.row, m.col}, position{endRow, m.lineLen(endRow)}, false)
 	m.reg, m.regLine = text, false
 	m.beginChange(key)
-	m.lines[m.row] = joinClusters(cs[:m.col])
+	m.deleteRange(position{m.row, m.col}, position{endRow, m.lineLen(endRow)}, false)
 	m.col = min(m.col, max(0, m.lineLen(m.row)-1))
 	if kind == 'C' {
 		m.col = m.lineLen(m.row)
@@ -110,17 +115,21 @@ func (m *Model) pasteRegister(key tea.KeyPressMsg, before bool, count int) (tea.
 		return nil, Event{}
 	}
 	m.beginChange(key)
-	for range max(1, count) {
-		if m.regLine && !m.opts.SingleLine {
-			text := strings.TrimSuffix(m.reg, "\n")
-			parts := strings.Split(text, "\n")
-			at := m.row + 1
-			if before {
-				at = m.row
-			}
-			m.lines = append(m.lines[:at], append(parts, m.lines[at:]...)...)
-			m.row, m.col = at, 0
-		} else {
+	if m.regLine && !m.opts.SingleLine {
+		text := strings.TrimSuffix(m.reg, "\n")
+		parts := strings.Split(text, "\n")
+		at := m.row + 1
+		if before {
+			at = m.row
+		}
+		inserted := make([]string, 0, len(parts)*max(1, count))
+		for range max(1, count) {
+			inserted = append(inserted, parts...)
+		}
+		m.lines = append(m.lines[:at], append(inserted, m.lines[at:]...)...)
+		m.row, m.col = at, firstWordColumn(m.lines[at])
+	} else {
+		for range max(1, count) {
 			text := strings.TrimSuffix(m.reg, "\n")
 			if !before && m.lineLen(m.row) > 0 {
 				m.col++
@@ -295,31 +304,38 @@ func (m *Model) applyLineOperator(op byte, from, to int, before snapshot, keys [
 		m.pushUndo(before)
 		m.redo = nil
 		m.lastChange = append([]tea.Msg(nil), keys...)
-		m.SetCursor(from, firstWordColumn(m.lines[from]))
+		m.SetCursor(from, before.pos.col)
 		m.rehighlight()
 		return nil, Event{Kind: Changed}
 	case 'c':
-		m.lines[from] = ""
+		indent := leadingIndent(m.lines[from])
+		m.lines[from] = indent
 		m.lines = append(m.lines[:from+1], m.lines[to+1:]...)
-		m.SetCursor(from, 0)
+		m.SetCursor(from, len(clusters(indent)))
 		m.mode = Insert
+		m.insertStart = position{m.row, m.col}
 		m.changeStart = &before
 		m.changeKeys = append([]tea.Msg(nil), keys...)
 		m.rehighlight()
 		return m.clipboard(text), Event{Kind: Changed}
 	default:
+		oldCol := m.col
 		m.lines = append(m.lines[:from], m.lines[to+1:]...)
 		if len(m.lines) == 0 {
 			m.lines = []string{""}
 		}
-		m.SetCursor(min(from, len(m.lines)-1), 0)
-		m.firstNonBlank()
+		m.SetCursor(min(from, len(m.lines)-1), oldCol)
+		m.clampNormalCursor()
 		m.pushUndo(before)
 		m.redo = nil
 		m.lastChange = append([]tea.Msg(nil), keys...)
 		m.rehighlight()
 		return m.clipboard(text), Event{Kind: Changed}
 	}
+}
+
+func leadingIndent(line string) string {
+	return line[:len(line)-len(strings.TrimLeft(line, " \t"))]
 }
 
 func (m *Model) toggleRange(a, b position, linewise bool) {

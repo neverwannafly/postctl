@@ -38,12 +38,13 @@ func (m *Model) applyMotion(key string, count int) bool {
 		m.col = max(0, m.lineLen(m.row)-1)
 		m.preferred = -1
 	case "G":
+		want := m.preferred
 		if m.count > 0 {
 			m.row = min(m.count-1, len(m.lines)-1)
 		} else {
 			m.row = len(m.lines) - 1
 		}
-		m.firstNonBlank()
+		m.col = columnAtDisplay(m.lines[m.row], max(0, want), false, m.opts.TabText)
 	case "%":
 		m.matchBracket()
 	default:
@@ -121,10 +122,13 @@ func (m *Model) bufferCells() []bufferCell {
 	return out
 }
 
-func (m *Model) objectRange(inner bool, object byte, count int) (position, position, bool, bool) {
+func (m *Model) objectRange(inner bool, object byte, count int) (position, position, bool, bool, bool) {
 	cs := clusters(m.lines[m.row])
 	if len(cs) == 0 {
-		return position{}, position{}, false, false
+		if object != '(' && object != ')' && object != 'b' && object != '{' && object != '}' &&
+			object != 'B' && object != '[' && object != ']' {
+			return position{}, position{}, false, false, false
+		}
 	}
 	if object == 'w' || object == 'W' {
 		big := object == 'W'
@@ -137,7 +141,13 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 			for end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
 				end++
 			}
-			return position{m.row, start}, position{m.row, end}, true, false
+			if !inner && end+1 < len(cs) {
+				end++
+				for end+1 < len(cs) && sameWordClass(cs[end], cs[end+1], big) {
+					end++
+				}
+			}
+			return position{m.row, start}, position{m.row, end}, true, false, false
 		}
 		end := start
 		for start > 0 && sameWordClass(cs[start], cs[start-1], big) {
@@ -163,12 +173,16 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 					end++
 				}
 			} else {
-				for start > 0 && isSpaceCluster(cs[start-1]) {
-					start--
+				leading := start
+				for leading > 0 && isSpaceCluster(cs[leading-1]) {
+					leading--
+				}
+				if leading > 0 {
+					start = leading
 				}
 			}
 		}
-		return position{m.row, start}, position{m.row, end}, true, false
+		return position{m.row, start}, position{m.row, end}, true, false, false
 	}
 	open, close := "", ""
 	switch object {
@@ -181,17 +195,17 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 	case '[', ']':
 		open, close = "[", "]"
 	default:
-		return position{}, position{}, false, false
+		return position{}, position{}, false, false, false
 	}
 	if open == close {
 		left, right := -1, -1
 		for i := 0; i < len(cs); {
-			if cs[i] != open {
+			if cs[i] != open || quoteInsideWord(cs, i, object) {
 				i++
 				continue
 			}
 			j := i + 1
-			for j < len(cs) && cs[j] != close {
+			for j < len(cs) && (cs[j] != close || quoteInsideWord(cs, j, object)) {
 				j++
 			}
 			if j >= len(cs) {
@@ -204,10 +218,10 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 			i = j + 1
 		}
 		if left < 0 {
-			return position{}, position{}, false, false
+			return position{}, position{}, false, false, false
 		}
 		if inner {
-			return position{m.row, left + 1}, position{m.row, right - 1}, true, right == left+1
+			return position{m.row, left + 1}, position{m.row, right - 1}, true, right == left+1, false
 		}
 		end := right
 		for end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
@@ -218,7 +232,7 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 				left--
 			}
 		}
-		return position{m.row, left}, position{m.row, end}, true, false
+		return position{m.row, left}, position{m.row, end}, true, false, false
 	}
 	cells := m.bufferCells()
 	cursor := -1
@@ -229,10 +243,13 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 		}
 	}
 	if cursor < 0 {
-		return position{}, position{}, false, false
+		return position{}, position{}, false, false, false
 	}
 	left, right := -1, -1
 	searchAt := cursor
+	if cells[cursor].text == close {
+		searchAt--
+	}
 	for range max(1, count) {
 		depth := 0
 		left = -1
@@ -247,14 +264,18 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 					break leftScan
 				}
 				depth--
-				if depth == 0 {
-					left = i
-					break leftScan
-				}
 			}
 		}
 		if left < 0 {
-			return position{}, position{}, false, false
+			for i := cursor + 1; i < len(cells); i++ {
+				if cells[i].text == open {
+					left = i
+					break
+				}
+			}
+			if left < 0 {
+				return position{}, position{}, false, false, false
+			}
 		}
 		depth = 0
 		right = -1
@@ -272,7 +293,7 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 			}
 		}
 		if right < 0 || cursor > right {
-			return position{}, position{}, false, false
+			return position{}, position{}, false, false, false
 		}
 		searchAt = left - 1
 	}
@@ -282,13 +303,17 @@ func (m *Model) objectRange(inner bool, object byte, count int) (position, posit
 			innerRow := a.row + 1
 			startCol := firstWordColumn(m.lines[innerRow])
 			endRow := b.row - 1
-			return position{innerRow, startCol}, position{endRow, m.lineLen(endRow)}, true, false
+			return position{innerRow, startCol}, position{endRow, m.lineLen(endRow)}, true, false, true
 		}
 		a = nextPosition(m, a)
 		b = prevPosition(m, b)
 	}
 	empty := less(b, a)
-	return a, b, true, empty
+	return a, b, true, empty, false
+}
+
+func quoteInsideWord(cs []string, i int, quote byte) bool {
+	return quote == '\'' && i > 0 && i+1 < len(cs) && isSmallWord(cs[i-1]) && isSmallWord(cs[i+1])
 }
 
 func nextPosition(m *Model, p position) position {
@@ -383,7 +408,12 @@ func (m *Model) wordUnderCursor() string {
 	}
 	i := min(m.col, len(cs)-1)
 	if !isSmallWord(cs[i]) {
-		return ""
+		for i < len(cs) && !isSmallWord(cs[i]) {
+			i++
+		}
+		if i >= len(cs) {
+			return ""
+		}
 	}
 	a, b := i, i
 	for a > 0 && isSmallWord(cs[a-1]) {
@@ -393,4 +423,20 @@ func (m *Model) wordUnderCursor() string {
 		b++
 	}
 	return joinClusters(cs[a : b+1])
+}
+
+func (m *Model) searchWholeWord(pattern string, dir int) bool {
+	for range len(m.bufferCells()) + 1 {
+		if !m.search(pattern, dir) {
+			return false
+		}
+		cs := clusters(m.lines[m.row])
+		beforeOK := m.col == 0 || !isSmallWord(cs[m.col-1])
+		end := m.col + len(clusters(pattern))
+		afterOK := end >= len(cs) || !isSmallWord(cs[end])
+		if beforeOK && afterOK {
+			return true
+		}
+	}
+	return false
 }

@@ -24,7 +24,7 @@ type corpusCase struct {
 	wantEvents []EventKind
 }
 
-func TestKeystrokeCorpus(t *testing.T) {
+func allCorpusCases() []corpusCase {
 	cases := []corpusCase{
 		{name: "insert", start: "ac", keys: "lib<Esc>", want: "abc", wantCol: 1},
 		{name: "append", start: "ac", keys: "a b<Esc>", want: "a bc", wantCol: 2},
@@ -46,10 +46,10 @@ func TestKeystrokeCorpus(t *testing.T) {
 		{name: "replace", start: "abc", col: 1, keys: "rX", want: "aXc", wantCol: 1},
 		{name: "join", start: "a\n  b", keys: "J", want: "a b", wantCol: 1},
 		{name: "toggle case", start: "aBc", keys: "3~", want: "AbC", wantCol: 2},
-		{name: "indent", start: "a", keys: ">>", want: "  a", wantCol: 2},
+		{name: "indent", start: "a", keys: ">>", want: "  a"},
 		{name: "outdent", start: "  a", keys: "<LT><LT>", want: "a"},
 		{name: "undo insert session", start: "a", keys: "Axyz<Esc>u", want: "a"},
-		{name: "redo insert session", start: "a", keys: "Axyz<Esc>u<C-r>", want: "axyz", wantCol: 3},
+		{name: "redo insert session", start: "a", keys: "Axyz<Esc>u<C-r>", want: "axyz", wantCol: 1},
 		{name: "dot append", start: "a\nb", keys: "A!<Esc>j.", want: "a!\nb!", wantRow: 1, wantCol: 1},
 		{name: "dot delete line", start: "a\nb\nc", keys: "dd.", want: "c"},
 		{name: "dot change inner word", start: "one two\nthree four", col: 1, keys: "ciwX<Esc>j.", want: "X two\nX four", wantRow: 1},
@@ -81,11 +81,11 @@ func TestKeystrokeCorpus(t *testing.T) {
 		{name: "visual delete", start: "abcd", keys: "vlld", want: "d"},
 		{name: "visual swap anchor", start: "abcd", col: 2, keys: "vhol", want: "abcd", wantCol: 3, wantMode: Visual},
 		{name: "visual line delete", start: "a\nb\nc", keys: "Vjd", want: "c"},
-		{name: "visual indent", start: "a\nb", keys: "Vj>", want: "  a\n  b", wantRow: 1},
+		{name: "visual indent", start: "a\nb", keys: "Vj>", want: "  a\n  b"},
 		{name: "insert backspace", start: "a", keys: "Axy<BS><Esc>", want: "ax", wantCol: 1},
 		{name: "insert delete", start: "ab", keys: "i<Del><Esc>", want: "b"},
 		{name: "insert ctrl word", start: "", keys: "ione two<C-w><Esc>", want: "one ", wantCol: 3},
-		{name: "insert ctrl line", start: "a", keys: "A xyz<C-u><Esc>", want: ""},
+		{name: "insert ctrl line", start: "a", keys: "A xyz<C-u><Esc>", want: "a"},
 		{name: "insert tab", start: "", keys: "i<Tab><Esc>", want: "  ", wantCol: 1},
 		{name: "paste unicode", start: "", keys: "i<Paste:é界👩‍💻><Esc>", want: "é界👩‍💻", wantCol: 2},
 		{name: "unicode motion", start: "é界👩‍💻x", keys: "lll", want: "é界👩‍💻x", wantCol: 3},
@@ -120,8 +120,8 @@ func TestKeystrokeCorpus(t *testing.T) {
 		{name: "visual yank", start: "abc", keys: "vly", want: "abc"},
 		{name: "visual x", start: "abc", keys: "vlx", want: "c"},
 		{name: "visual change", start: "abc", keys: "vlcX<Esc>", want: "Xc"},
-		{name: "visual outdent", start: "  a\n  b", keys: "Vj<LT>", want: "a\nb", wantRow: 1},
-		{name: "visual toggle", start: "Ab", keys: "vl~", want: "aB", wantCol: 1},
+		{name: "visual outdent", start: "  a\n  b", keys: "Vj<LT>", want: "a\nb"},
+		{name: "visual toggle", start: "Ab", keys: "vl~", want: "aB"},
 		{name: "visual join", start: "a\nb", keys: "VjJ", want: "a b", wantCol: 1},
 		{name: "visual find motion", start: "abcde", keys: "vfd", want: "abcde", wantCol: 3, wantMode: Visual},
 		{name: "visual gg motion", start: "a\nb\nc", row: 2, keys: "vgg", want: "a\nb\nc", wantMode: Visual},
@@ -148,6 +148,11 @@ func TestKeystrokeCorpus(t *testing.T) {
 			want: ch + "z",
 		})
 	}
+	return cases
+}
+
+func TestKeystrokeCorpus(t *testing.T) {
+	cases := allCorpusCases()
 	if len(cases) < 150 {
 		t.Fatalf("corpus has %d cases, want at least 150", len(cases))
 	}

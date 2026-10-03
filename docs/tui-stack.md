@@ -92,6 +92,14 @@ It adds no dependency: Chroma, Lip Gloss, `x/ansi`, and `uniseg` were already
 in the module graph. The supported bindings are the **Text fields** rows in
 the [design-language key map](design-language.md#key-map).
 
+Vim semantics are checked by the opt-in `TestDifferentialNvim` oracle. Set
+`VIMTEXT_NVIM=1` to compare the eligible keystroke corpus and 500 seeded,
+3–12-key generated cases with `nvim --clean --headless -n`; the harness uses
+two-space `expandtab` settings to match `Options.TabText`'s documented default.
+The sole intentional compatibility deviation is search syntax: vimtext treats
+the pattern literally, while Nvim treats it as a regular expression. The
+allowlist is kept in `internal/tui/vimtext/deviations.go`.
+
 ### Storage and secret rules
 
 - The workspace is a directory tree of YAML and `.js` files (see [model.md](model.md)); it is designed to live in git. Local, non-versioned state (history, cookies, active environment) lives under `.postctl/`, which is gitignored.

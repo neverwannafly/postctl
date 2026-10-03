@@ -32,6 +32,8 @@ func (m *Model) finishChange() {
 		return
 	}
 	if strings.Join(m.changeStart.lines, "\n") != m.Value() {
+		m.changeStart.redoPos = m.insertStart
+		m.changeStart.hasRedoPos = true
 		m.pushUndo(*m.changeStart)
 		m.redo = nil
 		if !m.replaying {
@@ -47,8 +49,12 @@ func (m *Model) undoChange() bool {
 	if len(m.undo) == 0 {
 		return false
 	}
-	m.pushRedo(m.snap())
 	s := m.undo[len(m.undo)-1]
+	redo := m.snap()
+	if s.hasRedoPos {
+		redo.pos = s.redoPos
+	}
+	m.pushRedo(redo)
 	m.undo = m.undo[:len(m.undo)-1]
 	m.restore(s)
 	return true
@@ -229,8 +235,11 @@ func sameWordClass(a, b string, big bool) bool {
 }
 
 func (m *Model) moveHorizontal(delta int) {
+	before := m.col
 	m.col = min(max(0, m.col+delta), max(0, m.lineLen(m.row)-boolInt(m.mode == Insert)))
-	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
+	if m.col != before {
+		m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
+	}
 }
 
 func boolInt(v bool) int {
@@ -288,12 +297,17 @@ func (m *Model) wordForward(big, end bool) {
 		m.setMotionPosition(row, max(0, len(cs)-1))
 		return
 	}
-	row++
-	if m.lines[row] == "" {
-		m.setMotionPosition(row, 0)
-		return
+	for row++; row < len(m.lines); row++ {
+		if m.lines[row] == "" {
+			m.setMotionPosition(row, 0)
+			return
+		}
+		if strings.TrimSpace(m.lines[row]) != "" {
+			m.setMotionPosition(row, firstWordColumn(m.lines[row]))
+			return
+		}
 	}
-	m.setMotionPosition(row, firstWordColumn(m.lines[row]))
+	m.setMotionPosition(len(m.lines)-1, max(0, m.lineLen(len(m.lines)-1)-1))
 }
 
 func (m *Model) wordBackward(big bool) {
@@ -450,13 +464,13 @@ func (m *Model) firstNonBlank() {
 	for m.col < len(cs) && isSpaceCluster(cs[m.col]) {
 		m.col++
 	}
-	m.preferred = -2
+	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
 }
 
-func (m *Model) findChar(kind byte, target string, count int) {
+func (m *Model) findChar(kind byte, target string, count int) bool {
 	cs := clusters(m.lines[m.row])
 	if len(target) == 0 {
-		return
+		return false
 	}
 	forward := kind == 'f' || kind == 't'
 	idx := m.col
@@ -478,7 +492,7 @@ func (m *Model) findChar(kind byte, target string, count int) {
 			}
 		}
 		if found < 0 {
-			return
+			return false
 		}
 		idx = found
 	}
@@ -491,6 +505,7 @@ func (m *Model) findChar(kind byte, target string, count int) {
 	m.col = min(max(0, idx), max(0, len(cs)-1))
 	m.preferred = m.col
 	m.lastFind, m.lastFindKey, m.lastFindPos = kind, target, idx
+	return true
 }
 
 func (m *Model) repeatFind(reverse bool, count int) {

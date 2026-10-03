@@ -48,7 +48,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
-| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done (review fixes) | ws/ux-v1-vimtext | 2026-10-03 19:00 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done (nvim oracle review) | ws/ux-v1-vimtext | 2026-10-03 19:33 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
@@ -794,5 +794,23 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Files: `internal/tui/vimtext/`, `docs/ledger.md`
 - Decisions: No findings were deferred. Multiline inner-pair edits preserve nvim's indentation and line structure; linewise single-line registers are charwise and contain no newline.
 - Tests: `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` green. Six goldens regenerated and reviewed. Apple M3 Pro benchmarks: `G`/`gg` 9.28 µs/op, 100 typed characters 2.91 ms total, edited-line highlight recompute 1.66 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.
+
+### 2026-10-03 19:07 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Began the second reviewer remediation by replacing hand-tuned edge-case convergence with a permanent batched nvim 0.11 differential oracle. Started adding the newly reported blocker, major, and minor cases to the shared corpus.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: `nvim --clean --headless -n` with autoindent enabled is authoritative. Intentional deviations are explicit and limited to literal search semantics.
+- Tests: Previous 425-case corpus and repository gate were green before this remediation.
+- Blockers / questions: none.
+- Next: land the opt-in differential harness, run corpus plus seeded random comparisons, then fix every non-allowlisted mismatch.
+
+### 2026-10-03 19:33 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Added the permanent batched nvim differential oracle and fixed all newly reported data-loss and fidelity regressions, including final-word operators, row-local inner objects, failed finds, nested pairs, visual text objects, multiline pair objects, autoindent, search reuse/counts, undo/redo cursors, visual end-of-line deletion, and whole-word `*`. The permanent corpus now has 472 cases.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: The oracle compares 460 eligible corpus cases and 500 seeded 3–12-key generated cases. Nvim uses two-space `expandtab` settings to match the documented `TabText` default. The only allowlisted difference is literal search versus Nvim regular-expression search.
+- Tests: `VIMTEXT_NVIM=1 go test ./internal/tui/vimtext -run TestDifferentialNvim` passed with `corpus=460 random=500 mismatches=0 allowed=1`; `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` passed. Six goldens regenerated with no diff. Apple M3 Pro: `G`/`gg` 6.95–7.18 µs per three-key cycle, 100 typed keys 1.06–1.08 ms total, highlight recompute 0.862–0.871 ms/key.
 - Blockers / questions: none.
 - Next: orchestrator re-review and merge.

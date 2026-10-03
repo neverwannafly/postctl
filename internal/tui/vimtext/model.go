@@ -103,8 +103,10 @@ type Completer interface {
 type position struct{ row, col int }
 
 type snapshot struct {
-	lines []string
-	pos   position
+	lines      []string
+	pos        position
+	redoPos    position
+	hasRedoPos bool
 }
 
 // Model is a modal text editor.
@@ -135,9 +137,10 @@ type Model struct {
 	lastFindKey string
 	lastFindPos int
 
-	anchor  position
-	reg     string
-	regLine bool
+	anchor    position
+	visualEOL bool
+	reg       string
+	regLine   bool
 
 	undo []snapshot
 	redo []snapshot
@@ -149,6 +152,7 @@ type Model struct {
 	insertCount   int
 	insertKind    string
 	insertSession string
+	insertStart   position
 
 	searching  bool
 	searchDir  int
