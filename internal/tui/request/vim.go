@@ -57,6 +57,7 @@ func (p *Pane) newField(spec fieldSpec) *vimfield.Field {
 			}
 			return mask
 		}
+		o.Completer = nil // a secret field offers no menu (the WebSocket pane agrees)
 	}
 	return vimfield.New(p.th, o)
 }
