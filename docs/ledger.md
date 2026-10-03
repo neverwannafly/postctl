@@ -53,7 +53,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
-| UX-M1 mouse | Gemini 3.8 Flash (high) | In review fixes | ws/ux-m1-mouse | 2026-10-03 20:45 IST |
+| UX-M1 mouse | Gemini 3.8 Flash (high) | Review fixes done | ws/ux-m1-mouse | 2026-10-03 21:03 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
 
@@ -1071,3 +1071,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green (`go build ./...`, `go test -race ./...` with comprehensive hit-testing, focus, double-click, wheel, tab click, and overlay tests; `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` passed.
 - Blockers / questions: none.
 - Next: Ready for orchestrator review and merge.
+
+### 2026-10-03 21:03 IST · UX-M1 · Gemini 3.8 Flash (high) · PROGRESS
+- Branch/worktree: `ws/ux-m1-mouse` · `~/work/postctl-wt/ux-m1-mouse`
+- Did: Addressed all review findings 1–9 after merging main (H1, T, V3 items 1–3):
+  1. Handled left-click logic only on `tea.MouseClickMsg` and wheel on `tea.MouseWheelMsg`; release and motion are ignored early.
+  2. Treated full-screen screens (`*screenOverlay`) as modal for outside clicks to avoid skipping Esc cancellation/unsaved edits.
+  3. Response pane: detected collapsed tabs mode at narrow widths and 80 cols, only allowing click on the visible selector at y=1 and ignoring y=2 body clicks; included V3 History tab in tab hit-testing.
+  4. Single-pane switcher: dynamically derived ranges from rendered tab labels via `ui.TabRanges`, handling focus offsets across all pane focus states.
+  5. Tree scrolling via wheel: updated selection when scrolled past the viewport boundary to keep selection visible (vim `Ctrl-e`/`Ctrl-y`).
+  6. Request wheel: ignored wheel events while a text field is editing (`p.Editing()`).
+  7. Performance: returned early on non-click/non-wheel events before hit-testing or rendering overlay views.
+  8. Matrix tests added: 120x40, 99 and 139 boundaries, ASCII look, sidebar toggled, full-screen screens, and collapsed tabs.
+  9. Ignored events before `phaseReady`; cleared pending leader/prefix state (`a.pend = nil`) on click.
+- Files: `internal/tui/mouse.go`, `internal/tui/mouse_test.go`, `internal/tui/tree.go`, `internal/tui/request/mouse.go`, `internal/tui/request/mouse_test.go`, `internal/tui/response/mouse.go`, `internal/tui/response/mouse_test.go`, `internal/tui/wspane/mouse.go`, `docs/ledger.md`.
+- Decisions: Filter out non-click/non-wheel events at top of `onMouse` before layout/hit-region derivation.
+- Tests: `task agents:check` green (`go build ./...`, `go test -race ./...`, `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` PASS.
+- Blockers / questions: none.
+- Next: Ready for re-review and merge.

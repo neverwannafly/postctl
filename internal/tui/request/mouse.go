@@ -13,9 +13,11 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 	if !p.editable() || p.confirm != nil {
 		return nil
 	}
-	m := msg.Mouse()
-	switch m.Button {
-	case tea.MouseLeft:
+	switch msg := msg.(type) {
+	case tea.MouseClickMsg:
+		if msg.Button != tea.MouseLeft {
+			return nil
+		}
 		if y == 2 || y == 3 {
 			tabs := p.tabList()
 			width := p.w
@@ -48,15 +50,21 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 				return p.onFocusSection(tui.FocusSectionMsg{Section: tabSections[hit]})
 			}
 		}
-	case tea.MouseWheelUp:
-		p.scrollWheel(-1, msg)
-	case tea.MouseWheelDown:
-		p.scrollWheel(1, msg)
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelUp:
+			p.scrollWheel(-1, msg)
+		case tea.MouseWheelDown:
+			p.scrollWheel(1, msg)
+		}
 	}
 	return nil
 }
 
 func (p *Pane) scrollWheel(delta int, msg tea.MouseMsg) {
+	if p.Editing() {
+		return
+	}
 	var key rune
 	if delta < 0 {
 		key = tea.KeyUp

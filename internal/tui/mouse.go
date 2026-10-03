@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,7 +46,15 @@ func (a *app) hitRegions() paneHitRegions {
 
 	if a.ov != nil {
 		r.hasOverlay = true
-		if d, ok := a.ov.(dialog); ok && d.isDialog() {
+		if _, ok := a.ov.(*screenOverlay); ok {
+			r.isModal = true
+			r.overlay = rect{
+				x: g.inset,
+				y: headerRows,
+				w: g.width,
+				h: g.bodyH,
+			}
+		} else if d, ok := a.ov.(dialog); ok && d.isDialog() {
 			r.isModal = true
 			box := a.ov.view(a, g.width, g.bodyH)
 			boxLines := strings.Split(strings.Trim(box, "\n"), "\n")
@@ -124,18 +133,59 @@ func (a *app) closeOverlay() tea.Cmd {
 		return nil
 	}
 	if _, ok := a.ov.(*screenOverlay); ok {
-		a.ov = nil
-		return a.afterScreen()
+		return nil
 	}
 	a.ov = nil
 	return nil
 }
 
+func (a *app) switcherSlotAt(relX int, slots []Slot, w int) (Slot, bool) {
+	tabs := make([]ui.Tab, len(slots))
+	for i, s := range slots {
+		prefix := "  "
+		if a.focus == s {
+			prefix = a.theme.Glyphs.Select + " "
+		}
+		tabs[i] = ui.Tab{Label: prefix + "[" + strconv.Itoa(int(s)+1) + "] " + s.String()}
+	}
+	ranges := a.theme.TabRanges(w, tabs)
+	for i, r := range ranges {
+		nextStart := w
+		if i+1 < len(ranges) {
+			nextStart = ranges[i+1].Start
+		}
+		if relX >= r.Start && relX < nextStart {
+			return slots[r.Index], true
+		}
+	}
+	return SlotSidebar, false
+}
+
 func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
-	if !a.mouseEnabled() {
+	if !a.mouseEnabled() || a.phase != phaseReady {
 		return nil
 	}
-	m := msg.Mouse()
+
+	var isClick, isWheel bool
+	var m tea.Mouse
+	switch event := msg.(type) {
+	case tea.MouseClickMsg:
+		m = event.Mouse()
+		if m.Button != tea.MouseLeft {
+			return nil
+		}
+		isClick = true
+		a.pend = nil
+	case tea.MouseWheelMsg:
+		m = event.Mouse()
+		if m.Button != tea.MouseWheelUp && m.Button != tea.MouseWheelDown {
+			return nil
+		}
+		isWheel = true
+	default:
+		return nil
+	}
+
 	x, y := m.X, m.Y
 	regions := a.hitRegions()
 
@@ -146,17 +196,23 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 		if regions.isModal {
 			return nil
 		}
-		return a.closeOverlay()
+		if isClick {
+			return a.closeOverlay()
+		}
+		return nil
 	}
 
-	switch m.Button {
-	case tea.MouseWheelUp, tea.MouseWheelDown:
+	if isWheel {
 		delta := 1
 		if m.Button == tea.MouseWheelUp {
 			delta = -1
 		}
 		if regions.sidebar.contains(x, y) {
+			oldSel := a.tree.sel
 			a.tree.scroll(delta)
+			if a.tree.sel != oldSel {
+				return a.syncSelection(false)
+			}
 			return nil
 		}
 		if regions.request.contains(x, y) {
@@ -172,24 +228,21 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 			return nil
 		}
 		return nil
+	}
 
-	case tea.MouseLeft:
+	if isClick {
 		if regions.switcher.contains(x, y) {
 			relX := x - regions.switcher.x
+			var slots []Slot
 			if a.layoutKind() == ui.LayoutSingle {
-				if relX < 19 {
-					return a.setFocus(SlotSidebar)
-				}
-				if relX < 34 {
-					return a.setFocus(SlotRequest)
-				}
-				return a.setFocus(SlotResponse)
+				slots = []Slot{SlotSidebar, SlotRequest, SlotResponse}
+			} else {
+				slots = []Slot{SlotRequest, SlotResponse}
 			}
-			// TwoPane
-			if relX < 15 {
-				return a.setFocus(SlotRequest)
+			if slot, ok := a.switcherSlotAt(relX, slots, regions.switcher.w); ok {
+				return a.setFocus(slot)
 			}
-			return a.setFocus(SlotResponse)
+			return nil
 		}
 		if regions.sidebarTitle.contains(x, y) {
 			return a.setFocus(SlotSidebar)

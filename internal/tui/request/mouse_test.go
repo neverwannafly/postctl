@@ -45,3 +45,44 @@ func TestRequestPaneMouseTabsAndWheel(t *testing.T) {
 	wheelUp := tea.MouseWheelMsg{X: 10, Y: 10, Button: tea.MouseWheelUp}
 	h.p.HandleMouse(wheelUp, 10, 10)
 }
+
+func TestRequestWheelDoesNothingWhileEditing(t *testing.T) {
+	h := newHarness(t)
+	// Focus on URL editing
+	h.p.urlE = true
+	if !h.p.Editing() {
+		t.Fatalf("expected p.Editing() to be true")
+	}
+
+	// Send wheel
+	wheelDown := tea.MouseWheelMsg{X: 10, Y: 10, Button: tea.MouseWheelDown}
+	h.p.HandleMouse(wheelDown, 10, 10)
+
+	// URL editor must still be active
+	if !h.p.urlE {
+		t.Errorf("wheel while editing should not dismiss or commit URL edit")
+	}
+
+	// Now test KV edit
+	h.p.urlE = false
+	kv, ok := h.p.views[tabParams].(*kvView)
+	if !ok {
+		t.Fatalf("expected kvView for tabParams")
+	}
+	items := kv.items(h.p)
+	if len(items) < 2 {
+		t.Fatalf("need at least 2 items, got %d", len(items))
+	}
+	kv.cur = 1
+	kv.beginEdit(h.p, items, 0)
+	if !h.p.Editing() {
+		t.Fatalf("expected p.Editing() to be true during kv edit")
+	}
+
+	// Send wheel up: with the current bug, kv.cur moves from 1 to 0!
+	wheelUp := tea.MouseWheelMsg{X: 10, Y: 10, Button: tea.MouseWheelUp}
+	h.p.HandleMouse(wheelUp, 10, 10)
+	if kv.cur != 1 {
+		t.Errorf("wheel up while editing moved kv.cur from 1 to %d", kv.cur)
+	}
+}

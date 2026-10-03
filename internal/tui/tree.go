@@ -360,11 +360,35 @@ func (tv *treeState) current() (treeRow, bool) {
 	return tv.rows[tv.cursor], true
 }
 
-// scroll shifts tv.top by delta without changing selection.
+// scroll shifts tv.top by delta, keeping the selection within the visible range (vim Ctrl-e/Ctrl-y).
 func (tv *treeState) scroll(delta int) {
+	if len(tv.rows) == 0 {
+		return
+	}
 	n := tv.viewRows()
 	maxTop := max(0, len(tv.rows)-n)
 	tv.top = max(0, min(tv.top+delta, maxTop))
+
+	bottom := min(len(tv.rows)-1, tv.top+n-1)
+	if tv.cursor < tv.top {
+		tv.cursor = tv.top
+		tv.settle(1)
+		if tv.cursor > bottom {
+			tv.settle(-1)
+		}
+		if r, ok := tv.current(); ok {
+			tv.sel = r.id
+		}
+	} else if tv.cursor > bottom {
+		tv.cursor = bottom
+		tv.settle(-1)
+		if tv.cursor < tv.top {
+			tv.settle(1)
+		}
+		if r, ok := tv.current(); ok {
+			tv.sel = r.id
+		}
+	}
 }
 
 // rowAt maps y (relative to tree body) to the visible row and row index.
