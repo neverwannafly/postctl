@@ -34,7 +34,12 @@ POSTCTL_FAKE_SENDER=1 ./bin/postctl --workspace "$tmp"
 
 In the fake TUI, open a request and press Ctrl-S. Resize across 140 and 100
 columns, open `?` and Ctrl-P, then edit a YAML or sibling `.js` file in the
-temporary workspace and watch it reload.
+temporary workspace and watch it reload. The keys are vim-flavoured: try
+`Space Space` (switcher), `g u` then `i` (edit the URL, `Esc` leaves insert
+mode), `g r` (response body), `Space H` (history of the request), `Space x`
+(diff with the previous send) and `Space j` (jq filter); `Space` plus a
+300 ms pause lists what is available, and `docs/keys.md` has the full table.
+`task tui:smoke` walks these keys offline.
 
 Next run focused tests and the full fast test set:
 

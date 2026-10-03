@@ -104,7 +104,7 @@ A g key lists only the sections the focused pane really has. Pressing a section 
 | `gm` | Messages | WebSocket: Messages tab |
 | `gr` | Response body | Focus the response pane on its Body tab |
 | `gH` | Response history | Focus the response pane on its History tab |
-| `[, ]` | Previous / next tab | Step through the tabs of the focused pane; repeat without the prefix |
+| `[, ]` | Previous / next tab | Step through the tabs of the focused pane; press again to keep stepping |
 
 ## Collections Sidebar (Tree)
 

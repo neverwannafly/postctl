@@ -270,7 +270,8 @@ func (a *app) pendingLabel() string {
 
 // followUp handles the key after a prefix. It reports false when the key is
 // not part of the sequence and should be processed as if no prefix was
-// pending (the always-available shortcuts, and any key after [ or ]).
+// pending (the always-available shortcuts). Any other unknown key, after [ or
+// ] too, cancels the sequence and says so (docs/briefs/UX-V0-shell-keys.md).
 func (a *app) followUp(p *pendingKeys, msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	s := msg.String()
 	switch s {
