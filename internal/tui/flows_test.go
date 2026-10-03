@@ -21,7 +21,7 @@ func envByName(ws *model.Workspace, name string) *model.Environment {
 func TestEnvironmentSwitcher(t *testing.T) {
 	h := newHarness(t, demo(), 140, 30)
 	h.mustHave("env  none")
-	h.keys("E")
+	h.keys("space", "e")
 	h.mustHave("Environments")
 	h.mustHave("No environment")
 	for _, n := range []string{"dev", "local", "prod", "staging"} {
@@ -41,7 +41,7 @@ func TestEnvironmentSwitcher(t *testing.T) {
 
 	// Reopening puts the cursor on the current one, and "No environment"
 	// is reachable and persisted.
-	h.keys("E")
+	h.keys("space", "e")
 	h.mustHave("active")
 	h.keys("home", "enter")
 	if h.a.activeEnv != "" || h.be.savedState().ActiveEnvironment != "" {
@@ -81,7 +81,7 @@ func TestEnvironmentSecretsAreMasked(t *testing.T) {
 			}
 		}
 		h := newHarness(t, ws, 140, 30, func(o *Options) { o.ASCII = ascii })
-		h.keys("E", "down", "down", "down")
+		h.keys("space", "e", "down", "down", "down")
 		mask := "••••"
 		if ascii {
 			mask = "****"
@@ -127,7 +127,7 @@ func TestPaletteRunsActionsAndSwitchesEnvironment(t *testing.T) {
 	}
 
 	h.keys("ctrl+p")
-	h.typeText("help")
+	h.typeText("all keys")
 	h.keys("enter")
 	if _, ok := h.a.ov.(*helpOverlay); !ok {
 		t.Fatalf("palette action should open help, ov=%T", h.a.ov)
@@ -187,7 +187,7 @@ func TestFirstRunForEmptyWorkspace(t *testing.T) {
 	if h.be.inited {
 		t.Fatal("an existing workspace is not re-initialized")
 	}
-	h.keys("n")
+	h.keys("space", "a")
 	h.typeText("Ping")
 	h.keys("enter")
 	h.mustNotHave("Welcome to postctl.")
@@ -262,9 +262,10 @@ func TestManualReloadWaitsForSaves(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.be.gate = make(chan struct{})
 	h.selectByName("Create charge")
+	h.a.Update(keyPress("space"))
 	h.a.Update(keyPress("D"))
 	loads := h.be.loads
-	h.keys("ctrl+r")
+	h.keys("space", "l")
 	if h.be.loads != loads {
 		t.Fatal("reload must not race in-flight saves")
 	}
@@ -314,7 +315,7 @@ func TestNoColorAndASCII(t *testing.T) {
 			t.Fatalf("ascii mode leaked %q:\n%s", r, a.screen())
 		}
 	}
-	a.keys("E")
+	a.keys("space", "e")
 	a.mustHave("Environments")
 }
 

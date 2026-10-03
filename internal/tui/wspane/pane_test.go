@@ -109,7 +109,8 @@ func TestLateDialAfterCancelIsAborted(t *testing.T) {
 	h.key("ctrl+s")
 	h.waitState(stOpen)
 	first := h.client
-	h.key("ctrl+l", "enter") // disconnect from the URL bar
+	h.send(tui.FocusSectionMsg{Section: tui.SectionURL})
+	h.key("enter") // disconnect from the URL bar
 	h.waitState(stIdle)
 	if codes := first.closeCodes(); len(codes) != 1 || codes[0] != wsx.CloseNormal {
 		t.Fatalf("close codes = %v", codes)
@@ -1239,3 +1240,54 @@ func TestMessageEventsAreBatched(t *testing.T) {
 }
 
 var _ = tea.Batch
+
+func TestSectionsFocusAndStepTabs(t *testing.T) {
+	h := newHarness(t)
+	for i, name := range tabSections {
+		h.send(tui.FocusSectionMsg{Section: name})
+		if h.p.tab != tabID(i) {
+			t.Errorf("%s: tab = %v, want %v", name, h.p.tab, tabID(i))
+		}
+	}
+	h.send(tui.SectionStepMsg{Delta: 1})
+	if h.p.tab != 0 {
+		t.Fatalf("] after the last tab -> %v", h.p.tab)
+	}
+	h.send(tui.FocusSectionMsg{Section: tui.SectionURL})
+	if h.p.zone != zBar {
+		t.Fatalf("gu: zone = %v", h.p.zone)
+	}
+	if len(h.p.Sections()) != 1+len(tabSections) {
+		t.Fatalf("Sections = %v", h.p.Sections())
+	}
+}
+
+// Every advertised Action.Keys alternative is a shell binding for the action,
+// or one of the pane's own keys listed here (handled in the pane's Update and
+// covered by its key tests).
+func TestActionKeysAreRealBindings(t *testing.T) {
+	own := map[string]bool{"Ctrl-R": true, "Ctrl-T": true, "Ctrl-X": true, "c": true, "f": true, "/": true, "x": true}
+	h := newHarness(t)
+	for _, act := range h.p.Actions() {
+		for _, bad := range tui.UnboundActionKeys(act.ID, act.Keys) {
+			if !own[bad] {
+				t.Errorf("%s advertises %q, which nothing dispatches to it", act.ID, bad)
+			}
+		}
+	}
+}
+
+// i on a key-value row starts editing its cell in insert, exactly like Enter.
+func TestIOnAKVRowEditsLikeEnter(t *testing.T) {
+	h := newHarness(t)
+	h.gotoTab(tabHeaders)
+	h.key("down", "i")
+	if !h.p.Editing() {
+		t.Fatal("i must start editing the header cell")
+	}
+	h.typ("X")
+	h.key("esc")
+	if got := h.req.Headers[0].Value; !strings.Contains(got, "X") {
+		t.Fatalf("typed text did not reach the cell: %+v", h.req.Headers)
+	}
+}

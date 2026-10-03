@@ -150,23 +150,20 @@ func templateURL(u model.URL, r *Redactor) (raw string, masked bool) {
 }
 
 func rebuildURLRaw(u model.URL, r *Redactor) string {
-	base := u.Raw
-	if idx := strings.IndexByte(base, '?'); idx >= 0 {
-		base = base[:idx]
-	}
+	base, frag := splitURLFragment(u.Raw)
+	base, _, _ = strings.Cut(base, "?")
 	if r != nil {
 		base = r.URL(base)
 	}
-	if len(u.Query) == 0 {
-		return base
+	if len(u.EnabledQuery()) == 0 {
+		return base + frag
 	}
 	var b strings.Builder
 	b.WriteString(base)
-	b.WriteByte('?')
-	for i, kv := range u.Query {
-		if i > 0 {
-			b.WriteByte('&')
-		}
+	sep := byte('?')
+	for _, kv := range u.EnabledQuery() {
+		b.WriteByte(sep)
+		sep = '&'
 		key := kv.Key
 		if r != nil {
 			key = r.Text(key)
@@ -176,7 +173,15 @@ func rebuildURLRaw(u model.URL, r *Redactor) string {
 		b.WriteByte('=')
 		b.WriteString(url.QueryEscape(val))
 	}
+	b.WriteString(frag)
 	return b.String()
+}
+
+func splitURLFragment(raw string) (base, frag string) {
+	if i := strings.IndexByte(raw, '#'); i >= 0 {
+		return raw[:i], raw[i:]
+	}
+	return raw, ""
 }
 
 func templateQuery(rows []model.KV, r *Redactor) []TemplateKV {

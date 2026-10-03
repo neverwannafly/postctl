@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -216,6 +217,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		curlDump.WriteString(masked)
 	}
 
+	querySecretReq := model.NewRequest("Query secret", http.MethodGet, server.URL+"/items?token="+sentinel)
+	ws.Collections[0].Items = append(ws.Collections[0].Items, querySecretReq)
+
 	frames := renderLeakSweepFrames(t, ws, env, coll, oauth, bearerOutcome, log)
 	for name, frame := range renderLeakSweepFrames(t, ws, env, coll, folderRequest, folderOutcome, log) {
 		frames["folder "+name] = frame
@@ -235,6 +239,22 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	if err := persistRestoredRequest(t, st, ws, coll, bearer, literalEntry.Template); err != nil {
 		t.Fatal(err)
 	}
+
+	shell := tui.New(tui.Options{
+		Backend: sweepBackend{
+			Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
+			ws:      ws,
+		},
+		NoWatch: true,
+	})
+	if initCmd := shell.Init(); initCmd != nil {
+		if batch, ok := initCmd().(tea.BatchMsg); ok && len(batch) > 0 {
+			shell, _ = shell.Update(batch[0]())
+		}
+	}
+	shell, _ = shell.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
+	shell, _ = shell.Update(tui.OpenSwitcherMsg{})
+	frames["switcher"] = shell.View().Content
 	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
 	for _, secret := range []string{sentinel, folderSentinel} {
@@ -246,7 +266,14 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		assertAbsent(t, secret, "pager output", pager)
 		assertAbsent(t, secret, "folder pager output", folderPager)
 		for name, frame := range frames {
+			if strings.HasSuffix(name, "response body") {
+				continue // the in-memory body is exempt: it shows what the server sent
+			}
 			assertAbsent(t, secret, name+" frame", []byte(frame))
+			if strings.HasSuffix(name, "response cookies") {
+				// The cookie column clips long values, so also look for the start.
+				assertAbsent(t, secret[:16], name+" frame (clipped value)", []byte(frame))
+			}
 		}
 		assertWorkspaceFilesClean(t, root, secret)
 		assertMaskGlyphsAbsent(t, root)
@@ -276,21 +303,66 @@ func renderLeakSweepFrames(
 	_ = requestPane.Focus()
 	_, _ = requestPane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 
+	// The response pane shows a result only for the request it was sent for.
+	shown := req
+	for _, r := range coll.Requests() {
+		if r.ID == out.RequestID {
+			shown = r
+		}
+	}
+	if shown.ID != out.RequestID {
+		t.Fatal("outcome request is not in the collection, so the response frames would be empty states")
+	}
 	responsePane := response.New(paneEnv)
 	responsePane.SetSize(140, 40)
 	_, _ = responsePane.Update(tui.SelectionMsg{Ref: tui.RequestRef{
-		Collection: coll, Request: coll.Requests()[0],
+		Collection: coll, Request: shown,
 	}})
 	_, _ = responsePane.Update(tui.SendResultMsg{Result: tuiengine.OutcomeToResult(out)})
 	_ = responsePane.Focus()
-	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight}) // Headers
-	headersFrame := responsePane.View()
-	for range 3 {
-		_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	// Walk all six tabs the way ] does and keep every frame.
+	step := tui.SectionStepMsg{Delta: 1}
+	tabNames := []string{"body", "headers", "cookies", "tests", "console", "timeline"}
+	tabFrames := map[string]string{"body": responsePane.View()}
+	for _, name := range tabNames[1:] {
+		_, _ = responsePane.Update(step)
+		tabFrames[name] = responsePane.View()
 	}
-	consoleFrame := responsePane.View()
-	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	timelineFrame := responsePane.View()
+	if !strings.Contains(tabFrames["cookies"], "session") {
+		t.Fatal("cookies tab shows no session cookie, so its masking is not exercised")
+	}
+	if len(tabFrames) != len(tabNames) {
+		t.Fatalf("captured %d response tabs, want %d", len(tabFrames), len(tabNames))
+	}
+
+	// Reveal (u) lasts for one visit: moving to another tab and back, or
+	// blurring the pane, masks again. Compare frames, never print them.
+	revealChanged := false
+	for _, name := range tabNames {
+		_, _ = responsePane.Update(tui.FocusSectionMsg{Section: tui.SectionRespBody})
+		for range slices.Index(tabNames, name) {
+			_, _ = responsePane.Update(step)
+		}
+		masked := responsePane.View()
+		_, _ = responsePane.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
+		if responsePane.View() != masked {
+			revealChanged = true
+		}
+		_, _ = responsePane.Update(step) // another tab, then back
+		_, _ = responsePane.Update(tui.SectionStepMsg{Delta: -1})
+		if responsePane.View() != masked {
+			t.Errorf("response %s tab stayed revealed after changing tabs", name)
+		}
+		_, _ = responsePane.Update(tea.KeyPressMsg{Code: 'u', Text: "u"})
+		responsePane.Blur()
+		_ = responsePane.Focus()
+		if responsePane.View() != masked {
+			t.Errorf("response %s tab stayed revealed after blur", name)
+		}
+	}
+	if !revealChanged {
+		t.Error("reveal changed no response tab, so the reset check proves nothing")
+	}
 
 	historyScreen := tuihistory.New(tui.ScreenEnv{
 		PaneEnv: paneEnv, Workspace: ws, ActiveEnv: env.ID,
@@ -306,13 +378,14 @@ func renderLeakSweepFrames(
 		_, _ = historyScreen.Update(cmd())
 	}
 
-	return map[string]string{
-		"request":           requestPane.View(),
-		"response headers":  headersFrame,
-		"response console":  consoleFrame,
-		"response timeline": timelineFrame,
-		"history":           historyScreen.View(),
+	frames := map[string]string{
+		"request": requestPane.View(),
+		"history": historyScreen.View(),
 	}
+	for name, frame := range tabFrames {
+		frames["response "+name] = frame
+	}
+	return frames
 }
 
 func renderRestoreAndDiffFrames(
@@ -459,5 +532,14 @@ func persistRestoredRequest(
 	for cmd != nil {
 		_, cmd = rp.Update(cmd())
 	}
-	return st.Save(context.Background(), ws)
+	return st.SaveRequest(context.Background(), coll, req.ID)
+}
+
+type sweepBackend struct {
+	tui.Backend
+	ws *model.Workspace
+}
+
+func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileError, error) {
+	return b.ws, nil, nil
 }

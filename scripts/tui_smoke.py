@@ -3,7 +3,8 @@
 
 It copies a synthetic workspace, starts the binary with the fake sender
 (POSTCTL_FAKE_SENDER=1, so no network), opens a request, presses Ctrl-S and
-checks that a response status reached the screen. It prints only pass/fail
+checks that a response status reached the screen, then presses Space and
+checks that the which-key popup appears. It prints only pass/fail
 lines, never screen content.
 
 Usage: python3 scripts/tui_smoke.py [BINARY] [WORKSPACE_DIR] [COLSxROWS]
@@ -71,11 +72,17 @@ def main():
         after = wait_for(fd, "200", 8)
         ok_start = "postctl" in first
         ok_send = "200" in after
+        os.write(fd, b" ")  # the Space leader: the which-key popup follows after 300 ms
+        popup = wait_for(fd, "Switch environment", 5)
+        ok_leader = "Switch environment" in popup
+        os.write(fd, b"\x1b")  # Esc cancels the sequence
+        drain(fd, 0.6)
         print(("PASS" if ok_start else "FAIL") + " first frame shows the header")
         print(("PASS" if ok_send else "FAIL") + " Ctrl-S rendered a response status")
+        print(("PASS" if ok_leader else "FAIL") + " Space shows the which-key popup")
         os.write(fd, b"q")
         drain(fd, 0.5)
-        return 0 if ok_start and ok_send else 1
+        return 0 if ok_start and ok_send and ok_leader else 1
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
         try:

@@ -30,11 +30,11 @@ func TestLayoutSwitchesAtBreakpoints(t *testing.T) {
 				t.Errorf("width %d: expected three panes:\n%s", c.width, scr)
 			}
 		case ui.LayoutTwoPane:
-			if strings.Count(strings.Split(scr, "\n")[2], "│") != 1 || !strings.Contains(scr, "2 Request") {
+			if strings.Count(strings.Split(scr, "\n")[2], "│") != 1 || !strings.Contains(scr, "[2] Request") {
 				t.Errorf("width %d: expected two panes:\n%s", c.width, scr)
 			}
 		default:
-			if strings.Contains(strings.Split(scr, "\n")[3], "│") || !strings.Contains(scr, "1 Collections") {
+			if strings.Contains(strings.Split(scr, "\n")[3], "│") || !strings.Contains(scr, "[1] Collections") {
 				t.Errorf("width %d: expected a single pane:\n%s", c.width, scr)
 			}
 		}
@@ -113,11 +113,11 @@ func TestFocusCycleThreePane(t *testing.T) {
 
 func TestFocusIsVisibleWithoutColor(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30, func(o *Options) { o.NoColor = true })
-	if !strings.Contains(strings.Split(h.screen(), "\n")[2], "› Collections") {
+	if !strings.Contains(strings.Split(h.screen(), "\n")[2], "› [1] Collections") {
 		t.Fatalf("focused sidebar needs a marker:\n%s", h.screen())
 	}
 	h.keys("tab")
-	if !strings.Contains(strings.Split(h.screen(), "\n")[2], "› Request") {
+	if !strings.Contains(strings.Split(h.screen(), "\n")[2], "› [2] Request") {
 		t.Fatalf("focused request pane needs a marker:\n%s", h.screen())
 	}
 }
@@ -147,9 +147,27 @@ func TestSinglePaneSidebarOverlay(t *testing.T) {
 		t.Fatalf("tab in single pane -> %v", h.a.focus)
 	}
 	h.keys("tab")
-	if h.a.focus != SlotRequest {
-		t.Fatalf("tab toggles request/response, got %v", h.a.focus)
+	if h.a.focus != SlotSidebar {
+		t.Fatalf("tab in single pane reaches Collections too: focus=%v", h.a.focus)
 	}
+	h.mustHave("Refund charge")
+	h.keys("tab")
+	if h.a.focus != SlotRequest {
+		t.Fatalf("tab from Collections -> %v", h.a.focus)
+	}
+	h.keys("shift+tab")
+	if h.a.focus != SlotSidebar {
+		t.Fatalf("shift+tab from Request in single pane -> %v", h.a.focus)
+	}
+	h.keys("esc")
+	if h.a.focus != SlotRequest {
+		t.Fatalf("esc closes the overlay -> %v", h.a.focus)
+	}
+	h.keys("/")
+	if h.a.tree.filtering {
+		t.Fatal("/ in the request pane must not open the collections filter")
+	}
+	h.keys("ctrl+b")
 	h.keys("/")
 	if h.a.focus != SlotSidebar || !h.a.tree.filtering {
 		t.Fatalf("/ opens the sidebar filter: focus=%v filtering=%v", h.a.focus, h.a.tree.filtering)
@@ -229,7 +247,7 @@ func TestEditingPaneKeepsPlainKeys(t *testing.T) {
 	}
 	tp.editing = false
 	h.keys("2")
-	h.keys("E")
+	h.keys("space", "e")
 	if _, ok := h.a.ov.(*envOverlay); !ok {
 		t.Fatalf("E opens the switcher once typing stops, ov=%T", h.a.ov)
 	}
@@ -272,7 +290,7 @@ func TestHeaderAlwaysShowsEnvironment(t *testing.T) {
 	ws := demo()
 	h := newHarness(t, ws, 80, 24)
 	h.mustHave("env  none")
-	h.keys("E", "down", "down", "down", "enter") // dev, local, prod
+	h.keys("space", "e", "down", "down", "down", "enter") // dev, local, prod
 	if !strings.Contains(strings.Split(h.screen(), "\n")[0], "! prod") {
 		t.Fatalf("production badge missing from header:\n%s", h.screen())
 	}
@@ -285,7 +303,7 @@ func TestHeaderAlwaysShowsEnvironment(t *testing.T) {
 
 func TestFooterHintsAreContextual(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
-	h.mustHave("n New")
+	h.mustHave("Space a New")
 	h.selectByName("Create charge")
 	h.mustHave("Enter Open")
 	h.selectByName("Charges")
@@ -293,8 +311,8 @@ func TestFooterHintsAreContextual(t *testing.T) {
 	h.keys("/")
 	h.mustHave("Esc Clear filter")
 	h.mustNotHave("q Quit")
-	h.keys("esc", "E")
-	h.mustNotHave("n New")
+	h.keys("esc", "space", "e")
+	h.mustNotHave("Space a New")
 	h.mustHave("Enter Use")
 }
 
@@ -414,9 +432,9 @@ func TestQuit(t *testing.T) {
 		t.Fatal("q quits from the tree")
 	}
 	h = newHarness(t, demo(), 160, 30)
-	h.keys("ctrl+c")
+	h.keys("ctrl+c", "ctrl+c")
 	if !h.quit {
-		t.Fatal("ctrl+c quits")
+		t.Fatal("ctrl+c twice quits")
 	}
 	h = newHarness(t, demo(), 160, 30)
 	h.keys("/")
@@ -430,6 +448,7 @@ func TestQuitWaitsForSaves(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.be.gate = make(chan struct{})
 	h.selectByName("Create charge")
+	h.a.Update(keyPress("space"))
 	h.a.Update(keyPress("D")) // duplicate: the save is now blocked on the gate
 	if !h.a.saver.busy() {
 		t.Fatal("expected a save in flight")
@@ -463,15 +482,29 @@ func isQuit(m tea.Msg) bool {
 	return ok
 }
 
-func TestKeyMapHasNoVimBindings(t *testing.T) {
+// The tree moves with the vim keys (plan U1) and keeps the arrows.
+func TestKeyMapHasVimAndArrowBindings(t *testing.T) {
 	km := newKeyMap(false)
 	for _, b := range []struct {
 		name string
 		keys []string
-	}{{"Up", km.Up.Keys()}, {"Down", km.Down.Keys()}, {"Fold", km.Fold.Keys()}, {"Unfold", km.Unfold.Keys()}} {
-		for _, k := range b.keys {
-			if k == "h" || k == "j" || k == "k" || k == "l" {
-				t.Errorf("%s is bound to vim key %q", b.name, k)
+		want []string
+	}{
+		{"Up", km.Up.Keys(), []string{"k", "up"}},
+		{"Down", km.Down.Keys(), []string{"j", "down"}},
+		{"Fold", km.Fold.Keys(), []string{"h", "left"}},
+		{"Unfold", km.Unfold.Keys(), []string{"l", "right"}},
+		{"PageUp", km.PageUp.Keys(), []string{"ctrl+u", "pgup"}},
+		{"PageDown", km.PageDown.Keys(), []string{"ctrl+d", "pgdown"}},
+		{"End", km.End.Keys(), []string{"G", "end"}},
+	} {
+		for _, w := range b.want {
+			found := false
+			for _, k := range b.keys {
+				found = found || k == w
+			}
+			if !found {
+				t.Errorf("%s lacks key %q (has %v)", b.name, w, b.keys)
 			}
 		}
 	}
@@ -481,14 +514,27 @@ func TestHelpIsGeneratedFromKeyMap(t *testing.T) {
 	h := newHarness(t, demo(), 160, 40)
 	h.keys("?")
 	scr := h.screen()
-	for _, want := range []string{"Everywhere", "Collections", "Request and response", "Ctrl-Enter", "Edit in $EDITOR", "Command palette", "Ctrl-P", "Duplicate", "Environments"} {
+	for _, want := range []string{"Everywhere", "Collections", "After Space", "Request and response", "Switch environment", "Command palette", "Ctrl-P", "Duplicate", "Ctrl-h j k l"} {
 		if !strings.Contains(scr, want) {
 			t.Errorf("help is missing %q:\n%s", want, scr)
 		}
 	}
+	// Ctrl-Enter and Ctrl-i rows need enhanced keyboard reporting: a legacy
+	// terminal sees Ctrl-S only and never an unreachable key.
+	if strings.Contains(scr, "Ctrl-Enter") || strings.Contains(scr, "Ctrl-i") {
+		t.Errorf("help lists a key this terminal cannot send:\n%s", scr)
+	}
+	h.keys("esc")
+	h.msg(tea.KeyboardEnhancementsMsg{Flags: 1})
+	h.keys("?")
+	for _, want := range []string{"Ctrl-Enter", "Ctrl-o Ctrl-i"} {
+		if !strings.Contains(h.screen(), want) {
+			t.Errorf("enhanced help is missing %q", want)
+		}
+	}
 	// Every documented binding is reachable from the key map itself.
 	km := newKeyMap(false)
-	for _, g := range km.helpGroups("Collections", nil) {
+	for _, g := range km.helpGroups("Collections", nil, nil, false, false) {
 		if len(g.Rows) == 0 || g.Title == "" {
 			t.Errorf("empty help group %+v", g)
 		}

@@ -148,7 +148,7 @@ func TestWatcherEventReloadsButOwnSavesDoNot(t *testing.T) {
 	}
 
 	// Right after one of our own saves the watcher echo is ignored.
-	h.keys("D")
+	h.keys("space", "D")
 	loads = h.be.loads
 	h.msg(fsChangedMsg{w: fw})
 	if h.be.loads != loads {

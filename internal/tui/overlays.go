@@ -192,6 +192,10 @@ type pickerOverlay struct {
 	empty    string
 	onPick   func(a *app, it pickItem) tea.Cmd
 	lastPage int
+
+	// exCommand, when set, is offered the typed text on Enter before the
+	// highlighted item is chosen (the palette's q, w and wq).
+	exCommand func(a *app, input string) (tea.Cmd, bool)
 }
 
 func newPicker(a *app, title, placeholder, empty string, items []pickItem, onPick func(a *app, it pickItem) tea.Cmd) (*pickerOverlay, tea.Cmd) {
@@ -223,6 +227,11 @@ func (p *pickerOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 		case "esc":
 			return nil, nil
 		case "enter":
+			if p.exCommand != nil {
+				if cmd, ok := p.exCommand(a, p.input.Value()); ok {
+					return nil, cmd
+				}
+			}
 			if p.cursor < len(p.res) {
 				it := p.all[p.res[p.cursor].index]
 				return nil, p.onPick(a, it)

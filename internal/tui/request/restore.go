@@ -51,6 +51,20 @@ func (p *Pane) takePendingPatch(id model.ID) (tui.ApplyRequestPatchMsg, bool) {
 	return msg, ok
 }
 
+func (p *Pane) dropPendingPatches(except model.ID) bool {
+	if len(p.pending) == 0 {
+		return false
+	}
+	var dropped bool
+	for id := range p.pending {
+		if id != except {
+			delete(p.pending, id)
+			dropped = true
+		}
+	}
+	return dropped
+}
+
 func applyTemplate(req *model.Request, tmpl *hist.RequestTemplate) (kept []string, errMsg string) {
 	if tmpl == nil {
 		return nil, "empty template"
@@ -59,18 +73,15 @@ func applyTemplate(req *model.Request, tmpl *hist.RequestTemplate) (kept []strin
 	if tmpl.Method != "" {
 		req.Method = tmpl.Method
 	}
-	// URL
 	if hist.FieldMasked(tmpl.URLMasked, tmpl.URL) {
 		kept = append(kept, "URL")
-	} else if hist.RestoreSafeValue(tmpl.URL) || tmpl.URL == "" {
-		req.URL.Raw = tmpl.URL
 	} else {
-		kept = append(kept, "URL")
+		req.URL.Raw = tmpl.URL
 	}
 	req.URL.Query = applyTemplateKV(cur.URL.Query, tmpl.Query, "query ", &kept)
 	req.URL.PathVars = applyTemplatePathVars(cur.URL.PathVars, tmpl.PathVars, &kept)
 	req.Headers = applyTemplateKV(cur.Headers, tmpl.Headers, "header ", &kept)
-	applyBodyTemplate(&req.Body, cur.Body, tmpl, &kept)
+	applyBodyTemplate(req, cur, tmpl, &kept)
 	return kept, ""
 }
 
@@ -78,9 +89,8 @@ func applyTemplateKV(cur []model.KV, tmpl []hist.TemplateKV, prefix string, kept
 	curBy := kvByKey(cur)
 	out := make([]model.KV, 0, len(tmpl))
 	for _, tk := range tmpl {
-		masked := hist.FieldMasked(tk.Masked, tk.Value)
 		kv := model.KV{Key: tk.Key, Value: tk.Value, Disabled: tk.Disabled}
-		if masked || !hist.RestoreSafeValue(tk.Value) {
+		if hist.FieldMasked(tk.Masked, tk.Value) {
 			if old, ok := curBy[strings.ToLower(tk.Key)]; ok {
 				kv.Value = old.Value
 			} else {
@@ -100,9 +110,8 @@ func applyTemplatePathVars(cur []model.Variable, tmpl []hist.TemplateVariable, k
 	}
 	out := make([]model.Variable, 0, len(tmpl))
 	for _, tv := range tmpl {
-		masked := hist.FieldMasked(tv.Masked, tv.Value)
 		v := model.Variable{Key: tv.Key, Value: tv.Value}
-		if masked || !hist.RestoreSafeValue(tv.Value) {
+		if hist.FieldMasked(tv.Masked, tv.Value) {
 			if old, ok := curBy[strings.ToLower(tv.Key)]; ok {
 				v.Value = old.Value
 			} else {
@@ -115,55 +124,60 @@ func applyTemplatePathVars(cur []model.Variable, tmpl []hist.TemplateVariable, k
 	return out
 }
 
-func applyBodyTemplate(b *model.Body, cur model.Body, tmpl *hist.RequestTemplate, kept *[]string) {
-	if tmpl.BodyMode != "" {
-		b.Mode = tmpl.BodyMode
+func applyBodyTemplate(req *model.Request, cur *model.Request, tmpl *hist.RequestTemplate, kept *[]string) {
+	mode := tmpl.BodyMode
+	if mode == "" && len(tmpl.BodyURLEncoded) == 0 && len(tmpl.BodyFormData) == 0 && tmpl.BodyRaw == "" {
+		req.Body = model.Body{}
+		return
 	}
-	switch tmpl.BodyMode {
+	b := model.Body{Mode: mode}
+	switch mode {
 	case model.BodyRaw:
 		if hist.FieldMasked(tmpl.BodyRawMasked, tmpl.BodyRaw) || tmpl.BodyRawTruncated || tmpl.BodyRawEncoding != "" {
+			b = cur.Body
 			*kept = append(*kept, bodyKeepLabel(tmpl))
-		} else if hist.RestoreSafeValue(tmpl.BodyRaw) || tmpl.BodyRaw == "" {
-			b.Raw = tmpl.BodyRaw
 		} else {
-			*kept = append(*kept, "body")
+			b.Raw = tmpl.BodyRaw
 		}
 	case model.BodyURLEncoded:
-		b.URLEncoded = applyTemplateKV(cur.URLEncoded, tmpl.BodyURLEncoded, "field ", kept)
+		b.URLEncoded = applyTemplateKV(cur.Body.URLEncoded, tmpl.BodyURLEncoded, "field ", kept)
 	case model.BodyFormData:
-		b.FormData = applyTemplateForm(cur.FormData, tmpl.BodyFormData, kept)
+		b.FormData = applyTemplateForm(cur.Body.FormData, tmpl.BodyFormData, kept)
 	case model.BodyGraphQL:
-		if b.GraphQL == nil {
-			b.GraphQL = &model.GraphQLBody{}
-		}
+		g := &model.GraphQLBody{}
 		if hist.FieldMasked(tmpl.BodyRawMasked, tmpl.BodyRaw) || tmpl.BodyRawTruncated || tmpl.BodyRawEncoding != "" {
+			if cur.Body.GraphQL != nil {
+				*g = *cur.Body.GraphQL
+			}
 			*kept = append(*kept, "GraphQL query")
-		} else if hist.RestoreSafeValue(tmpl.BodyRaw) || tmpl.BodyRaw == "" {
-			b.GraphQL.Query = tmpl.BodyRaw
 		} else {
-			*kept = append(*kept, "GraphQL query")
+			g.Query = tmpl.BodyRaw
 		}
 		if tmpl.BodyGraphQLVariables != "" || tmpl.BodyGraphQLVariablesMasked || tmpl.BodyGraphQLVariablesTruncated {
 			if hist.FieldMasked(tmpl.BodyGraphQLVariablesMasked, tmpl.BodyGraphQLVariables) ||
-				tmpl.BodyGraphQLVariablesTruncated || !hist.RestoreSafeValue(tmpl.BodyGraphQLVariables) {
+				tmpl.BodyGraphQLVariablesTruncated {
+				if cur.Body.GraphQL != nil {
+					g.Variables = cur.Body.GraphQL.Variables
+				}
 				*kept = append(*kept, "GraphQL variables")
 			} else {
-				b.GraphQL.Variables = tmpl.BodyGraphQLVariables
+				g.Variables = tmpl.BodyGraphQLVariables
 			}
 		}
+		b.GraphQL = g
 	case model.BodyBinary:
-		if hist.FieldMasked(tmpl.BodyRawMasked, tmpl.BodyRaw) || !hist.RestoreSafeValue(tmpl.BodyRaw) {
-			if tmpl.BodyRaw != "" {
-				*kept = append(*kept, "body file")
-			}
+		if hist.FieldMasked(tmpl.BodyRawMasked, tmpl.BodyRaw) {
+			b = cur.Body
+			*kept = append(*kept, "body file")
 		} else {
 			b.File = tmpl.BodyRaw
 		}
-	case "":
-		if len(tmpl.BodyURLEncoded) == 0 && len(tmpl.BodyFormData) == 0 && tmpl.BodyRaw == "" {
-			*b = model.Body{}
+	default:
+		if tmpl.BodyRaw != "" || len(tmpl.BodyURLEncoded) > 0 || len(tmpl.BodyFormData) > 0 {
+			b.Mode = tmpl.BodyMode
 		}
 	}
+	req.Body = b
 }
 
 func bodyKeepLabel(tmpl *hist.RequestTemplate) string {
@@ -185,7 +199,7 @@ func applyTemplateForm(cur []model.FormPart, tmpl []hist.TemplateFormPart, kept 
 	for _, tp := range tmpl {
 		part := model.FormPart{Key: tp.Key, Type: tp.Type, Disabled: tp.Disabled}
 		if tp.Type == model.FormFile {
-			if hist.FieldMasked(tp.SrcMasked, tp.Src) || !hist.RestoreSafeValue(tp.Src) {
+			if hist.FieldMasked(tp.SrcMasked, tp.Src) {
 				if old, ok := curBy[strings.ToLower(tp.Key)]; ok {
 					part.Src = old.Src
 				}
@@ -194,7 +208,7 @@ func applyTemplateForm(cur []model.FormPart, tmpl []hist.TemplateFormPart, kept 
 				part.Src = tp.Src
 			}
 		} else {
-			if hist.FieldMasked(tp.ValueMasked, tp.Value) || !hist.RestoreSafeValue(tp.Value) {
+			if hist.FieldMasked(tp.ValueMasked, tp.Value) {
 				if old, ok := curBy[strings.ToLower(tp.Key)]; ok {
 					part.Value = old.Value
 				}

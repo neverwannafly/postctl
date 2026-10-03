@@ -1,6 +1,6 @@
  postctl  payments-api                                                                                                                                                                        env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- › Collections  11 requests                  │   Request                                                                         │   Response                                                          
+ › [1] Collections  11 requests              │   [2] Request                                                                     │   [3] Response                                                      
  › ▾ Payments                              8 │ Payments                                                                          │ No response yet                                                     
      ▾ Charges                             4 │ A folder or collection. Enter folds or unfolds it.                                │ Select a request to see its response here.                          
          GET   List charges                  │                                                                                   │                                                                     
@@ -57,4 +57,4 @@
                                              │                                                                                   │                                                                     
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Enter Fold   n New   / Filter   r Rename   d Delete   m Move   D Duplicate   R Run collection   ? Help   Ctrl-P Palette   E Environments   q Quit
+ Enter Fold   Space a New   / Filter   Space r Rename   Space d Delete   Space m Move   Space D Duplicate   ? Help   Ctrl-P Palette   Space Actions   q Quit

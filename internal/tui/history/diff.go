@@ -19,6 +19,11 @@ func (m *Model) beginDiff() (tui.Screen, tea.Cmd) {
 		m.notice, m.fail = "Select a different entry to compare with the mark.", false
 		return m, nil
 	}
+	m.diff = nil
+	m.diffHeaders = nil
+	m.diffBodyMode = true
+	m.phase = phDiff
+	m.diffGen++
 	return m, m.loadDiffPair(m.markID, cur.ID)
 }
 
@@ -45,23 +50,42 @@ func (m *Model) loadDiffPair(markID, otherID string) tea.Cmd {
 	}
 }
 
+type diffReadyMsg struct {
+	gen     int
+	body    *diffview.Model
+	headers *diffview.Model
+}
+
 func (m *Model) onDiffPair(msg diffPairMsg) (tui.Screen, tea.Cmd) {
 	if msg.err != nil {
 		m.notice, m.fail = msg.err.Error(), true
+		m.phase = phList
 		return m, nil
 	}
-	leftText, leftHdrs := responseTexts(msg.left)
-	rightText, rightHdrs := responseTexts(msg.right)
-	m.diff = diffview.New(m.th,
-		sideSummary("Marked", msg.left), sideSummary("Current", msg.right),
-		leftText, rightText,
-	)
-	m.diffHeaders = diffview.NewHeaders(m.th,
-		sideSummary("Marked", msg.left), sideSummary("Current", msg.right),
-		leftHdrs, rightHdrs,
-	)
-	m.diffBodyMode = true
-	m.phase = phDiff
+	gen := m.diffGen
+	th := m.th
+	left, right := msg.left, msg.right
+	return m, func() tea.Msg {
+		leftText, leftHdrs := responseTexts(left)
+		rightText, rightHdrs := responseTexts(right)
+		body := diffview.New(th,
+			sideSummary("Marked", left), sideSummary("Current", right),
+			leftText, rightText,
+		)
+		headers := diffview.NewHeaders(th,
+			sideSummary("Marked", left), sideSummary("Current", right),
+			leftHdrs, rightHdrs,
+		)
+		return diffReadyMsg{gen: gen, body: body, headers: headers}
+	}
+}
+
+func (m *Model) onDiffReady(msg diffReadyMsg) (tui.Screen, tea.Cmd) {
+	if msg.gen != m.diffGen || m.phase != phDiff {
+		return m, nil
+	}
+	m.diff = msg.body
+	m.diffHeaders = msg.headers
 	m.diff.SetSize(m.w, m.h)
 	m.diffHeaders.SetSize(m.w, m.h)
 	return m, nil
@@ -99,10 +123,14 @@ func responseBodyString(r *history.ResponseSnapshot) string {
 func (m *Model) diffKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc", "q":
+		m.diffGen++
 		m.phase = phList
 		return m, nil
 	case "h", "t":
 		m.diffBodyMode = !m.diffBodyMode
+		return m, nil
+	}
+	if m.diff == nil {
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -115,8 +143,12 @@ func (m *Model) diffKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 }
 
 func (m *Model) viewDiff() string {
+	hdr := m.screenHeader("History diff")
+	if m.diff == nil {
+		return hdr + "\n" + m.th.EmptyState("Comparing…", "Building the response diff. Esc cancels.", "", m.w)
+	}
 	if m.diffBodyMode {
-		return m.screenHeader("History diff") + "\n" + m.diff.View()
+		return hdr + "\n" + m.diff.View()
 	}
 	return m.screenHeader("History diff (headers)") + "\n" + m.diffHeaders.View()
 }

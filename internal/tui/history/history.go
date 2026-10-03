@@ -84,6 +84,7 @@ type Model struct {
 	diff         *diffview.Model
 	diffHeaders  *diffview.Model
 	diffBodyMode bool
+	diffGen      int
 }
 
 // New builds the history browser.
@@ -104,7 +105,7 @@ func (m *Model) KeyHints() []ui.Hint {
 		return []ui.Hint{
 			{Key: "n/N", Label: "Hunk", Priority: 2},
 			{Key: "h", Label: "Headers/body", Priority: 2},
-			{Key: "↑↓", Label: "Scroll", Priority: 3},
+			{Key: "j/k", Label: "Scroll", Priority: 3},
 			{Key: "Esc", Label: "Back", Priority: 1},
 		}
 	case phDetail:
@@ -130,6 +131,7 @@ func (m *Model) KeyHints() []ui.Hint {
 			{Key: "/", Label: "Filter", Priority: 1},
 			{Key: "f", Label: "Status filter", Priority: 2},
 			{Key: "m", Label: "Mark", Priority: 2},
+			{Key: "j/k", Label: "Move", Priority: 2},
 			{Key: "Enter", Label: "Detail", Priority: 1},
 			{Key: "o", Label: "Open", Priority: 2},
 			{Key: "s", Label: "Re-send", Priority: 2},
@@ -203,6 +205,8 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		return m, nil
 	case diffPairMsg:
 		return m.onDiffPair(v)
+	case diffReadyMsg:
+		return m.onDiffReady(v)
 	case tea.KeyPressMsg:
 		if m.phase == phConfirmClear {
 			return m.confirmKey(v)
@@ -282,20 +286,20 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
-	case "up":
+	case "up", "k":
 		m.move(-1)
-	case "down":
+	case "down", "j":
 		m.move(1)
+	case "home", "gg":
+		m.cur = 0
+		m.top = 0
+	case "end", "G":
+		m.cur = max(0, len(m.items)-1)
+		m.clampTop()
 	case "pgup":
 		m.move(-m.listRows())
 	case "pgdown":
 		m.move(m.listRows())
-	case "home":
-		m.cur = 0
-		m.top = 0
-	case "end":
-		m.cur = max(0, len(m.items)-1)
-		m.clampTop()
 	case "/":
 		m.filtering = true
 	case "f":

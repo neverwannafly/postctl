@@ -35,7 +35,7 @@ func TestGoldenScreens(t *testing.T) {
 		}},
 		{"env-switcher", func(t *testing.T, w, h int) *harness {
 			hh := newHarness(t, demo(), w, h)
-			hh.keys("E", "down", "down", "down")
+			hh.keys("space", "e", "down", "down", "down")
 			return hh
 		}},
 		{"palette", func(t *testing.T, w, h int) *harness {
@@ -52,7 +52,7 @@ func TestGoldenScreens(t *testing.T) {
 		{"delete-dialog", func(t *testing.T, w, h int) *harness {
 			hh := newHarness(t, demo(), w, h)
 			hh.selectByName("Customers")
-			hh.keys("d")
+			hh.keys("space", "d")
 			return hh
 		}},
 		{"filter", func(t *testing.T, w, h int) *harness {

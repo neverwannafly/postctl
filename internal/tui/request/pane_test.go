@@ -372,3 +372,19 @@ func TestNarrowTabBarScrollsToActive(t *testing.T) {
 	h.mustHave("Settings")
 	h.mustHave("‹")
 }
+
+// i on a key-value row starts editing its cell in insert, exactly like Enter.
+func TestIOnAKVRowEditsLikeEnter(t *testing.T) {
+	h := newHarness(t)
+	h.key("down", "i")
+	if !h.p.Editing() || h.p.VimMode() != "INSERT" {
+		t.Fatalf("i must start editing in insert (editing=%v mode=%q)", h.p.Editing(), h.p.VimMode())
+	}
+	h.key("ctrl+a")
+	h.key("ctrl+k")
+	h.typ("50")
+	h.key("enter")
+	if h.req.URL.Query[0].Value != "50" {
+		t.Fatalf("query = %v", h.req.URL.Query)
+	}
+}

@@ -113,7 +113,23 @@ func (p *Pane) Focus() tea.Cmd {
 }
 
 // Blur implements [tui.Pane].
-func (p *Pane) Blur() { p.focused = false }
+func (p *Pane) Blur() {
+	p.focused = false
+	p.revealSecrets = false
+}
+
+// VimMode implements [tui.ModeReporter]. The search and path boxes are not
+// modal yet, so editing one reports INSERT.
+func (p *Pane) VimMode() string {
+	if p.Editing() {
+		return "INSERT"
+	}
+	return ""
+}
+
+// Sections implements [tui.SectionLister]: g jumps can reach the Body tab; [
+// and ] step through every tab.
+func (p *Pane) Sections() []string { return []string{tui.SectionRespBody} }
 
 // Editing implements [tui.Editor].
 func (p *Pane) Editing() bool { return p.searchActive || p.pathActive }
@@ -162,6 +178,7 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tui.SelectionMsg:
 		p.ref = msg.Ref
+		p.revealSecrets = false
 		p.syncViewFromSelection()
 		if demoEnabled() && msg.Ref.Request != nil && !p.demoInjected {
 			p.demoInjected = true
@@ -173,6 +190,16 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	case tui.ThemeChangedMsg:
 		p.th = msg.Theme
 		p.spin = p.th.NewSpinner()
+	case tui.FocusSectionMsg:
+		if msg.Section == tui.SectionRespBody {
+			p.tab = tabBody
+			p.revealSecrets = false
+		}
+	case tui.SectionStepMsg:
+		if !p.Editing() && msg.Delta != 0 {
+			p.tab = tab((int(p.tab) + msg.Delta + int(tabCount)) % int(tabCount))
+			p.revealSecrets = false // reveal lasts for one tab visit
+		}
 	case tui.SendStartedMsg:
 		p.sendingID = msg.RequestID
 		p.sendStep = "Starting"
@@ -185,6 +212,7 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 			p.sendStep = msg.Step.Text
 		}
 	case tui.SendResultMsg:
+		p.revealSecrets = false
 		p.applyResult(msg.Result)
 		p.sendingID = ""
 	case spinner.TickMsg:
@@ -248,58 +276,57 @@ func tickElapsed() tea.Cmd {
 
 func (p *Pane) onKey(msg tea.KeyPressMsg) tea.Cmd {
 	s := msg.String()
-	switch {
-	case s == "esc":
+	switch s {
+	case "esc":
 		if p.sendingID != "" && p.ref.Request != nil {
 			return func() tea.Msg { return tui.CancelSendMsg{RequestID: p.ref.Request.ID} }
 		}
 		return nil
-	case s == "ctrl+s":
+	case "ctrl+s":
 		if p.transportErr() && p.ref.Request != nil {
 			return func() tea.Msg { return tui.RetrySendMsg{RequestID: p.ref.Request.ID} }
 		}
 		return nil
-	case s == "y":
+	case "y":
 		return p.cmdCopyBody()
-	case s == "w":
+	case "w":
 		p.wrap = !p.wrap
-	case s == "tab" || s == "right":
-		p.tab = (p.tab + 1) % tabCount
-	case s == "shift+tab" || s == "left":
-		p.tab = (p.tab + tabCount - 1) % tabCount
-	case s >= "1" && s <= "6":
-		p.tab = tab(s[0] - '1')
-	case s == "/":
+	case "/":
 		p.beginSearch()
-	case s == "n":
+	case "n":
 		p.searchNext(1)
-	case s == "N":
+	case "N":
 		p.searchNext(-1)
-	case s == ".":
+	case ".":
 		p.beginPathFilter()
-	case s == " ":
+	case "enter":
 		p.toggleFoldCursor()
-	case s == "left", s == "h":
+	case "left", "h":
 		p.foldCursor(true)
-	case s == "right", s == "l":
+	case "right", "l":
 		p.foldCursor(false)
-	case s == "up", s == "k":
+	case "up", "k":
 		p.scrollUp()
-	case s == "down", s == "j":
+	case "down", "j":
 		p.scrollDown()
-	case s == "pgup":
+	case "pgup", "ctrl+u":
 		p.scroll -= max(1, p.contentHeight()/2)
 		p.clampScroll()
-	case s == "pgdown":
+	case "pgdown", "ctrl+d":
 		p.scroll += max(1, p.contentHeight()/2)
 		p.clampScroll()
-	case s == "r":
+	case "home":
+		p.scroll = 0
+	case "end", "G":
+		p.scroll = p.scrollTotal()
+		p.clampScroll()
+	case "r":
 		p.togglePrettyRaw()
-	case s == "f":
+	case "f":
 		if p.tab == tabTests {
 			p.testsFilterFailed = !p.testsFilterFailed
 		}
-	case s == "u":
+	case "u":
 		p.revealSecrets = true
 	}
 	return nil
@@ -314,7 +341,7 @@ func (p *Pane) KeyHints() []ui.Hint {
 		return []ui.Hint{{Key: "Ctrl-S", Label: "Retry", Priority: 0}, {Key: "?", Label: "Help", Priority: 5}}
 	}
 	h := []ui.Hint{
-		{Key: "Tab", Label: "Next tab", Priority: 3},
+		{Key: "[ ]", Label: "Tab", Priority: 3},
 		{Key: "/", Label: "Search", Priority: 2},
 		{Key: "y", Label: "Copy body", Priority: 4},
 	}
@@ -439,7 +466,7 @@ func (p *Pane) tabsBar(w int) string {
 	}
 	// Collapsed selector at narrow widths.
 	label := tabs[int(p.tab)].Label
-	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  Tab next", int(p.tab)+1, tabCount, label))
+	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  ] next", int(p.tab)+1, tabCount, label))
 }
 
 func (p *Pane) buildTabs() []ui.Tab {

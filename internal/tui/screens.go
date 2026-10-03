@@ -115,21 +115,21 @@ func (a *app) openHistory() tea.Cmd {
 func (a *app) screenActions() []Action {
 	var out []Action
 	if a.opts.NewEnvEditor != nil {
-		out = append(out, Action{ID: "env.edit", Title: "Edit environments", Group: "Environment", Keys: "Ctrl-E",
+		out = append(out, Action{ID: "env.edit", Title: "Edit environments", Group: "Environment", Keys: "Space E",
 			Enabled: func() bool { return a.ws != nil },
 			Run:     func() tea.Cmd { return a.openEnvEditor("") }})
 	}
 	if a.opts.NewCookieManager != nil {
-		out = append(out, Action{ID: "cookies.open", Title: "Cookies", Group: "Workspace",
+		out = append(out, Action{ID: "cookies.open", Title: "Cookies", Group: "Workspace", Keys: "Space c",
 			Run: func() tea.Cmd { return a.openCookies() }})
 	}
 	if a.opts.NewRunner != nil {
-		out = append(out, Action{ID: "runner.open", Title: "Run collection…", Group: "Runner", Keys: "R",
+		out = append(out, Action{ID: "runner.open", Title: "Run collection…", Group: "Runner", Keys: "Space R",
 			Enabled: func() bool { return a.ws != nil },
 			Run:     func() tea.Cmd { return a.openRunnerFromTree() }})
 	}
 	if a.opts.NewHistory != nil {
-		out = append(out, Action{ID: "history.open", Title: "History", Group: "Workspace", Keys: "H",
+		out = append(out, Action{ID: "history.open", Title: "History", Group: "Workspace", Keys: "Space h",
 			Run: func() tea.Cmd { return a.openHistory() }})
 	}
 	return out

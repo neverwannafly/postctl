@@ -1,6 +1,6 @@
  postctl  payments-api                                                                                        env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-   Collections  11 requests    │ › 2 Request    3 Response                                                             
+   Collections  11 requests    │ › [2] Request    [3] Response                                                         
    ▾ Payments                8 │ DELETE  {{baseUrl}}/v1/charges/{{chargeId}}                                           
      ▾ Charges               4 │ Payments › Charges › Refund charge                                                    
          GET   List charges    │                                                                                       
@@ -37,4 +37,4 @@
                                │                                                                                       
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Tab Next pane   ? Help   Ctrl-P Palette   E Environments   q Quit
+ Tab Next pane   ? Help   Ctrl-P Palette   Space Actions   q Quit

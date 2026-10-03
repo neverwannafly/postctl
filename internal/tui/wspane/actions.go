@@ -52,7 +52,7 @@ func (p *Pane) Actions() []tui.Action {
 			return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
 		}},
 		{ID: "ws.clearLog", Title: "Clear message log", Group: "WebSocket", Keys: "x", Enabled: hasLog, Run: p.clearLog},
-		{ID: "ws.focusURL", Title: "Edit WebSocket URL", Group: "WebSocket", Keys: "Ctrl-L", Enabled: ok, Run: func() tea.Cmd {
+		{ID: "ws.focusURL", Title: "Edit WebSocket URL", Group: "WebSocket", Keys: "gu", Enabled: ok, Run: func() tea.Cmd {
 			p.stopEditing()
 			p.setZone(zBar)
 			return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
@@ -60,7 +60,7 @@ func (p *Pane) Actions() []tui.Action {
 	}
 	for i := range numTabs {
 		acts = append(acts, tui.Action{
-			ID: "ws.tab." + strings.ToLower(tabNames[i]), Title: "Go to " + tabNames[i] + " tab (WebSocket)", Group: "WebSocket", Enabled: ok,
+			ID: "ws.tab." + strings.ToLower(tabNames[i]), Title: "Go to " + tabNames[i] + " tab (WebSocket)", Group: "WebSocket", Keys: "g" + tabKeys[i], Enabled: ok,
 			Run: func() tea.Cmd {
 				p.stopEditing()
 				p.tab = i

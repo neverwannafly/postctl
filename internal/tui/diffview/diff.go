@@ -39,12 +39,34 @@ const DefaultMaxLines = 20000
 
 const contextLines = 3
 
+// DiffTooBig reports that edit distance exceeded the cap.
+type DiffTooBig struct {
+	LeftLines  int
+	RightLines int
+}
+
+func (e DiffTooBig) Error() string {
+	return fmt.Sprintf("Responses differ too much to diff line by line (%d vs %d lines)", e.LeftLines, e.RightLines)
+}
+
 // Diff computes a line-based unified diff between a and b.
 func Diff(a, b string) []Line {
-	aLines := splitLines(a)
-	bLines := splitLines(b)
+	lines, _, _ := Compute(a, b)
+	return lines
+}
+
+// Compute builds a unified diff or reports truncation or DiffTooBig.
+func Compute(a, b string) (lines []Line, truncated bool, err error) {
+	left, trL := Cap(a, DefaultMaxLines)
+	right, trR := Cap(b, DefaultMaxLines)
+	truncated = trL || trR
+	aLines := splitLines(left)
+	bLines := splitLines(right)
 	script := shortestScript(aLines, bLines)
-	return buildUnified(aLines, bLines, script)
+	if script == nil {
+		return nil, truncated, DiffTooBig{LeftLines: len(aLines), RightLines: len(bLines)}
+	}
+	return buildUnified(aLines, bLines, script), truncated, nil
 }
 
 func splitLines(s string) []string {
@@ -123,10 +145,10 @@ func buildUnified(a, b []string, script []editOp) []Line {
 
 	var out []Line
 	oldLine, newLine := 1, 1
-	for ri, reg := range regions {
-		if ri > 0 && reg.lo > regions[ri-1].hi+1 {
-			// Skip gap: advance line counters for skipped same lines.
-			for i := regions[ri-1].hi + 1; i < reg.lo; i++ {
+	prevHi := -1
+	for _, reg := range regions {
+		for i := prevHi + 1; i < reg.lo; i++ {
+			if raw[i].kind == LineSame {
 				oldLine++
 				newLine++
 			}
@@ -158,6 +180,7 @@ func buildUnified(a, b []string, script []editOp) []Line {
 				newLine++
 			}
 		}
+		prevHi = reg.hi
 	}
 	return out
 }

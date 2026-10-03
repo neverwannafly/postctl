@@ -2,6 +2,7 @@ package diffview
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -40,19 +41,23 @@ type Model struct {
 // texts (when headersMode is toggled on).
 func New(th ui.Theme, left, right SideSummary, leftText, rightText string) *Model {
 	leftText, rightText = prettyJSONPair(leftText, rightText)
-	leftText, trL := Cap(leftText, DefaultMaxLines)
-	rightText, trR := Cap(rightText, DefaultMaxLines)
-	lines := Diff(leftText, rightText)
+	lines, truncated, err := Compute(leftText, rightText)
 	m := &Model{
 		th:        th,
 		Left:      left,
 		Right:     right,
 		Lines:     lines,
 		Hunks:     Hunks(lines),
-		truncated: trL || trR,
+		truncated: truncated,
 	}
-	if trL || trR {
+	if truncated {
 		m.notice = "Diff input truncated at 20,000 lines per side."
+	}
+	if err != nil {
+		var tb DiffTooBig
+		if errors.As(err, &tb) {
+			m.notice = tb.Error()
+		}
 	}
 	return m
 }

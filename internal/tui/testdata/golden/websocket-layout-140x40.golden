@@ -1,6 +1,6 @@
  postctl  payments-api                                                                                                            env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-   Collections  12 requests     │ › ws title                                                                                               
+   [1] Collections  12 requests │ › [2] ws title                                                                                           
    ▾ Payments                 9 │ ws pane: Live feed                                                                                       
      ▾ Charges                4 │                                                                                                          
          GET   List charges     │                                                                                                          
@@ -37,4 +37,4 @@
                                 │                                                                                                          
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- K ws hint   Tab Next pane   ? Help   Ctrl-P Palette   E Environments   q Quit
+ K ws hint   Tab Next pane   ? Help   Ctrl-P Palette   Space Actions   q Quit

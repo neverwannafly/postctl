@@ -95,31 +95,26 @@ my-service/
 
 ## TUI Keyboard Shortcuts
 
-`postctl` is optimized for rapid keyboard navigation using standard keys (no vim modes):
+`postctl` is keyboard-first and vim-flavoured: motions move through lists and panes, actions sit behind the `Space` leader, and arrows, `Enter` and `Esc` keep working everywhere. Press `Space` and wait 300 ms to see the keys that are available right now (the which-key popup).
 
 | Key | Action |
 | --- | --- |
-| `Ctrl-S` / `Ctrl-Enter` | **Send request** immediately (Ctrl-S always works) |
-| `Tab` / `Shift-Tab` | Move focus between panes: **Collections → Request → Response** |
-| `1` / `2` / `3` | Jump directly to Collections, Request, or Response pane |
-| `↑` / `↓` | Move selection in tree, table rows, or scroll response |
-| `Enter` | Open selected request, edit table row, or execute action |
-| `Ctrl-P` | Open **Command Palette** (fuzzy search requests, actions, environments) |
-| `E` | Open active **Environment switcher** overlay |
-| `Ctrl-E` | Open full-screen **Environment & Variable Editor** |
-| `R` | Open **Collection Runner** for selected collection or folder |
-| `H` | Open request **Send History** viewer |
-| `m` / `d` (in History) | Mark an entry, then **diff** its response against another |
-| `r` (in History detail) | **Restore** that send's unresolved request into the editor (confirm first) |
+| `Ctrl-S` / `Ctrl-Enter` | **Send request** immediately (Ctrl-S always works, even while typing) |
+| `Space` | **Leader**: `Space f` (or `Space Space`) find a request, `Space e` environment, `Space E` edit environments, `Space a` new, `Space r` rename, `Space d` delete, `Space D` duplicate, `Space R` run collection, `Space h` history, `Space y` copy as curl, `Space o` open in `$EDITOR`, `Space l` reload, `Space q` quit |
+| `Ctrl-P` / `:` | Open the **Command Palette** / the command line (`:q`, `:q!`, `:w`, `:wq`) |
+| `j` `k` `h` `l`, arrows | Move in the tree and fold folders; `Ctrl-d` / `Ctrl-u` half page, `gg` / `G` top and bottom |
+| `Tab` / `Shift-Tab`, `1` `2` `3` | Move focus between panes: **Collections → Request → Response** (the pane titles show `[1] [2] [3]`) |
+| `Ctrl-h` `Ctrl-j` `Ctrl-k` `Ctrl-l` | Move to the neighbouring pane (past the edge, hand the move to tmux-style hosts) |
+| `g` then `u` `p` `a` `h` `b` `s` `t` `S` `r` | Go to the URL, Params, Auth, Headers, Body, Pre-request, Tests, Settings or Response body; `[` / `]` step through tabs |
+| `Ctrl-o` / `Space [` / `Space ]` | Back and forward through the requests you opened |
+| `Enter` | Open selected request, fold a folder, or edit a table row |
 | `/` | Filter requests in sidebar, or search text in response pane |
 | `Ctrl-B` | Show or hide the Collections sidebar |
-| `Ctrl-O` | Open current request, body, or script in your external `$EDITOR` |
-| `Ctrl-R` | Reload workspace files from disk |
 | `?` | Show in-app keyboard shortcut and help overlay |
-| `Esc` | Back, cancel dialog, or close overlay |
-| `q` | Quit `postctl` |
+| `Esc` | Leave a text field, close an overlay, then cancel a running send |
+| `Ctrl-C` twice / `q` | Quit `postctl` (`Ctrl-C` in a text field acts as `Esc`) |
 
-See [`docs/keys.md`](docs/keys.md) for the complete reference across all panes and dialogs.
+Typing in a text field always inserts text: `Space`, `g`, `q` and `:` never start a shortcut there. See [`docs/keys.md`](docs/keys.md) for the complete reference across all panes and dialogs.
 
 ---
 

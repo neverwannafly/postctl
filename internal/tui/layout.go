@@ -134,7 +134,11 @@ func (a *app) body(g geometry) string {
 		}
 		return a.ov.view(a, g.width, g.bodyH)
 	}
-	return a.mainBody(g)
+	main := a.mainBody(g)
+	if wk := a.whichKeyView(g); wk != "" {
+		return overlayBottom(t.Block(main, g.width, g.bodyH), wk, g)
+	}
+	return main
 }
 
 // dialog marks overlays drawn as a bordered box over the main screen rather
@@ -243,7 +247,21 @@ func (a *app) paneTitle(s Slot, w int) string {
 			title = tt.Title()
 		}
 	}
-	return t.Truncate(t.Section(title, detail, focused), w)
+	return t.Truncate(t.Section(a.badge(s, w, title, detail)+title, detail, focused), w)
+}
+
+// badge is the "[1] " jump-number prefix of a pane title. It is left out when
+// the title would no longer fit with it (the narrowest accessible layout).
+func (a *app) badge(s Slot, w int, title, detail string) string {
+	b := "[" + strconv.Itoa(int(s)+1) + "] "
+	need := 2 + ui.Width(b) + ui.Width(title)
+	if detail != "" {
+		need += 2 + ui.Width(detail)
+	}
+	if need > w {
+		return ""
+	}
+	return b
 }
 
 // paneView renders one slot's content at w x h.
@@ -264,7 +282,7 @@ func (a *app) switcherTitle(w int, slots []Slot) string {
 	t := a.theme
 	var parts []string
 	for _, s := range slots {
-		label := strconv.Itoa(int(s)+1) + " " + s.String()
+		label := "[" + strconv.Itoa(int(s)+1) + "] " + s.String()
 		switch {
 		case a.focus == s:
 			parts = append(parts, t.Render(ui.AccentPrimary, t.Glyphs.Select+" "+label))
@@ -287,12 +305,19 @@ func (a *app) hints() []ui.Hint {
 	case a.phase == phaseLoading:
 		return []ui.Hint{hint("q", "Quit", 0)}
 	case a.ov != nil:
-		return a.ov.hints(a)
+		hs := a.ov.hints(a)
+		switch a.ov.(type) {
+		case *pickerOverlay, *promptOverlay:
+			hs = append([]ui.Hint{hint("INSERT", "", 0)}, hs...)
+		}
+		return hs
+	case a.pend != nil:
+		return []ui.Hint{hint(a.pendingLabel(), "", 0), hint("Esc", "Cancel", 0), hint("Ctrl-P", "Palette", 2)}
 	case a.isFirstRun():
 		return a.firstRunHints()
 	}
 	global := []ui.Hint{
-		hint("?", "Help", 0), hint("Ctrl-P", "Palette", 1), hint("E", "Environments", 3), hint("q", "Quit", 6),
+		hint("?", "Help", 0), hint("Ctrl-P", "Palette", 1), hint("Space", "Actions", 3), hint("q", "Quit", 6),
 	}
 	if a.editing() {
 		// Plain keys go to the text field, so only the shortcuts that still
@@ -314,7 +339,31 @@ func (a *app) hints() []ui.Hint {
 	if a.layoutKind() == ui.LayoutSingle && a.focus != SlotSidebar {
 		own = append(own, hint("Ctrl-B", "Collections", 2))
 	}
-	return append(own, global...)
+	hs := append(append([]ui.Hint(nil), own...), global...)
+	if m := a.modeLabel(); m != "" {
+		hs = append([]ui.Hint{hint(m, "", 0)}, hs...)
+	}
+	return hs
+}
+
+// modeLabel is the editing mode shown at the start of the footer while a text
+// field has the keyboard, or "".
+func (a *app) modeLabel() string {
+	switch a.focus {
+	case SlotSidebar:
+		if a.tree.filtering {
+			return "INSERT"
+		}
+	case SlotRequest:
+		if m, ok := a.request.(ModeReporter); ok {
+			return m.VimMode()
+		}
+	default:
+		if m, ok := a.response.(ModeReporter); ok {
+			return m.VimMode()
+		}
+	}
+	return ""
 }
 
 func (a *app) sidebarHints() []ui.Hint {
@@ -329,11 +378,11 @@ func (a *app) sidebarHints() []ui.Hint {
 	case ok && (r.kind == rowFolder || r.kind == rowCollection):
 		hs = append(hs, hint("Enter", "Fold", 0))
 	}
-	hs = append(hs, hint("n", "New", 1), hint("/", "Filter", 1))
+	hs = append(hs, hint("Space a", "New", 1), hint("/", "Filter", 1))
 	if ok && r.kind != rowProblem {
-		hs = append(hs, hint("r", "Rename", 4), hint("d", "Delete", 5), hint("m", "Move", 5), hint("D", "Duplicate", 6))
-		if r.kind == rowCollection || r.kind == rowFolder {
-			hs = append(hs, hint("R", "Run collection", 2))
+		hs = append(hs, hint("Space r", "Rename", 4), hint("Space d", "Delete", 5), hint("Space m", "Move", 5), hint("Space D", "Duplicate", 6))
+		if (r.kind == rowCollection || r.kind == rowFolder) && a.opts.NewRunner != nil {
+			hs = append(hs, hint("Space R", "Run collection", 2))
 		}
 	}
 	if a.tree.query != "" {

@@ -144,14 +144,81 @@ func TestCapTruncates(t *testing.T) {
 	}
 }
 
+func TestHunkHeaderCoordinates(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b string
+		want string
+	}{
+		{
+			name: "start",
+			a:    "a\nb\nc",
+			b:    "A\nb\nc",
+			want: "@@ -1,",
+		},
+		{
+			name: "middle",
+			a:    strings.Join([]string{"l1", "l2", "l3", "l4", "l5", "keep", "tail"}, "\n"),
+			b:    strings.Join([]string{"l1", "l2", "l3", "l4", "L5", "keep", "tail"}, "\n"),
+			want: "@@ -2,",
+		},
+		{
+			name: "after_omitted_prefix",
+			a:    strings.Repeat("same\n", 10) + "old\nmore",
+			b:    strings.Repeat("same\n", 10) + "new\nmore",
+			want: "@@ -8,",
+		},
+		{
+			name: "end",
+			a:    "a\nb\nc",
+			b:    "a\nb\nC",
+			want: "@@ -1,",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, ln := range Diff(tc.a, tc.b) {
+				if ln.Kind == LineHunkHeader && strings.Contains(ln.Text, tc.want) {
+					return
+				}
+			}
+			var hdrs []string
+			for _, ln := range Diff(tc.a, tc.b) {
+				if ln.Kind == LineHunkHeader {
+					hdrs = append(hdrs, ln.Text)
+				}
+			}
+			t.Fatalf("missing hunk header prefix %q in %v", tc.want, hdrs)
+		})
+	}
+}
+
 func TestHunkNavigation(t *testing.T) {
+	// Two hunks separated by unchanged lines (no context merge).
+	var a, b strings.Builder
+	for i := 0; i < 20; i++ {
+		if i > 0 {
+			a.WriteByte('\n')
+			b.WriteByte('\n')
+		}
+		a.WriteString("same")
+		b.WriteString("same")
+	}
+	a.WriteString("\nfirst-old\n")
+	b.WriteString("\nfirst-new\n")
+	for i := 0; i < 10; i++ {
+		a.WriteString("same\n")
+		b.WriteString("same\n")
+	}
+	a.WriteString("second-old")
+	b.WriteString("second-new")
 	m := New(ui.NewTheme(true, false, false),
 		SideSummary{Label: "A", Status: "200"}, SideSummary{Label: "B", Status: "200"},
-		"one", "two",
+		a.String(), b.String(),
 	)
 	m.SetSize(80, 24)
 	if len(m.Hunks) < 2 {
-		t.Skip("need multiple hunks")
+		t.Fatalf("need multiple hunks, got %d", len(m.Hunks))
 	}
 	before := m.HunkIndex()
 	m, _ = m.Update(tea.KeyPressMsg{Text: "n"})

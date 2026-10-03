@@ -1,6 +1,6 @@
 postctl  payments-api                                                                                                                                                                          env  none
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-> 1 Collections    2 Request    3 Response
+> [1] Collections    [2] Request    [3] Response
   v Payments                                                                                                                                                                                           8
     v Charges                                                                                                                                                                                          4
         GET   List charges                                                                                                                                                                              
@@ -57,4 +57,4 @@ postctl  payments-api                                                           
                                                                                                                                                                                                         
 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Enter Open   n New   / Filter   r Rename   d Delete   m Move   D Duplicate   Esc Close   ? Help   Ctrl-P Palette   E Environments   q Quit
+Enter Open   Space a New   / Filter   Space r Rename   Space d Delete   Space m Move   Space D Duplicate   Esc Close   ? Help   Ctrl-P Palette   Space Actions   q Quit

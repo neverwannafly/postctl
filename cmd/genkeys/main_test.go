@@ -46,7 +46,7 @@ func TestDocsContainsWebSocketKeys(t *testing.T) {
 	required := []string{
 		"WebSocket Pane",
 		"Ctrl-S, Ctrl-Enter",
-		"Ctrl-L",
+		"gu",
 		"Ctrl-T (composer)",
 		"Ctrl-R (composer)",
 		"Ctrl-X (composer)",

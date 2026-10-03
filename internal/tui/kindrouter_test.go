@@ -283,12 +283,12 @@ func TestNewWebSocketRequestFromThePalette(t *testing.T) {
 
 func TestNewPromptOffersWebSocketOnlyWithAPane(t *testing.T) {
 	h, _, _ := routed(t)
-	h.keys("n")
+	h.keys("space", "a")
 	h.mustHave("WebSocket")
 	h.keys("esc")
 
 	plain := newHarness(t, demo(), 160, 30)
-	plain.keys("n")
+	plain.keys("space", "a")
 	plain.mustNotHave("WebSocket")
 	plain.keys("esc")
 	plain.keys("ctrl+p")
@@ -298,7 +298,7 @@ func TestNewPromptOffersWebSocketOnlyWithAPane(t *testing.T) {
 
 func TestNewPromptCreatesWebSocketKind(t *testing.T) {
 	h, _, _ := routed(t)
-	h.keys("n")
+	h.keys("space", "a")
 	h.keys("tab") // Request -> WebSocket
 	h.typeText("Prices")
 	h.keys("enter")

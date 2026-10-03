@@ -1,0 +1,24 @@
+ postctl  payments-api                                                env  none
+ ------------------------------------------------------------------------------
+ > [1] Collections    [2] Request    [3] Response                              
+   v Payments                                                                 8
+     v Charges                                                                4
+         GET   List charges                                                    
+ >       POST  Create charge                                                   
+         DEL   Refund charge                                                   
+         PATCH Update charge                                                   
+     v Customers                                                              3
+         POST  Create customer                                                 
+  +--------------------------------------------------------------------------+ 
+  | Space                                                         Esc Cancel | 
+  | f  Find request (or Space)           m  Move to folder                   | 
+  | p  Command palette                   b  Toggle sidebar                   |3
+  | e  Switch environment                l  Reload workspace                 | 
+  | a  New request or folder             q  Quit                             | 
+  | r  Rename                            [  Back (jump list)                 | 
+  | d  Delete                            ]  Forward (jump list)              | 
+  | D  Duplicate                         ?  All keys                         | 
+  +--------------------------------------------------------------------------+ 
+ ------------------------------------------------------------------------------
+ 
+ Space…   Esc Cancel   Ctrl-P Palette

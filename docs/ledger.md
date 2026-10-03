@@ -47,12 +47,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | FIX-IMP import fixes (script loss, secret-by-name, empty-input warnings, `env set --secret` stdin) | Sonnet 5.5 | Done, merged to main | fix/import | 2026-09-30 13:40 IST |
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
-| UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
+| UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done, merged to main | ws/ux-v0-shell | 2026-10-03 19:44 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
-| UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
-| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 20:15 IST |
+| UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
+| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 19:56 IST |
 
 ## Entries
+
+### 2026-10-03 19:56 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: Merged main (V0 leader keys, Q switcher). Re-review fixes: Myers O((N+M)×D) diff with 5k edit cap; async diff with Comparing state and Esc cancel; hunk line numbers after omitted prefix; pending restore dropped on request switch; full template replacement (empty values allowed); URL fragment and enabled-query rebuild; autosave persistence test; history j/k/gg/G keys; merge conflicts in README, ledger, leak sweep.
+- Files: `internal/tui/{diffview,history,request}`, `internal/history/template.go`, `cmd/genkeys`, `docs/keys.md`, goldens, `internal/qa/secret_leak_test.go`, `docs/ledger.md`
+- Decisions: `history.request` leader action deferred to V3; shell restore cancel covered at pane level plus shell apply-when-open test.
+- Tests: `task agents:check` green. Benchmark `BenchmarkDiff20kLines`: ~137 ms/op (1-line change at 20k lines).
+- Blockers / questions: none
+- Next: none
 
 ### 2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE
 - Branch/worktree: ws/ux-h1-history
@@ -787,3 +796,88 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go test ./internal/qa` (agent-doc references).
 - Blockers / questions: none.
 - Next: phase 1 (V0, V1, Q, H1) in parallel; merge order V1, Q, H1, V0; then phase 2 briefs.
+
+### 2026-10-03 18:25 IST · UX-V0 · Sonnet 5.5 (high) · STARTED
+- Branch/worktree: ws/ux-v0-shell (`~/work/postctl-wt/ux-v0-shell`).
+- Did: read the brief, `docs/design-language.md` Key map and plan U1-U4; mapped the shell input path (`app.onKey`), the Request/Response/WebSocket pane keys and the tests that press them.
+- Files: none yet.
+- Decisions: leader keys resolve to action IDs, first usable action wins, missing or disabled actions are hidden and inert; text fields keep every printable key.
+- Tests: baseline green.
+- Blockers / questions: none.
+- Next: shell input rewrite, pane migration, tests, `KeyCatalog`, goldens, smoke, gate.
+
+### 2026-10-03 19:05 IST · UX-V0 · Sonnet 5.5 (high) · DONE
+- Branch/worktree: ws/ux-v0-shell; committed on the branch, not pushed, not merged.
+- Did: global vim motions (`j k h l`, `Ctrl-d/u`, `gg G`) in the tree and panes; Esc ladder (text field, overlay, kept filter, then cancel the selected request's send) and Ctrl-C ladder (twice within a second quits; acts as Esc while typing; cancels a pending prefix); `Space` leader with a 300 ms which-key popup and the `g`, `[`, `]` prefixes; `:` command line (`q`, `q!`, `w`, `wq`); `FocusSectionMsg` / `SectionStepMsg` handled by the request, WebSocket and response panes; `Ctrl-h/j/k/l` pane movement per layout with `Options.OnEdge`; jump list (`Ctrl-o`, `Ctrl-i` with enhanced keyboard reporting, `Space [` / `Space ]` everywhere; depth 100, deduped, deleted entries skipped); request-pane single letters moved to leader action IDs (`request.curl`, `request.curl.reveal`, `request.editor`, `request.reveal`, `request.snippet`, `request.undo`, `request.redo`, `request.focusURL`, `request.getToken`); `ModeReporter` footer label; `[1] [2] [3]` pane badges; `KeyCatalog` rewritten, `docs/keys.md` regenerated, help overlay generated from the leader table, README key table.
+- Files: `internal/tui/{app,keys,leader,whichkey,jumplist,panemove,sidebar,firstrun,palette,overlays,layout,help,pane,kindrouter}.go`, `internal/tui/request/*`, `internal/tui/wspane/*`, `internal/tui/response/pane.go`, `internal/ui/header.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/design-language.md` (key-value table line), `README.md`, `internal/tui/AGENTS.md`, `scripts/tui_smoke.py` (adds a Space which-key step), `internal/qa/secret_leak_test.go` (response tabs now step with `SectionStepMsg`), tests and 49 golden files (39 changed, 10 new which-key goldens).
+- Decisions: Space is the leader everywhere outside text fields, so the kv-table toggle moved to `x`, the response JSON fold to `Enter`, the tree fold to `h/l/Enter`, the OAuth token key `g` to the Enter on "Get new token" row and the `request.getToken` palette action; `Ctrl-e`, `Ctrl-r` (reload), `n r D m d R E H` in the tree are now `Space e E a r D m d R h l`. `Backspace` acts as `Ctrl-h` outside text fields (legacy encoding, design-language note). Reserved leader keys (`Space f`/`Space Space`, `H`, `x`, `j`, and `gH`) are hidden and inert until their action IDs (`request.find`, `history.request`, `response.diff`, `response.jq`) exist, and are deliberately not listed in `docs/keys.md` so no unwired key is advertised. New exported identifiers: `tui.Direction` (`DirLeft`, `DirDown`, `DirUp`, `DirRight`, `String`), `tui.ModeReporter`, `tui.SectionLister`, `tui.FocusSectionMsg`, `tui.SectionStepMsg`, the `tui.Section*` constants, `tui.Options.OnEdge`.
+- Deferred: modal vim editing inside text fields, `i` on a pane row, `Enter` starting in normal mode, overlay `j k` in normal mode (V1/V2a own `vimtext`; the mode label reports `INSERT` while a field is edited and nothing otherwise); mouse (U3); the four reserved leader keys above.
+- Tests: new `vimkeys_test.go` (leader present, missing, disabled; hidden and inert keys; which-key timing, stale timers, cancel, fall-through, purity, fits-size; Esc and Ctrl-C ladders; `:` commands; typing Space, g, q, `:` into pane, filter and palette fields; Ctrl-S always sends; Ctrl-h/j/k/l per layout with `OnEdge`; jump list, bounds and deleted entries; badges; mode footer), section tests in `request`, `response`, `wspane`, a `ui` empty-label hint test, which-key goldens at 3 sizes x 3 looks plus a g-prefix golden. Existing tests moved to the new keys. `task agents:check` green (build, `go test -race ./...`, `golangci-lint run` 0 issues); `task tui:smoke` PASS (3 checks).
+- Design-review checklist: (1) active environment and the primary action stay in the header and footer; unchanged. (2) every waiting or error state keeps its text; unavailable leader keys say "not available here" or "not bound" and how to see the keys. (3) every flow works without mouse, colour or Unicode; which-key goldens in NO_COLOR and ASCII. (4) the mode label shows whenever a text field has focus (`INSERT` for now), and every new key is in which-key (only when usable) and `docs/keys.md`. (5) selection and `[N]` badges are text. (6) readable at 80x24 (popup is 2 columns, 3 from 96 wide, with an "…and N more keys" note) and reflows at 100 and 140. (7) which-key, footer and help hold static labels only; no values, tokens or URLs; no new data path, so the leak sweep needed only its tab-stepping fix. (8) tree width rules untouched. (9) the popup is one bordered box at the bottom, for grouping only.
+- Blockers / questions: none. Merge order per orchestrator (V1, Q, H1, V0): V0 touches `internal/tui/{app,keys,leader,layout,palette,help}.go`, so expect conflicts with Q in `palette.go` / `switcher` wiring; the leader ID `request.find` is what Q should register, `history.request` for H1.
+- Next: orchestrator merge; then rerun `task keys` and `go test ./internal/tui -update` after the merge.
+
+### 2026-10-03 18:28 IST · UX-Q · Gemini 3.8 Flash · STARTED
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Read brief UX-Q-switcher.md, plan §0 U1-U6, design-language.md, internal/tui/AGENTS.md, palette.go, app.go, tree.go, overlays.go. Began implementing the request-only quick switcher overlay.
+- Files: docs/ledger.md
+- Decisions: Keep app.go diff minimal (~6 lines, well under 25 lines) and do not touch onKey/globalKey. Exclude URL query strings and hosts from row views. Record MRU depth 50 in syncSelection(true).
+- Tests: Baseline tests in internal/tui pass.
+- Blockers / questions: None.
+- Next: Implement OpenSwitcherMsg in pane.go, palette action in palette.go, app.go MRU hook and switcher message handler, switcher.go overlay with fuzzy matching and pure View, and switcher_test.go with ranking, purity, sentinel, and golden tests.
+
+### 2026-10-03 18:40 IST · UX-Q · Gemini 3.8 Flash · DONE
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Implemented the request-only quick switcher overlay. Handled OpenSwitcherMsg, registered palette action request.find in Navigation group with empty Keys string, recorded opened requests into a depth-50 deduplicated MRU via syncSelection(true), stripped URL query strings and hosts from display, implemented fuzzy matching across name, method, folder and URL path with MRU tie-breaking, added character match highlighting with selection token and underline, and added tests (ranking table, selection/focus open behavior, MRU dedupe/depth, sentinel URL masking, pure View, empty workspace) plus 9 goldens across 3 sizes and 3 looks.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, internal/tui/pane.go, internal/tui/palette.go, internal/tui/app.go, internal/tui/testdata/golden/switcher-*.golden, docs/ledger.md.
+- Decisions: Kept app.go diff to 5 added lines without touching onKey or globalKey. View is pure and performs no state mutation or I/O.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green; go test ./internal/tui -update regenerated only the 9 new switcher goldens.
+- Blockers / questions: none.
+- Next: Ready for orchestrator review and merge into main.
+
+### 2026-10-03 19:00 IST · UX-Q · Gemini 3.8 Flash · DONE
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Addressed all two-reviewer findings. (1) cleanURLPath strips scheme and authority (including userinfo and port) for scheme and scheme-less URLs; drops leading {{var}} or host/port authority segment. (2) cleanURLPath template-aware scan treats ? and # inside {{...}} as literal path text rather than delimiters. (3) Stripped ANSI escape sequences and C0/C1 control characters from names, folder paths and URL paths before matching, measuring and rendering; added test with embedded ESC sequence. (4) Updated empty-state guidance to avoid unwired shortcut. (5) Integrated switcher overlay into secret leak sweep in secret_leak_test.go, verifying query tokens do not leak. (6) Unified fuzzy search by invoking palette rankBy against composite search labels while maintaining MRU order as tie-breaker. (7) Pruned workspace-deleted IDs from MRU on open and record. (8) Removed redundant setFocus call from openItem. (9) Added regression tests for tree cursor moves leaving MRU unchanged, lenient-load problem exclusion, deleted request pruning, scroll clipping, and single-line truncation at 80x24.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, internal/qa/secret_leak_test.go, docs/ledger.md.
+- Decisions: Preserved count semantics ('n of m'); retained pure View semantics with zero side-effects.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues. Secret leak sweep and golden tests all pass.
+- Blockers / questions: none.
+- Next: Ready for orchestrator merge into main.
+
+### 2026-10-03 19:05 IST · UX-Q · Gemini 3.8 Flash · PROGRESS
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Addressed three re-review items. (1) cleanURLPath drops the first segment as authority for any scheme-less URL not starting with '/', fixing single-label host leaks (`host/path` -> `/path`, `localhost/p` -> `/p`, `api/v1` -> `/v1`). (2) Method text is sanitized (ANSI/control stripped) before matching and rendering, tested with ESC sequence in method. (3) Requests with empty names after sanitizing render as `(unnamed request)`.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, docs/ledger.md.
+- Decisions: Scheme-less authority handling simplified to unconditionally drop the first segment when not starting with '/'. Empty sanitized names consistently display `(unnamed request)`.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues.
+- Blockers / questions: none.
+- Next: Ready for orchestrator merge into main.
+
+### 2026-10-03 19:06 IST · UX-Q · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-q-switcher merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: two review rounds (correctness, privacy/design) by reviewer subagents; accepted fixes for scheme-less host stripping, template-aware query split, control-character stripping, unwired key in the empty state, leak-sweep coverage, palette matcher reuse, MRU pruning. Declined: masking literal path segments (URL bar shows the same path; secrets belong in secret variables). Deferred: INSERT indicator in overlays (V0/V2b).
+- Tests: `task agents:check` green on main after merge; `postctl --help` starts.
+- Next: V0 binds `Space f`/`Space Space` to `request.find` and changes the empty-state hint to `Space a` on rebase.
+
+### 2026-10-03 19:35 IST · UX-V0 · Sonnet 5.5 (high) · DONE
+- Branch/worktree: ws/ux-v0-shell · ~/work/postctl-wt/ux-v0-shell (not pushed)
+- Did: merged main (UX-Q switcher) and applied both reviewers' findings. Merge conflicts: `docs/ledger.md` (kept both entries, main's rows plus mine), `internal/tui/app.go` (kept `recordJump` and `recordRecent`), `internal/tui/palette.go` (kept `request.find`, `palette.open`, `env.switch`). STEP 0: `request.find` Keys are "Space f / Space Space" and both are leader bindings; the switcher empty state names `Space a`; Esc, Ctrl-n and Ctrl-p in the switcher are tested under the new routing (the switcher owns Ctrl-P: cursor up); the switcher is in which-key, `KeyCatalog` and `docs/keys.md`.
+- Items: 1 done (always-keys before overlay dispatch via `overlayAlways`; non-modal overlays close then the key acts; confirm and prompt ignore them; screens keep their keys and Ctrl-P closes them; Esc and Ctrl-C unchanged; table tests for every overlay x key; `design-language.md` Always line edited). 2 done (`/` filters only with Collections focused; panes decide otherwise; test). 3 done (single-pane Tab and Shift-Tab cycle all three panes). 4 done (screens.go Keys fixed; `tui.UnboundActionKeys` plus tests in tui, request, response, wspane that every Action.Keys value is empty or dispatches to its action). 5 done (unknown key after `[`, `]`, `g` or Space cancels and says "No binding for <keys>"). 6 done (`i` on a KV row edits like Enter, request and wspane). 7 done (`tui.CancelOAuthMsg`; Esc from Collections or Response cancels a running sign-in; not while typing). 8 done (help rows for Ctrl-Enter and Ctrl-i only when enhanced keyboard reporting is on; keys.md notes it). 9 done (removed the unreachable 1-6 response keys and the code; response tab order fixed in keys.md). 10 done (OAuth error text). 11 done (see below). 12 done (`TestShellViewIsPureWithPrefixAndWhichKey`). 13 done (`jumplist.step` returns the target, `commit` after reveal succeeds). 14 done (`request/shell_test.go` drives the real shell and request pane: Space y, Space Y, Space v, Space o, Space i; Enter on the Get new token row).
+- Leak sweep (item 11): `renderLeakSweepFrames` now walks all six response tabs (body, headers, cookies, tests, console, timeline), shows the request that the outcome belongs to (the old folder run rendered an empty state), asserts a session cookie is on screen, and asserts that reveal (`u`) is masked again after a tab change and after blur. The in-memory body frame is exempt by design. The cookie column clips long values, so the cookies frame is also checked for the first 16 characters. Mutation proof: with the cookie masking branch disabled the sweep failed on the cookies frames (both runs); with the reveal reset removed from the tab step it failed for the cookies and timeline tabs. Both mutations were reverted. Response pane now resets reveal on tab change, blur, selection and new result (`TestRevealLastsOneTabVisit`).
+- Files: `internal/tui/{app,leader,jumplist,keys,help,pane,palette,screens,switcher,actionkeys}.go`, `internal/tui/request/{kv,oauth,pane}.go`, `internal/tui/wspane/kv.go`, `internal/tui/response/pane.go`, tests (`alwayskeys_test.go`, `actionkeys_test.go`, `request/shell_test.go`, `response/reveal_test.go` and edits), `internal/qa/secret_leak_test.go`, `cmd/genkeys/main.go`, `docs/{keys,design-language}.md`, README.
+- Goldens: `help-*` (3) and `whichkey-*` (9) only; diffs read (Find request row, Ctrl-o row without Ctrl-i on a legacy terminal).
+- Tests: `task agents:check` green (0 lint issues), `task tui:smoke` PASS, `go mod tidy` no diff. `TestEscLadder` no longer calls `Update` from a second goroutine (it raced once Esc touched the request pane).
+- Blockers / questions: none. Note for the orchestrator: the design-language line saying overlay inputs open in insert and Esc goes to normal first does not match the switcher or palette (Esc closes); left as is.
+- Next: orchestrator merge.
+
+### 2026-10-03 19:55 IST · UX-V0 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v0-shell · ~/work/postctl-wt/ux-v0-shell (not pushed)
+- Did: (1) Ctrl-P closing a hosted screen now returns `afterScreen()`, the path Esc takes, so a renamed or deleted active environment syncs the panes; `TestCtrlPClosesTheScreenLikeEsc` compares Esc and Ctrl-P after a rename and after a delete (it fails with the old direct close). (2) keys text and `genkeys` no longer say Ctrl-B works in overlays. (3) Backspace-as-Ctrl-h moves panes only when `insertActive()` is false; `insertActive()` now also covers the request switcher and a tree filter kept open from any pane; `TestBackspaceMovesPanesOnlyWhenNothingIsBeingTyped` covers the tree filter and the switcher.
+- Tests: `task agents:check` green, `task tui:smoke` PASS.
+- Next: orchestrator merge.
+
+### 2026-10-03 19:44 IST · UX-V0 · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-v0-shell merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: two review rounds (key-map conformance; invariants and regressions). Accepted all findings. Decision recorded in the design language: "always" keys work in panes and non-modal overlays (palette, switcher, help, which-key); modal dialogs and prompts ignore them; full-screen screens keep their own keys. Known gap until V2b: overlay inputs close on Esc instead of entering normal mode.
+- Tests: `task agents:check` green on main after merge; `task tui:smoke` PASS (3 checks); `postctl --help` starts.
+- Next: V1 (oracle round), H1 (security re-review pending), then phase 2 briefs.

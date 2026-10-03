@@ -230,14 +230,14 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 	case "a", "insert":
 		k.addRow(p, items)
 		return true, true
-	case "enter":
+	case "enter", "i": // i edits the cell in insert, like Enter
 		if len(items) == 0 {
 			k.addRow(p, items)
 			return true, true
 		}
 		k.beginEdit(p, items, 1)
 		return true, false
-	case "space", " ":
+	case "x", "space", " ":
 		if k.cur < len(items) && !items[k.cur].path {
 			items[k.cur].Disabled = !items[k.cur].Disabled
 			storeItems(k.kind, p.req, items)
@@ -247,7 +247,7 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 			return true, true
 		}
 		return true, false
-	case "d", "delete", "backspace":
+	case "d", "delete":
 		if k.cur < len(items) && !items[k.cur].path {
 			items = append(items[:k.cur], items[k.cur+1:]...)
 			storeItems(k.kind, p.req, items)
@@ -322,7 +322,7 @@ func (k *kvView) hints() []ui.Hint {
 	return []ui.Hint{
 		{Key: "Enter", Label: "Edit", Priority: 2},
 		{Key: "a", Label: "Add", Priority: 2},
-		{Key: "Space", Label: "Toggle", Priority: 3},
+		{Key: "x", Label: "Toggle", Priority: 3},
 		{Key: "d", Label: "Delete", Priority: 3},
 	}
 }
