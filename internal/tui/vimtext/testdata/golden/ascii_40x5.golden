@@ -1,0 +1,48 @@
+== normal ==
+alpha [7mb[meta                              
+gamma delta                             
+                                        
+                                        
+                                        
+
+== insert ==
+edit[7ma[mble text                           
+                                        
+                                        
+                                        
+                                        
+
+== visual ==
+[7ms[m[7me[m[7ml[m[7me[m[7mc[m[7mt[m this range                       
+                                        
+                                        
+                                        
+                                        
+
+== line numbers ==
+1 first                                 
+2 se[7mc[mond                                
+3 third                                 
+                                        
+                                        
+
+== highlight ==
+[7mc[monst answer = 42;                      
+return answer;                          
+                                        
+                                        
+                                        
+
+== placeholder ==
+Type to filter                          
+                                        
+                                        
+                                        
+                                        
+
+== completion ==
+pr[7m [m                                     
+[1;7m> print  function[m                       
+  printf  function                      
+                                        
+                                        

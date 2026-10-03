@@ -48,7 +48,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
-| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done | ws/ux-v1-vimtext | 2026-10-03 18:36 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
@@ -760,3 +760,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go test ./internal/qa` (agent-doc references).
 - Blockers / questions: none.
 - Next: phase 1 (V0, V1, Q, H1) in parallel; merge order V1, Q, H1, V0; then phase 2 briefs.
+
+### 2026-10-03 18:27 IST · UX-V1 · GPT-5.6 Sol · STARTED
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Read the vimtext brief, phase overview, binding decisions, design-language key map, TUI package rules, stack policy, and existing text widgets. Began the standalone modal editor package.
+- Files: `docs/ledger.md`
+- Decisions: Implement the exact public API in the brief with no root TUI or engine dependency; keep rendering pure and clipboard text redacted before command creation.
+- Tests: Not run yet.
+- Blockers / questions: none.
+- Next: Implement the editor, then add the complete behavior, routing, rendering, corpus, golden, and benchmark coverage.
+
+### 2026-10-03 18:36 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Added the standalone modal editor with normal, insert, visual and visual-line modes; Vim motions, operators, text objects, registers, undo/redo/repeat, search, completion, redacted clipboard commands, grapheme-aware rendering, line numbers, semantic Chroma highlighting, and pure cached views. Added 241 corpus cases, routing/security/completion/purity tests, six multi-state golden files across three looks and two sizes, and a 5,000-line benchmark.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Public API matches the brief without deviations. Highlight updates recompute the edited line while structural changes refresh the full cached span set.
+- Tests: `go test -race ./internal/tui/vimtext`, focused package lint, and `task agents:check` green. Benchmarks on Apple M3 Pro: `G`/`gg` 4.56 µs/op, 100 typed characters 1.14 ms total, edited-line highlight recompute 0.91 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator review and phase-2 adoption.
