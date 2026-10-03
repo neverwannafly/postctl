@@ -160,12 +160,6 @@ func (p *Pane) statusLeft(room int) string {
 		return th.Busy(frame, th.Truncate(text, max(4, room-2)))
 	case l != nil && l.state == stClosing:
 		return th.Busy("", "Closing the connection")
-	case p.notice != "":
-		tok := ui.TextSecondary
-		if p.noticeWarn {
-			tok = ui.StatusWarning
-		}
-		return th.Render(tok, th.Truncate(p.notice, room))
 	case l != nil && l.state == stOpen:
 		return p.connectedLine(l, room)
 	case l != nil && l.failed:

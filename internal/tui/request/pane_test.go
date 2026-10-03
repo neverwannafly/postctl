@@ -155,7 +155,7 @@ func TestEmptyURLDoesNotSend(t *testing.T) {
 			t.Fatal("sent with empty URL")
 		}
 	}
-	h.mustHave("Enter a URL first")
+	h.mustToast("Enter a URL first")
 }
 
 func TestSendingShowsProgressAndEscCancels(t *testing.T) {

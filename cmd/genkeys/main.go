@@ -41,7 +41,7 @@ var KeyCatalog = []Section{
 			{":", "Command line", "Open the palette as a command line: q or wq quits, q! quits without waiting for saves, w saves now"},
 			{"Space", "Leader", "Start a key sequence; after 300 ms the which-key popup lists the keys that are available (see Leader keys)"},
 			{"g", "Go to", "Start a g sequence: gg top, gu URL, gp Params, ... (see Go-to and section keys)"},
-			{"[, ]", "Previous / next section tab", "Step through the tabs of the focused pane; press again to keep stepping"},
+			{"[, ]", "Previous / next section tab", "Step through the tabs of the focused pane; press again to keep stepping; any other key ends the repeat and is handled normally"},
 			{"q", "Quit", "Quit postctl (waits for pending saves)"},
 			{"Ctrl-C", "Quit", "Press twice within a second to quit; in a text field it acts as Esc, and it cancels a pending Space or g"},
 			{"Tab", "Next pane", "Cycle focus forward: Collections → Request → Response"},
@@ -110,7 +110,7 @@ var KeyCatalog = []Section{
 			{"gm", "Messages", "WebSocket: Messages tab"},
 			{"gr", "Response body", "Focus the response pane on its Body tab"},
 			{"gH", "Response history", "Focus the response pane on its History tab"},
-			{"[, ]", "Previous / next tab", "Step through the tabs of the focused pane; repeat without the prefix"},
+			{"[, ]", "Previous / next tab", "Step through the tabs of the focused pane; press again to keep stepping; any other key ends the repeat and is handled normally"},
 		},
 	},
 	{

@@ -34,12 +34,7 @@ func (o *screenOverlay) view(_ *app, _, _ int) string { return o.s.View() }
 
 func (o *screenOverlay) hints(*app) []ui.Hint { return o.s.KeyHints() }
 
-func (o *screenOverlay) overlayVimMode() string {
-	if m, ok := o.s.(ModeReporter); ok {
-		return m.VimMode()
-	}
-	return ""
-}
+func (o *screenOverlay) overlayVimMode() string { return screenVimMode(o.s) }
 
 // openScreen shows s over the main screen.
 func (a *app) openScreen(s Screen) tea.Cmd {
@@ -122,7 +117,10 @@ func (a *app) openHistory() tea.Cmd {
 	if a.opts.NewHistory == nil {
 		return a.toastInfo("History is not available in this build.")
 	}
-	return a.openScreen(a.opts.NewHistory(a.screenEnv("")))
+	open := a.openScreen(a.opts.NewHistory(a.screenEnv("")))
+	// The screen loads its list when told it opened (as openRequestHistory
+	// does); waiting for some unrelated message left the list empty.
+	return tea.Batch(open, func() tea.Msg { return ScreenOpenedMsg{} })
 }
 
 // screenActions are the palette entries for the hosted screens.

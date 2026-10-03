@@ -311,11 +311,11 @@ func (f *form) rowView(p *Pane, r formRow, focused bool, labelW, valW int) strin
 			val = f.in.Render(valW, 1)
 		case r.value == "":
 			val = th.Render(ui.TextQuiet, th.Truncate(r.placeholder, valW))
-		case r.secret && !f.reveal && !strings.Contains(r.value, "{{"):
+		case r.secret && !f.reveal && !vimfield.PureRef(r.value):
 			val = th.Render(ui.TextPrimary, th.Glyphs.Mask)
 		default:
 			val = th.Render(ui.TextPrimary, th.Truncate(r.value, valW))
-			if !r.secret || f.reveal || strings.Contains(r.value, "{{") {
+			if !r.secret || f.reveal || vimfield.PureRef(r.value) {
 				if hl := p.sc.highlight(r.value); len(hl) > 0 {
 					val = renderSpans(th, r.value, hl, valW)
 				}

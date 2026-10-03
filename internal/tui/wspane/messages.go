@@ -362,7 +362,7 @@ func (p *Pane) cycleFilter() tea.Cmd {
 	l := p.cur()
 	l.log.dir = (l.log.dir + 1) % 3
 	l.log.refilter()
-	return p.setNotice("Showing: "+l.log.dir.label(), false)
+	return p.setNotice("Showing: "+l.log.dir.phrase(), false)
 }
 
 func (p *Pane) beginSearch() {

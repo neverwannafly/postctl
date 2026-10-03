@@ -228,11 +228,8 @@ func TestUnknownKeyAfterAPrefixSaysSo(t *testing.T) {
 		keys []string
 		want string
 	}{
-		{[]string{"[", "x"}, "No binding for [x"},
-		{[]string{"]", "z"}, "No binding for ]z"},
 		{[]string{"g", "z"}, "No binding for gz"},
 		{[]string{"space", "z"}, "No binding for Space z"},
-		{[]string{"]", "]", "x"}, "No binding for ]x"},
 	}
 	for _, c := range cases {
 		t.Run(strings.Join(c.keys, ""), func(t *testing.T) {
@@ -248,6 +245,31 @@ func TestUnknownKeyAfterAPrefixSaysSo(t *testing.T) {
 				if k == "x" || k == "z" {
 					t.Fatalf("the unknown key %q leaked to the pane", k)
 				}
+			}
+		})
+	}
+}
+
+// After [ or ] the next bracket keeps stepping; any other key ends the repeat
+// and is handled as if no prefix was pending (changed 2026-10-03, QA: it used
+// to be swallowed with a "No binding" toast, so "] x" lost the x).
+func TestKeyAfterABracketIsHandledNormally(t *testing.T) {
+	for _, keys := range [][]string{{"]", "x"}, {"[", "x"}, {"]", "]", "x"}} {
+		t.Run(strings.Join(keys, ""), func(t *testing.T) {
+			p := &uxPane{sections: []string{"A", "B", "C"}}
+			h := uxHarness(t, p, 160, 30)
+			h.keys("2")
+			h.keys(keys...)
+			h.mustNotHave("No binding")
+			if h.a.pend != nil {
+				t.Fatal("the repeat must end")
+			}
+			found := false
+			for _, k := range p.got {
+				found = found || k == "x"
+			}
+			if !found {
+				t.Fatalf("the key after %q did not reach the pane (got %v)", keys[0], p.got)
 			}
 		})
 	}

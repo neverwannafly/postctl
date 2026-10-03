@@ -114,6 +114,15 @@ func (p *Pane) openEditor() tea.Cmd {
 	})
 }
 
+// resumeBar hands the keyboard back to the URL field after a round trip that
+// applied nothing: openEditor blurred the field, and a bar that stays blurred
+// ignores every key.
+func (p *Pane) resumeBar() {
+	if p.zone == zBar {
+		p.setZone(zBar)
+	}
+}
+
 func (p *Pane) onEditorDone(m editorDoneMsg) tea.Cmd {
 	in := p.editorReq
 	p.editorReq = nil
@@ -121,6 +130,7 @@ func (p *Pane) onEditorDone(m editorDoneMsg) tea.Cmd {
 		return nil
 	}
 	if m.err != nil {
+		p.resumeBar()
 		return p.setNotice("The editor did not finish; nothing changed")
 	}
 	if p.req == nil || p.req.ID != in.id {
@@ -133,6 +143,7 @@ func (p *Pane) onEditorDone(m editorDoneMsg) tea.Cmd {
 		text = strings.TrimSuffix(text, "\n")
 	}
 	if text == in.before {
+		p.resumeBar()
 		return p.setNotice("No changes")
 	}
 	pre := p.req.Clone()

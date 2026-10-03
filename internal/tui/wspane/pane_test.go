@@ -69,7 +69,7 @@ func TestConnectNeedsAURL(t *testing.T) {
 	h.req.URL = model.ParseURL("")
 	h.send(tui.SelectionMsg{Ref: h.ref()})
 	h.key("ctrl+s")
-	h.mustHave("Enter a URL")
+	h.mustToast("Enter a URL")
 	if h.p.state() != stIdle || len(h.inputs) != 0 {
 		t.Fatal("must not connect without a URL")
 	}
@@ -239,7 +239,7 @@ func TestInvalidJSONIsNotSent(t *testing.T) {
 	}
 	h.mustHave("!")
 	h.key("ctrl+s")
-	h.mustHave("Not sent")
+	h.mustToast("Not sent")
 	if len(c.sentTexts()) != 0 {
 		t.Fatalf("sent %q", c.sentTexts())
 	}
@@ -301,7 +301,7 @@ func TestEmptyMessageIsNotSent(t *testing.T) {
 	h := newHarness(t)
 	c := h.connect()
 	h.key("down", "ctrl+s")
-	h.mustHave("The message is empty")
+	h.mustToast("The message is empty")
 	if len(c.sentTexts()) != 0 {
 		t.Fatal("sent an empty message")
 	}
@@ -316,7 +316,7 @@ func TestSendFailureIsReported(t *testing.T) {
 	h.key("down", "i")
 	h.typ("hello")
 	h.key("ctrl+s")
-	h.mustHave("The connection is closed")
+	h.mustToast("The connection is closed")
 }
 
 func TestSavedMessageSendsInOrder(t *testing.T) {
@@ -332,7 +332,7 @@ func TestSavedMessageSendsInOrder(t *testing.T) {
 	if len(got) != 2 || got[0] != `{"type":"subscribe","channel":"btc"}` || got[1] != "ping" {
 		t.Fatalf("sent %q", got)
 	}
-	h.mustHave(`Sent "heartbeat"`)
+	h.mustToast(`Sent "heartbeat"`)
 }
 
 func TestSavedJSONThatIsInvalidIsNotSent(t *testing.T) {
@@ -340,7 +340,7 @@ func TestSavedJSONThatIsInvalidIsNotSent(t *testing.T) {
 	c := h.connect()
 	h.req.WebSocket.Messages[0].Body = `{"broken":`
 	h.key("down", "tab", "enter")
-	h.mustHave("Not sent")
+	h.mustToast("Not sent")
 	if len(c.sentTexts()) != 0 {
 		t.Fatal("sent invalid JSON")
 	}
@@ -404,7 +404,7 @@ func TestSaveTemplateNamesFromFieldOrNumber(t *testing.T) {
 func TestSaveEmptyTemplateRefused(t *testing.T) {
 	h := newHarness(t)
 	h.key("down", "ctrl+x")
-	h.mustHave("Nothing to save")
+	h.mustToast("Nothing to save")
 	if len(h.p.messages()) != 3 {
 		t.Fatal("saved an empty message")
 	}
@@ -543,12 +543,13 @@ func TestLogFilterCyclesDirections(t *testing.T) {
 	if l.log.dir != filterIn || l.log.count() != 4 { // connecting + open + alpha + beta
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())
 	}
-	h.mustHave("Received")
+	h.mustHave("Showing: received only")
 	h.mustNotHave("text  gamma")
 	h.key("f")
 	if l.log.dir != filterOut || l.log.count() != 3 { // connecting + open + gamma
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())
 	}
+	h.mustHave("Showing: sent only")
 	h.key("f")
 	if l.log.dir != filterAll || l.log.count() != 5 {
 		t.Fatalf("filter %v count %d", l.log.dir, l.log.count())
@@ -618,7 +619,7 @@ func TestLogDetailShowsPrettyJSON(t *testing.T) {
 	if len(h.clip) != 1 || !strings.Contains(h.clip[0], `"symbol":"BTC"`) {
 		t.Fatalf("clipboard = %q", h.clip)
 	}
-	h.mustHave("Copied the message")
+	h.mustToast("Copied the message")
 	h.key("esc")
 	if h.p.detail != nil {
 		t.Fatal("Esc closes the detail view")
@@ -677,7 +678,7 @@ func TestClearLog(t *testing.T) {
 	if len(h.p.peek().log.entries) != 0 {
 		t.Fatal("log not cleared")
 	}
-	h.mustHave("Cleared 3 entries")
+	h.mustToast("Cleared 3 entries")
 	h.mustHave("No messages yet")
 }
 
@@ -686,7 +687,7 @@ func TestPingShowsRoundTrip(t *testing.T) {
 	h.connect()
 	h.runAction("ws.ping")
 	h.waitLog(3)
-	h.mustHave("Pong in 12 ms")
+	h.mustToast("Pong in 12 ms")
 	texts := strings.Join(h.logTexts(), "|")
 	if !strings.Contains(texts, "12 ms") {
 		t.Fatalf("log = %s", texts)
@@ -1109,7 +1110,7 @@ func TestKeyHintsFollowState(t *testing.T) {
 	h.gate = make(chan struct{})
 	h.key("esc")
 	h.key("ctrl+s") // already open: sends
-	h.mustHave("The message is empty")
+	h.mustToast("The message is empty")
 }
 
 func TestActionsAreEnabledByState(t *testing.T) {

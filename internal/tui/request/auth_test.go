@@ -219,7 +219,7 @@ func TestOAuthWaitingStateShowsLinkAndCancels(t *testing.T) {
 	if h.p.oauth != nil {
 		t.Fatal("esc did not cancel")
 	}
-	h.mustHave("Sign-in cancelled")
+	h.mustToast("Sign-in cancelled")
 	// A late event from the cancelled attempt is ignored.
 	h.p.Update(oauthEventsMsg{run: run, ev: oauthDoneEv{tok: &model.OAuth2Token{AccessToken: "late"}}})
 	if h.req.Auth.OAuth2.Token != nil {
@@ -323,7 +323,7 @@ func TestCopyCurlMasksSecretsByDefault(t *testing.T) {
 	if strings.Contains(c, "X-Trace") {
 		t.Error("disabled header included")
 	}
-	h.mustHave("secrets masked")
+	h.mustToast("secrets masked")
 }
 
 func TestCopyCurlWithSecrets(t *testing.T) {
@@ -332,7 +332,7 @@ func TestCopyCurlWithSecrets(t *testing.T) {
 	if len(h.clip) != 1 || !strings.Contains(h.clip[0], "Authorization: Bearer s3cr3t-value") {
 		t.Fatalf("clipboard = %v", h.clip)
 	}
-	h.mustHave("with secrets")
+	h.mustToast("with secrets")
 }
 
 func TestCopyCurlMasksLiteralAuthCredentials(t *testing.T) {

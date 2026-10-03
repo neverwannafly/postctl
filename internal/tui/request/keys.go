@@ -72,7 +72,6 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 		return p.confirmKey(m)
 	}
 	s := m.String()
-	p.notice = "" // a message lasts until the next key
 	switch s {
 	case "ctrl+s", "ctrl+enter":
 		return p.sendNow()

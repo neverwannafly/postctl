@@ -119,7 +119,7 @@ func TestUndoRedoStructuralSteps(t *testing.T) {
 		t.Fatal("redo did not re-delete")
 	}
 	h.key("ctrl+y")
-	h.mustHave("Nothing to redo")
+	h.mustToast("Nothing to redo")
 }
 
 func TestUndoCoalescesTyping(t *testing.T) {
@@ -171,7 +171,7 @@ func TestUndoMarksDirtyAndSaves(t *testing.T) {
 func TestNothingToUndo(t *testing.T) {
 	h := newHarness(t)
 	h.key("ctrl+z")
-	h.mustHave("Nothing to undo")
+	h.mustToast("Nothing to undo")
 }
 
 func TestExternalReloadKeepsUnsavedEdits(t *testing.T) {

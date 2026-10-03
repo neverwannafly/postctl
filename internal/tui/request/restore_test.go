@@ -42,10 +42,11 @@ func TestApplyHistoryTemplateKeepsMaskedFields(t *testing.T) {
 	if req.Method != "PATCH" {
 		t.Fatalf("method = %q", req.Method)
 	}
-	if !strings.Contains(p.notice, "Authorization") || !strings.Contains(p.notice, "body") {
-		t.Fatalf("notice = %q", p.notice)
+	msg := cmd()
+	if got := strings.Join(toastsIn(msg), " "); !strings.Contains(got, "Authorization") || !strings.Contains(got, "body") {
+		t.Fatalf("toasts = %q", got)
 	}
-	_, _ = p.Update(cmd())
+	_, _ = p.Update(msg)
 	// Undo should restore method from before patch.
 	_, _ = p.Update(tea.KeyPressMsg{Text: "ctrl+z"})
 	if req.Method != preMethod {
@@ -182,29 +183,28 @@ func TestRestoreAutosavePersistence(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected cmd")
 	}
-	for cmd != nil {
-		var msg tea.Msg
-		if c := cmd(); c != nil {
-			if batch, ok := c.(tea.BatchMsg); ok {
-				for _, sub := range batch {
-					if sub != nil {
-						msg = sub()
-					}
-				}
-			} else {
-				msg = c
-			}
+	// Run every command, and every message it produces, in order.
+	queue := []tea.Cmd{cmd}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		msg := c()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			queue = append(queue, batch...)
+			continue
 		}
 		if sm, ok := msg.(tui.SaveMsg); ok {
-			c := ws.Collection(sm.Collection)
-			if err := st.SaveRequest(context.Background(), c, sm.ID); err != nil {
+			coll := ws.Collection(sm.Collection)
+			if err := st.SaveRequest(context.Background(), coll, sm.ID); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if msg != nil {
-			_, cmd = p.Update(msg)
-		} else {
-			cmd = nil
+			_, next := p.Update(msg)
+			queue = append(queue, next)
 		}
 	}
 	reloaded, err := st.Load()
@@ -248,16 +248,31 @@ func TestPendingPatchCancelledWhenSwitchingRequests(t *testing.T) {
 	if len(p.pending) != 1 {
 		t.Fatalf("pending = %d", len(p.pending))
 	}
-	_, _ = p.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: refund, Path: []string{coll.Name, refund.Name}}})
-	if !strings.Contains(p.notice, "Restore cancelled") {
-		t.Fatalf("notice = %q", p.notice)
+	_, cancelCmd := p.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: refund, Path: []string{coll.Name, refund.Name}}})
+	if got := strings.Join(toastsIn(cancelCmd()), " "); !strings.Contains(got, "Restore cancelled") {
+		t.Fatalf("toasts = %q", got)
 	}
 }
 
-func testAfterImmediate(_ time.Duration, msg tea.Msg) tea.Cmd {
-	if _, ok := msg.(noticeExpireMsg); ok {
-		return nil
+// toastsIn lists the toast texts in a command's message, running the commands
+// of a batch once.
+func toastsIn(msg tea.Msg) []string {
+	switch m := msg.(type) {
+	case tui.ToastMsg:
+		return []string{m.Text}
+	case tea.BatchMsg:
+		var out []string
+		for _, c := range m {
+			if c != nil {
+				out = append(out, toastsIn(c())...)
+			}
+		}
+		return out
 	}
+	return nil
+}
+
+func testAfterImmediate(_ time.Duration, msg tea.Msg) tea.Cmd {
 	return func() tea.Msg { return msg }
 }
 

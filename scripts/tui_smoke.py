@@ -3,9 +3,11 @@
 
 It copies a synthetic workspace, starts the binary with the fake sender
 (POSTCTL_FAKE_SENDER=1, so no network), opens a request, presses Ctrl-S and
-checks that a response status reached the screen, then presses Space and
-checks that the which-key popup appears. It prints only pass/fail
-lines, never screen content.
+checks that a response status reached the screen, then walks the vim-style
+keys a person uses: the Space Space switcher, editing the URL in insert mode
+and Esc, Ctrl-S, `gr`, `Space H` (history tab), `Space x` (diff), `Space j`
+with `.` (jq), Ctrl-h and Ctrl-l, and `q`. It prints only pass/fail
+lines (one per step), never screen content, and finishes in about 20 seconds.
 
 Usage: python3 scripts/tui_smoke.py [BINARY] [WORKSPACE_DIR] [COLSxROWS]
 Defaults: bin/postctl, internal/tui/testdata/demo, 140x40. Build first with
@@ -48,6 +50,25 @@ def wait_for(fd, needle, timeout):
     return seen
 
 
+def press(fd, *keys):
+    """Write each key on its own, a beat apart, as a person types (one write
+    of several bytes can be read as a paste)."""
+    for key in keys:
+        os.write(fd, key)
+        time.sleep(0.12)
+
+
+def exited(pid, seconds):
+    """Reports whether the child exits within seconds."""
+    end = time.time() + seconds
+    while time.time() < end:
+        done, _ = os.waitpid(pid, os.WNOHANG)
+        if done:
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def main():
     binary = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "bin/postctl")
     source = sys.argv[2] if len(sys.argv) > 2 else "internal/tui/testdata/demo"
@@ -63,26 +84,56 @@ def main():
         env = dict(os.environ, POSTCTL_FAKE_SENDER="1", TERM="xterm-256color", NO_COLOR="1")
         os.execve(binary, [binary, "--workspace", workspace], env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", rows, cols, 0, 0))
+    results = []
+
+    def check(name, ok):
+        results.append(ok)
+        print(("PASS" if ok else "FAIL") + " " + name)
+
+    def step(name, keys, needle, timeout=5, alternatives=()):
+        """Presses keys, then passes when needle (or an alternative) shows."""
+        press(fd, *keys)
+        seen = wait_for(fd, needle, timeout)
+        if needle not in seen:
+            for alt in alternatives:
+                if alt in seen:
+                    needle = alt
+        check(name, needle in seen)
+
     try:
         first = wait_for(fd, "postctl", 15)
-        for key in (DOWN, DOWN, ENTER):  # select a request and open it
-            os.write(fd, key)
-            drain(fd, 0.4)
-        os.write(fd, CTRL_S)
-        after = wait_for(fd, "200", 8)
-        ok_start = "postctl" in first
-        ok_send = "200" in after
-        os.write(fd, b" ")  # the Space leader: the which-key popup follows after 300 ms
-        popup = wait_for(fd, "Switch environment", 5)
-        ok_leader = "Switch environment" in popup
-        os.write(fd, b"\x1b")  # Esc cancels the sequence
-        drain(fd, 0.6)
-        print(("PASS" if ok_start else "FAIL") + " first frame shows the header")
-        print(("PASS" if ok_send else "FAIL") + " Ctrl-S rendered a response status")
-        print(("PASS" if ok_leader else "FAIL") + " Space shows the which-key popup")
-        os.write(fd, b"q")
+        check("first frame shows the header", "postctl" in first)
+        press(fd, DOWN, DOWN, ENTER)  # select a request and open it
+        drain(fd, 0.4)
+        step("Ctrl-S rendered a response status", [CTRL_S], "200", 8)
+        step("Space shows the which-key popup", [b" "], "Switch environment")
+        press(fd, b"\x1b")  # Esc cancels the sequence
         drain(fd, 0.5)
-        return 0 if ok_start and ok_send and ok_leader else 1
+        step("Space Space opens the switcher", [b" ", b" "], "Enter Open")
+        press(fd, b"h", b"e", b"a", b"l")
+        step("the switcher filters by name", [], "Health")
+        step("Enter opens the chosen request", [ENTER], "Request \u00b7 Health")
+        step("g u then i enters insert mode in the URL", [b"g", b"u", b"i"], "INSERT")
+        press(fd, b"x")
+        step("Esc returns to normal mode", [b"\x1b"], "NORMAL")
+        step("Ctrl-S sends the edited request", [CTRL_S], "200", 8)
+        step("g r focuses the response body", [b"g", b"r"], "Search")
+        step("Space H shows the response History tab", [b" ", b"H"], "7/7]")
+        press(fd, b"\x1b")
+        drain(fd, 0.4)
+        step("Space x diffs with the previous send", [b" ", b"x"], "Previous",
+             alternatives=("No earlier send",))
+        press(fd, b"\x1b")
+        drain(fd, 0.4)
+        step("Space j opens the jq input", [b" ", b"j"], "Enter Apply")
+        step("a jq filter shows its output", [b".", ENTER], "jq output")
+        press(fd, b"\x1b")
+        drain(fd, 0.4)
+        step("Ctrl-h moves to the request pane", [b"\x08"], "Ctrl-S Send")
+        step("Ctrl-l moves back to the response pane", [b"\x0c"], "Search")
+        press(fd, b"q")
+        check("q quits", exited(pid, 5))
+        return 0 if all(results) else 1
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
         try:

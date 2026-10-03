@@ -78,7 +78,7 @@ func TestMouseOpensEnvironmentCellAtPointer(t *testing.T) {
 	h := newHarness(t, 120, 30)
 	h.scr.zone = zTable
 	x := listW + 3 + 6
-	h.scr.HandleMouse(tea.MouseClickMsg{X: x, Y: 4, Button: tea.MouseLeft}, x, 4)
+	h.scr.HandleMouse(tea.MouseClickMsg{X: x, Y: 5, Button: tea.MouseLeft}, x, 5)
 	if !h.scr.edit || h.scr.col != 0 || h.scr.in == nil {
 		t.Fatal("clicking the environment key cell did not open it")
 	}
@@ -621,5 +621,37 @@ func TestFocusOption(t *testing.T) {
 	s := New(tui.ScreenEnv{PaneEnv: tui.PaneEnv{Theme: ui.NewTheme(true, false, false)}, Workspace: ws, Focus: "e-prod", ActiveEnv: "e-stg"}, Deps{})
 	if s.curEnv().ID != "e-prod" {
 		t.Fatalf("focus = %s", s.curEnv().ID)
+	}
+}
+
+// A click lands on the row it is drawn on, in the wide layout and in the
+// narrow one (the hit test once sat one line above the drawn rows).
+func TestMouseClickSelectsTheRowDrawnUnderThePointer(t *testing.T) {
+	for _, size := range []struct{ w, h int }{{120, 30}, {70, 30}} {
+		h := newHarness(t, size.w, size.h)
+		h.scr.zone = zTable
+		rows := h.scr.rows()
+		if len(rows) < 2 {
+			t.Fatal("the fixture needs two variables")
+		}
+		want := 1
+		y := -1
+		for i, line := range strings.Split(h.view(), "\n") {
+			if strings.Contains(line, rows[want].Key) && !strings.Contains(line, "Environments") {
+				y = i
+				break
+			}
+		}
+		if y < 0 {
+			t.Fatalf("%dx%d: the second variable is not drawn", size.w, size.h)
+		}
+		x := 7 // inside the key column
+		if size.w >= 100 {
+			x = listW + 3 + 7
+		}
+		h.scr.HandleMouse(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}, x, y)
+		if h.scr.cur != want {
+			t.Fatalf("%dx%d: a click on the drawn row %d selected row %d", size.w, size.h, want, h.scr.cur)
+		}
 	}
 }

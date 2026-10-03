@@ -317,6 +317,7 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 - The current mode is always visible: the footer starts with `NORMAL`, `INSERT` or `VISUAL` (text, never color alone) whenever a text field has focus.
 - Show only valid key hints for the current screen. A global key must not silently replace a focused text field's expected behavior.
 - Discoverability: pressing the leader or a prefix (`Space`, `g`, `[`, `]`) shows a which-key popup listing the next keys after a short delay; pane titles show their jump number (`[1]`, `[2]`, `[3]`).
+- An action's result ("Copied as curl, secrets masked", editor results, restore, format) appears as a shell toast, and nowhere else: it is visible whichever pane has focus and at any size, and panes draw no inline copy, so the text appears exactly once. Text carries counts and names, never values.
 - Support keyboard-only operation. Mouse support is on by default (plan U3) and never required.
 
 Mouse: a click focuses a pane or text field and places its cursor without
@@ -345,6 +346,8 @@ This is the binding spec; `docs/keys.md` is generated from code and must match i
 **Panes and lists (outside text fields):** `j k` and arrows move, `h l` collapse and expand in the tree (left and right elsewhere), `gg G` top and bottom, `Ctrl-d Ctrl-u` half page, `/` filter or search, `n N` next and previous match, `Enter` open or activate (in a text-field row: edit, starting in normal), `i` edit the field under the cursor in insert, `[ ]` previous and next section tab, `Tab Shift-Tab` cycle panes, `1 2 3` jump to a pane, `Ctrl-h/j/k/l` move to the neighbouring pane (handing off to tmux at the edge; `Backspace` acts as `Ctrl-h` where the terminal cannot tell them apart), `Ctrl-o Ctrl-i` back and forward through opened requests (`Space [` and `Space ]` as fallbacks), `u Ctrl-r` undo and redo request edits, `?` help, `:` palette (`:q`, `:w`, `:wq` are accepted), `q` quit.
 
 **Section jumps (`g` prefix):** `gu` URL · `gp` Params · `ga` Auth · `gh` Headers · `gb` Body · `gs` Pre-request script · `gt` Tests · `gS` Settings · `gm` WebSocket messages · `gr` response Body · `gH` response History. `gg` stays "top".
+
+**Tab steps (`[` and `]` prefixes):** `[` and `]` step to the previous or next tab of the focused pane; pressing `[` or `]` again keeps stepping. Any other key ends the repeat and is handled as if no prefix was pending (it is not swallowed). Unlike `Space` and `g`, these prefixes do not report "No binding".
 
 **Leader (`Space`, normal mode outside insert):**
 

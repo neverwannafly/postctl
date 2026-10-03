@@ -394,7 +394,8 @@ func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 		if m.wide() && m.tab != tabGlobals {
 			contentX, contentW = listW+envColumnGap, m.w-listW-envColumnGap
 		}
-		firstRowY := envScreenHeaderRows + 1
+		// Below the header rows come the summary line and the table header.
+		firstRowY := envScreenHeaderRows + 2
 		tableH := m.h - envScreenHeaderRows
 		if !m.wide() && m.tab != tabGlobals {
 			firstRowY++

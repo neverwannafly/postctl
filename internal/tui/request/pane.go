@@ -202,9 +202,6 @@ type Pane struct {
 
 	send sendState
 
-	notice   string // a short quiet message on the status row
-	noticeAt time.Time
-
 	editorReq *editorIntent
 
 	oauth    *oauthRun
@@ -358,23 +355,16 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		return p, p.onOAuthSaved(m)
 	case curlDoneMsg:
 		return p, p.onCurlDone(m)
-	case noticeExpireMsg:
-		if p.noticeAt.Equal(time.Time(m)) {
-			p.notice = ""
-		}
-		return p, nil
 	case tui.ApplyRequestPatchMsg:
 		return p, p.applyHistoryTemplate(m)
 	}
 	return p, nil
 }
 
-// setNotice shows a short message on the status row for a few seconds.
+// setNotice reports an action's result as a shell toast, the only place the
+// result is shown: the toast is drawn whichever pane has focus (a narrow layout
+// shows one pane) and the pane keeps no copy of its own, so the text appears
+// exactly once at every size. The text carries no values.
 func (p *Pane) setNotice(text string) tea.Cmd {
-	p.notice = text
-	p.noticeAt = p.deps.now()
-	at := p.noticeAt
-	return p.deps.after(4*time.Second, noticeExpireMsg(at))
+	return msgCmd(tui.ToastMsg{Kind: ui.ToastInfo, Text: text})
 }
-
-type noticeExpireMsg time.Time

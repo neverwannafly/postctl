@@ -270,7 +270,9 @@ func (a *app) pendingLabel() string {
 
 // followUp handles the key after a prefix. It reports false when the key is
 // not part of the sequence and should be processed as if no prefix was
-// pending (the always-available shortcuts, and any key after [ or ]).
+// pending: the always-available shortcuts, and any key after [ or ] (the
+// repeat ends there). An unknown key after Space or g cancels the sequence and
+// says so.
 func (a *app) followUp(p *pendingKeys, msg tea.KeyPressMsg) (tea.Cmd, bool) {
 	s := msg.String()
 	switch s {
@@ -292,6 +294,9 @@ func (a *app) followUp(p *pendingKeys, msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			}
 			cmd := a.stepSection(delta)
 			return tea.Batch(cmd, a.startPending(s)), true
+		}
+		if p.prefix == "[" || p.prefix == "]" {
+			return nil, false // the repeat ends; the key is handled as usual
 		}
 		return a.noBinding(p.prefix + displayKey(s)), true
 	}

@@ -133,8 +133,6 @@ func (p *Pane) statusRow() string {
 		left = p.sendProgress(room)
 	case p.oauth != nil:
 		left = th.Busy("", th.Truncate("Waiting for OAuth 2.0 sign-in. Esc cancels.", max(4, room-2)))
-	case p.notice != "":
-		left = th.Render(ui.TextSecondary, th.Truncate(p.notice, room))
 	case p.urlE:
 		left = p.previewLine(room)
 	default:

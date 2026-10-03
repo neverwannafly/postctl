@@ -34,3 +34,5 @@ Shell `Update` tests for every row of the Key map you implement: leader dispatch
 ## Acceptance
 
 `task agents:check` green, `task keys` committed, smoke passes. Ledger STARTED/DONE entries and a status row (DONE lists the design-review checklist answers). Commit on your branch; do not push. Final message: key-map rows implemented vs deferred (with reason), new exported identifiers, golden files changed (count), test results, commit hash.
+
+> **Changed 2026-10-03 (QA):** after `[` or `]`, an unbound follow-up key no longer cancels with a "No binding" message. It ends the repeat and is processed normally. `Space` and `g` still report an unknown follow-up key.

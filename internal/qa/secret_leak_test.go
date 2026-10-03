@@ -727,7 +727,7 @@ func renderResponseV3Frames(
 			driveResponsePane(t, hp, tui.FocusSectionMsg{Section: tui.SectionRespHistory})
 			frame := hp.View()
 			if !strings.Contains(frame, "ago") && !strings.Contains(frame, "just now") {
-				t.Fatalf("%s: the History tab lists no sends:\n%s", c.req.Name, frame)
+				t.Fatalf("%s: the History tab lists no sends (frame: %s)", c.req.Name, frameShape(frame))
 			}
 			if l == log {
 				frames[prefix+"history tab"] = frame
@@ -760,7 +760,7 @@ func renderResponseV3Frames(
 			name := prefix + "jq " + string(rune('a'+i))
 			frames[name] = pane.View()
 			if !strings.Contains(frames[name], "Body (jq)") {
-				t.Fatalf("%s: jq filter %q did not apply:\n%s", c.req.Name, filter, frames[name])
+				t.Fatalf("%s: jq filter %q did not apply (frame: %s)", c.req.Name, filter, frameShape(frames[name]))
 			}
 			clips = nil
 			driveResponsePane(t, pane, tea.KeyPressMsg{Code: 'y', Text: "y"})

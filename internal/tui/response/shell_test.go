@@ -34,6 +34,13 @@ func newShellRig(t *testing.T) *shellRig { return newShellRigSized(t, 140, 40) }
 // log, so gH has a History tab to reach.
 func newShellRigSized(t *testing.T, w, h int) *shellRig {
 	t.Helper()
+	return newShellRigOptions(t, w, h, nil)
+}
+
+// newShellRigOptions is newShellRigSized with a hook that adjusts the shell
+// options (for example to give it a Sender).
+func newShellRigOptions(t *testing.T, w, h int, adjust func(*tui.Options)) *shellRig {
+	t.Helper()
 	dir := t.TempDir()
 	ws := tuitest.Demo()
 	if _, err := tuitest.Write(dir, ws); err != nil {
@@ -50,7 +57,7 @@ func newShellRigSized(t *testing.T, w, h int) *shellRig {
 		Clipboard: func(s string) tea.Cmd { r.clip = append(r.clip, s); return nil },
 		Log:       func() (tui.HistoryReader, error) { return log, nil },
 	})
-	r.m = tui.New(tui.Options{
+	opts := tui.Options{
 		Backend:        tui.NewStoreBackend(dir, store.WithSecretStore(store.NewMemorySecrets())),
 		NoWatch:        true,
 		NewRequestPane: request.Factory(request.Deps{}),
@@ -59,7 +66,11 @@ func newShellRigSized(t *testing.T, w, h int) *shellRig {
 			r.pane = p.(*Pane)
 			return p
 		},
-	})
+	}
+	if adjust != nil {
+		adjust(&opts)
+	}
+	r.m = tui.New(opts)
 	r.send(tea.WindowSizeMsg{Width: w, Height: h})
 	r.run(r.m.Init())
 	r.pump(300 * time.Millisecond)
