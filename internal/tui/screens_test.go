@@ -267,3 +267,29 @@ func TestCtrlPClosesTheScreenLikeEsc(t *testing.T) {
 		}
 	}
 }
+
+// modeScreen is a fakeScreen that reports a vim mode.
+type modeScreen struct{ fakeScreen }
+
+func (s *modeScreen) VimMode() string { return "INSERT" }
+
+func (s *modeScreen) Update(msg tea.Msg) (Screen, tea.Cmd) {
+	next, cmd := s.fakeScreen.Update(msg)
+	if next == nil {
+		return nil, cmd
+	}
+	return s, cmd
+}
+
+// The footer names the mode of a screen's text field once, not twice.
+func TestScreenModeAppearsOnceInTheFooter(t *testing.T) {
+	s := &modeScreen{}
+	h := newHarness(t, demo(), 120, 30, func(o *Options) {
+		o.NewEnvEditor = func(ScreenEnv) Screen { return s }
+	})
+	h.keys("space", "E")
+	h.mustHave("Leave fake")
+	if n := strings.Count(h.screen(), "INSERT"); n != 1 {
+		t.Fatalf("the INSERT badge appears %d times in the frame, want 1", n)
+	}
+}

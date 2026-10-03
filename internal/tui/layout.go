@@ -316,12 +316,7 @@ func (a *app) hints() []ui.Hint {
 				hs = append([]ui.Hint{hint(s, "", 0)}, hs...)
 			}
 		}
-		if o, ok := a.ov.(*screenOverlay); ok {
-			if s := screenVimMode(o.s); s != "" {
-				hs = append([]ui.Hint{hint(s, "", 0)}, hs...)
-			}
-		}
-		return hs
+		return hs // screenOverlay reports its screen's mode through overlayVimMode
 	case a.pend != nil:
 		return []ui.Hint{hint(a.pendingLabel(), "", 0), hint("Esc", "Cancel", 0), hint("Ctrl-P", "Palette", 2)}
 	case a.isFirstRun():

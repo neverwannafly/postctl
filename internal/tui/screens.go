@@ -27,12 +27,7 @@ func (o *screenOverlay) view(_ *app, _, _ int) string { return o.s.View() }
 
 func (o *screenOverlay) hints(*app) []ui.Hint { return o.s.KeyHints() }
 
-func (o *screenOverlay) overlayVimMode() string {
-	if m, ok := o.s.(ModeReporter); ok {
-		return m.VimMode()
-	}
-	return ""
-}
+func (o *screenOverlay) overlayVimMode() string { return screenVimMode(o.s) }
 
 // openScreen shows s over the main screen.
 func (a *app) openScreen(s Screen) tea.Cmd {
