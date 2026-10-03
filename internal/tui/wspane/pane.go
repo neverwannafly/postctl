@@ -1,8 +1,6 @@
 package wspane
 
 import (
-	"time"
-
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
@@ -94,10 +92,6 @@ type Pane struct {
 	editorReq *editorIntent
 	lives     map[model.ID]*live
 	saves     map[model.ID]*saveState
-
-	notice     string
-	noticeWarn bool
-	noticeAt   time.Time
 }
 
 // New builds the pane.
@@ -308,32 +302,21 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		return p, p.onPinged(m)
 	case tickMsg:
 		return p, p.onTick(m)
-	case noticeExpireMsg:
-		if p.noticeAt.Equal(time.Time(m)) {
-			p.notice = ""
-		}
 	}
 	return p, nil
 }
 
-// noticeExpireMsg clears a status-row notice.
-type noticeExpireMsg time.Time
-
-// setNotice reports an action's result. The message goes to the shell toast,
-// which is drawn whichever pane has focus (a narrow layout shows only one
-// pane), and stays on the status row for a few seconds. warn styles it as a
-// warning. The text carries no values.
+// setNotice reports an action's result as a shell toast, the only place the
+// result is shown: the toast is drawn whichever pane has focus (a narrow layout
+// shows one pane) and the pane keeps no copy of its own, so the text appears
+// exactly once at every size. warn styles it as a warning. The text carries no
+// values.
 func (p *Pane) setNotice(text string, warn bool) tea.Cmd {
-	p.notice, p.noticeWarn = text, warn
-	p.noticeAt = p.deps.now()
 	kind := ui.ToastInfo
 	if warn {
 		kind = ui.ToastWarning
 	}
-	return tea.Batch(
-		p.deps.after(4*time.Second, noticeExpireMsg(p.noticeAt)),
-		msgCmd(tui.ToastMsg{Kind: kind, Text: text}),
-	)
+	return msgCmd(tui.ToastMsg{Kind: kind, Text: text})
 }
 
 // ---- binding to the selected request -------------------------------------------
@@ -359,7 +342,6 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	p.zone, p.tab, p.sect = zTabs, tabMessages, sComposer
 	p.savedCur, p.savedTop = 0, 0
 	p.searching, p.rename, p.detail, p.confirm = false, nil, nil, nil
-	p.notice = ""
 	p.refreshChain()
 	p.reloadAll()
 	if m.Open && p.req != nil && p.req.URL.Raw == "" {

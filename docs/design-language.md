@@ -317,7 +317,7 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 - The current mode is always visible: the footer starts with `NORMAL`, `INSERT` or `VISUAL` (text, never color alone) whenever a text field has focus.
 - Show only valid key hints for the current screen. A global key must not silently replace a focused text field's expected behavior.
 - Discoverability: pressing the leader or a prefix (`Space`, `g`, `[`, `]`) shows a which-key popup listing the next keys after a short delay; pane titles show their jump number (`[1]`, `[2]`, `[3]`).
-- An action's result ("Copied as curl, secrets masked", editor results, restore, format) appears as a shell toast, so it is visible whichever pane has focus and at any size; a pane may also keep it on its status row. Text carries counts and names, never values.
+- An action's result ("Copied as curl, secrets masked", editor results, restore, format) appears as a shell toast, and nowhere else: it is visible whichever pane has focus and at any size, and panes draw no inline copy, so the text appears exactly once. Text carries counts and names, never values.
 - Support keyboard-only operation. Mouse support is on by default (plan U3) and never required.
 
 Mouse: a click focuses a pane or text field and places its cursor without

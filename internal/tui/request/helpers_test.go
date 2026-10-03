@@ -291,6 +291,29 @@ func (h *harness) mustHave(sub string) {
 	}
 }
 
+// toasts lists the shell toasts the pane asked for, in order. Action results
+// are shown there only; the pane draws no copy of its own.
+func (h *harness) toasts() []string {
+	var out []string
+	for _, m := range h.out {
+		if t, ok := m.(tui.ToastMsg); ok {
+			out = append(out, t.Text)
+		}
+	}
+	return out
+}
+
+// mustToast fails unless some toast contains sub.
+func (h *harness) mustToast(sub string) {
+	h.t.Helper()
+	for _, t := range h.toasts() {
+		if strings.Contains(t, sub) {
+			return
+		}
+	}
+	h.t.Fatalf("no toast contains %q (toasts: %q)", sub, h.toasts())
+}
+
 func (h *harness) mustNotHave(sub string) {
 	h.t.Helper()
 	if h.has(sub) {

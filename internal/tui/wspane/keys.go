@@ -45,7 +45,6 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 	if p.confirm != nil {
 		return p.confirmKey(m)
 	}
-	p.notice = "" // a message lasts until the next key
 	cmd := p.dispatch(m)
 	p.syncFocus()
 	return cmd

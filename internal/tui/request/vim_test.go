@@ -291,7 +291,7 @@ func TestEditorRefusesAHiddenSecret(t *testing.T) {
 	h.gotoTab(tabAuth)
 	h.key("down", "down", "enter")
 	h.action("request.editor")
-	h.mustHave("Reveal the secret")
+	h.mustToast("Reveal the secret")
 	if h.req.Auth.Bearer.Token != "literal-secret-value" {
 		t.Fatal("a hidden secret was sent to the editor")
 	}

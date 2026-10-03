@@ -381,7 +381,7 @@ func TestEditorRefusesAHiddenSecretAndTempFileIsPrivate(t *testing.T) {
 	if _, err := os.Stat(out); err == nil {
 		t.Fatal("the editor ran for a hidden secret")
 	}
-	h.mustHave("Reveal the secret first")
+	h.mustToast("Reveal the secret first")
 
 	h.key("esc", "esc")
 	h.key("up")

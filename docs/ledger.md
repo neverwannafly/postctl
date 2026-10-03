@@ -57,7 +57,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 | UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Done (round 2), not merged | qa/ux | 2026-10-03 23:30 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Done (round 3), not merged | qa/ux | 2026-10-03 23:50 IST |
 
 ## Entries
 
@@ -1345,4 +1345,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
   7. Design call: after `[` or `]` an unbound key ends the repeat and is handled normally (`TestKeyAfterABracketIsHandledNormally`; `TestUnknownKeyAfterAPrefixSaysSo` keeps `g` and `Space`). Updated `leader.go`, `docs/design-language.md` Key map, `docs/keys.md` (`task keys`), and a dated note in `docs/briefs/UX-V0-shell-keys.md`.
 - Tests: see the gate result below. Deferred items from the DONE entry: the hidden-notice item is resolved by 6, the `]` item by 7; mouse leak coverage by 5.
 - Blockers / questions: duplicate notice text at wide sizes (status row plus toast); drop the status-row copy later if wanted.
+- Next: orchestrator merges `qa/ux`.
+
+### 2026-10-03 23:50 IST · UX-QA · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: `qa/ux` · `/Users/shubham/work/postctl-wt/qa-ux`.
+- Did: one rule for pane action-result notices: the shell toast is the only place. The request and WebSocket panes no longer draw or keep an inline copy (`notice`, expiry timer and status-row case removed; `setNotice` only returns the `ToastMsg`). This supersedes the "keep both" decision of the previous entry; the duplicate-text blocker is closed. Side effect: a notice no longer clears on the next key, the shell toast has its own lifetime.
+- Tests: pane tests that asserted the inline text now assert the emitted toast (`mustToast` in both harnesses, `toastsIn` in `restore_test.go`). New `TestActionNoticesShowExactlyOnceAtEverySize` renders 80x24, 120x40 and 200x60 with the request and the response focused and counts one occurrence; proved by running it against the previous commit (count 2 at every size with the request focused, and at 200x60 with the response focused).
+- Goldens: only the 9 `internal/tui/wspane/testdata/state-log-filtered-*` files changed (3 sizes x dark, `NO_COLOR`, ASCII); the "Showing: Received" status row now shows the connection summary, which was hidden behind the notice. Read, nothing else moved.
+- Docs: `docs/design-language.md` Interaction language bullet.
+- Blockers / questions: none.
 - Next: orchestrator merges `qa/ux`.

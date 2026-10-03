@@ -74,7 +74,7 @@ func TestBodyFormatInvalidJSONExplains(t *testing.T) {
 		t.Fatal("no format action")
 	}
 	h.run(run())
-	h.mustHave("Cannot format")
+	h.mustToast("Cannot format")
 	if h.req.Body.Raw != `{"a": }` {
 		t.Fatal("invalid JSON was modified")
 	}
@@ -272,7 +272,7 @@ func TestEditorRoundTripRawBody(t *testing.T) {
 	if h.req.Body.Raw != `{"edited": true}` {
 		t.Fatalf("raw = %q", h.req.Body.Raw)
 	}
-	h.mustHave("Updated from the editor")
+	h.mustToast("Updated from the editor")
 	h.key("ctrl+z")
 	if !strings.Contains(h.req.Body.Raw, "amount") {
 		t.Fatalf("undo raw = %q", h.req.Body.Raw)
@@ -317,7 +317,7 @@ func TestEditorSeesCurrentTextAndTempFileIsPrivate(t *testing.T) {
 	if mode != 0o600 {
 		t.Fatalf("temp file mode = %v", mode)
 	}
-	h.mustHave("No changes")
+	h.mustToast("No changes")
 }
 
 func TestEditorFailureChangesNothing(t *testing.T) {
@@ -329,14 +329,14 @@ func TestEditorFailureChangesNothing(t *testing.T) {
 	if h.req.Body.Raw != before {
 		t.Fatal("body changed after a failed editor")
 	}
-	h.mustHave("nothing changed")
+	h.mustToast("nothing changed")
 }
 
 func TestEditorNothingToOpenOnAuthTab(t *testing.T) {
 	h := newHarness(t, editorDeps("true"))
 	h.gotoTab(tabAuth)
 	h.action("request.editor")
-	h.mustHave("Nothing to open")
+	h.mustToast("Nothing to open")
 }
 
 func TestEditorBulkHeaders(t *testing.T) {

@@ -38,15 +38,12 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	p.msel = nil
 	p.confirm = nil
 	if restoreCancelled {
-		p.notice = "Restore cancelled: you switched requests"
-		n := p.setNotice(p.notice)
+		n := p.setNotice("Restore cancelled: you switched requests")
 		if cmd == nil {
 			cmd = n
 		} else {
 			cmd = tea.Batch(cmd, n)
 		}
-	} else {
-		p.notice = ""
 	}
 	p.oauthErr = ""
 	p.refreshChain()
