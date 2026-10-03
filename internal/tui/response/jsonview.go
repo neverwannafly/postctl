@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"regexp"
 	"strings"
+	"sync/atomic"
 
 	"github.com/tidwall/gjson"
 )
@@ -18,7 +19,12 @@ type jsonDoc struct {
 	filtered   []byte
 }
 
+// jsonFormats counts calls to buildJSONDoc; tests use it to prove where the
+// formatting runs (never in Update) and that a superseded build does none.
+var jsonFormats atomic.Int64
+
 func buildJSONDoc(body []byte, path string) (*jsonDoc, error) {
+	jsonFormats.Add(1)
 	src := body
 	if path != "" {
 		p := strings.TrimSpace(path)

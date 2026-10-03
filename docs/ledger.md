@@ -1207,3 +1207,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `vimfold_test.go` (11), medium-JSON formatting and superseded-build tests, footer-note test, sending-elapsed test, shell tests. `task agents:check` green (0 lint issues), `task tui:smoke` PASS, `postctl --help` ok, `go mod tidy` no diff.
 - Blockers / questions: none.
 - Next: merge `ws/ux-v3-response` into main.
+
+### 2026-10-03 22:03 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: re-review of 87356de. The build command now checks its generation first, again after formatting and before the fold index, and again before the spans and the highlighter; a superseded build formats nothing when it was already stale at the start. `prepareCurrent` no longer builds the line index for an editor body over 64 KiB (the plain viewer indexes on demand if it has to show one meanwhile). Search across folds is documented in `vimfold.go`: it matches visible text only and never opens a fold.
+- Files: `internal/tui/response/{vimbody.go,pane.go,jsonview.go,vimfold.go}` and tests.
+- Tests: `jsonFormats` counter (test hook, atomic): superseded build formats 0 times and the current one once; Update for a 4 MiB JSON body formats and indexes nothing; fold search (open, closed, after `zo`); folds survive `u` and reset on a new response. `task agents:check` and `task tui:smoke` green.
+- Blockers / questions: none.
+- Next: merge `ws/ux-v3-response` into main.

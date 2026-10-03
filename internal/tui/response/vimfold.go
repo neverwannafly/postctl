@@ -16,12 +16,13 @@ import (
 //	za toggle   zo open   zc close   zR open all   zM close all
 //
 // A closed node is one line, `"items": […] 3 items,` or `{…} 12 keys`. The
-// buffer holds the visible text, so motions, search and the highlighter
-// treat a folded node as the single line it looks like, and a yank copies
-// what is on screen (a folded line yields the summary, never the hidden
-// text), which keeps a copy from carrying anything the user did not see. The
-// fold keys are the pane's own: the buffer never sees them, and every other
-// z key is swallowed (the buffer has no scroll-to-cursor commands).
+// buffer holds the visible text, so motions, search and the highlighter treat
+// a folded node as the single line it looks like. A search matches the visible
+// text only: it does not look inside a closed node and does not open one. A
+// yank copies what is on screen (a folded line yields the summary, never the
+// hidden text), which keeps a copy from carrying anything the user did not
+// see. The fold keys are the pane's own: the buffer never sees them, and every
+// other z key is swallowed (the buffer has no scroll-to-cursor commands).
 
 // region is a JSON node that spans lines: the lines start through end-1.
 type region struct {

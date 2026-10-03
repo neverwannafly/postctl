@@ -1073,7 +1073,13 @@ func (p *Pane) prepareCurrent() {
 	if p.bodyKind == BodyBinary && p.bodyMode != modeHex {
 		p.bodyMode = modeHex
 	}
-	p.rawIdx.build(body)
+	p.rawIdx.reset()
+	if !p.vimEligible(st) || len(body) <= vimInlineMax {
+		// A body the editor will show (the big ones are built in a command)
+		// needs no line index; the plain viewer indexes it itself if it must
+		// show it meanwhile.
+		p.rawIdx.build(body)
+	}
 	p.clampScroll()
 }
 

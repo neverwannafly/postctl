@@ -191,3 +191,58 @@ func TestFoldViewIsPure(t *testing.T) {
 		t.Fatal("View changed between calls")
 	}
 }
+
+// Search matches the visible text only: it neither finds text inside a closed
+// node nor opens the node.
+func TestFoldSearchMatchesVisibleTextOnly(t *testing.T) {
+	p, _ := foldPane(t)
+	vimKeys(t, p, "/", `"`, "c", `"`, "enter")
+	if r, _ := vimPos(p); r != 3 {
+		t.Fatalf("an open node is searched: row %d, want 3", r)
+	}
+	vimKeys(t, p, "g", "g", "j", "z", "c")
+	folded := foldText(p)
+	vimKeys(t, p, "g", "g", "/", `"`, "c", `"`, "enter")
+	if r, _ := vimPos(p); r != 0 {
+		t.Fatalf("text inside a closed node must not match, cursor moved to row %d", r)
+	}
+	if foldText(p) != folded {
+		t.Fatal("a search must not open a fold")
+	}
+	vimKeys(t, p, "/", "t", "a", "i", "l", "enter")
+	if r, _ := vimPos(p); r != strings.Count(folded[:strings.Index(folded, "tail")], "\n") {
+		t.Fatalf("visible text after the fold still matches: row %d", r)
+	}
+	vimKeys(t, p, "g", "g", "j", "z", "o", "g", "g", "/", `"`, "c", `"`, "enter")
+	if r, _ := vimPos(p); r != 3 {
+		t.Fatalf("after zo the text is searchable again: row %d", r)
+	}
+}
+
+func TestFoldsSurviveRevealAndResetOnANewResponse(t *testing.T) {
+	p, _ := foldPane(t)
+	full := foldText(p)
+	vimKeys(t, p, "j", "z", "c")
+	folded := foldText(p)
+	row, _ := vimPos(p)
+	vimKeys(t, p, "u") // reveal changes what copies hold, not what is folded
+	if foldText(p) != folded {
+		t.Fatal("reveal must not touch the folds")
+	}
+	if r, _ := vimPos(p); r != row {
+		t.Fatalf("reveal moved the cursor from row %d to %d", row, r)
+	}
+	vimKeys(t, p, "z", "R", "z", "c") // folds still work after a reveal
+	if foldText(p) != folded {
+		t.Fatalf("zc after reveal:\n%s", foldText(p))
+	}
+	// A new response for the same request starts open.
+	id := p.ref.Request.ID
+	v3Pump(t, p, tui.SendResultMsg{Result: v3Result(id, foldDoc, "", history.NewRedactor([]string{v3Secret}))})
+	if !p.vimLive() || foldText(p) != full {
+		t.Fatalf("a new response starts with every node open, got:\n%s", foldText(p))
+	}
+	if p.foldPending {
+		t.Fatal("no fold key is pending")
+	}
+}

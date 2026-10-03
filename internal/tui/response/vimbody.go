@@ -272,12 +272,21 @@ func (p *Pane) buildVim(th ui.Theme, key vimKey, closed map[int]bool, reuse *fol
 		ix   *foldIndex
 		vis  []int
 	)
+	if stale() { // a newer build was asked for before this one started
+		return nil
+	}
 	if key.mode == modePretty && kind == BodyJSON {
 		if ix = reuse; ix == nil {
 			if doc, err := buildJSONDoc(body, key.path); err == nil {
+				if stale() {
+					return nil
+				}
 				ix = indexFolds(doc.lines)
 			}
 		}
+	}
+	if stale() {
+		return nil
 	}
 	if ix != nil {
 		var lines []string

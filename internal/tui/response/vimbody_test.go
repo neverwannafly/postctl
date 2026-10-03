@@ -538,12 +538,19 @@ func TestVimBodySupersededBuildStopsBeforeTheHighlighter(t *testing.T) {
 	p, id, _ := v3Pane(t, nil, v3Theme())
 	_, first := p.Update(tui.SendResultMsg{Result: v3Result(id, mediumJSON("one"), "", nil)})
 	_, second := p.Update(tui.SendResultMsg{Result: v3Result(id, mediumJSON("two"), "", nil)})
+	before := jsonFormats.Load()
 	built, ok := first().(vimBuiltMsg)
+	if jsonFormats.Load() != before {
+		t.Fatal("a superseded build must not format the body")
+	}
 	if !ok || built.v != nil {
 		t.Fatalf("a superseded build must return without a buffer, got %+v ok=%v", built.v != nil, ok)
 	}
 	if built, ok := second().(vimBuiltMsg); !ok || built.v == nil {
 		t.Fatal("the current build must produce its buffer")
+	}
+	if jsonFormats.Load() != before+1 {
+		t.Fatalf("the current build formats once, got %d", jsonFormats.Load()-before)
 	}
 }
 
@@ -603,5 +610,24 @@ func TestSendingElapsedIsStampedInUpdate(t *testing.T) {
 	time.Sleep(150 * time.Millisecond)
 	if p.View() != before {
 		t.Fatal("View must not read the clock")
+	}
+}
+
+func TestUpdateDoesNotFormatOrIndexALargeEditorBody(t *testing.T) {
+	body := `{"items":[` + strings.Repeat(`{"id":"abcdef","n":1},`, (4<<20)/22) + `{}]}`
+	if len(body) < 4<<20 || len(body) >= largeBodyThreshold {
+		t.Fatalf("test body size %d", len(body))
+	}
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	before := jsonFormats.Load()
+	_, cmd := p.Update(tui.SendResultMsg{Result: v3Result(id, body, "", nil)})
+	if cmd == nil {
+		t.Fatal("the buffer is built in a command")
+	}
+	if jsonFormats.Load() != before {
+		t.Fatal("Update formatted the body")
+	}
+	if len(p.rawIdx.offsets) != 0 {
+		t.Fatalf("Update indexed %d lines of a body the editor will show", len(p.rawIdx.offsets))
 	}
 }
