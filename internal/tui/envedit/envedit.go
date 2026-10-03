@@ -13,7 +13,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
-	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/listmotion"
+	"github.com/shubham/postctl/internal/tui/screenfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -105,6 +106,7 @@ const (
 	thenReveal hydrateThen = iota
 	thenUnsecret
 	thenDuplicate
+	thenEdit
 )
 
 // Model is the environment editor screen.
@@ -120,7 +122,7 @@ type Model struct {
 
 	mode   mode
 	intent nameIntent
-	name   *textin.Input
+	name   *screenfield.Field
 	nameEr string
 	dupOf  model.ID
 	dupVs  []model.Variable
@@ -128,12 +130,15 @@ type Model struct {
 	confFn func() tea.Cmd
 
 	// variables table
-	cur, top int
-	edit     bool
-	col      int
-	in       *textin.Input
-	draft    bool
-	reveal   bool
+	cur, top      int
+	edit          bool
+	col           int
+	in            *screenfield.Field
+	draft         bool
+	reveal        bool
+	editBaseline  string
+	editSkipValue bool
+	listNav       listmotion.View
 
 	seq    map[saveKey]uint64
 	dirty  map[saveKey]bool
@@ -174,7 +179,15 @@ func (m *Model) focusInitial() {
 }
 
 // SetSize implements tui.Screen.
-func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
+func (m *Model) SetSize(w, h int) {
+	m.w, m.h = w, h
+	if m.name != nil {
+		m.name.SetWidth(max(4, w-12))
+	}
+	if m.in != nil {
+		m.in.SetWidth(max(4, w-15))
+	}
+}
 
 // ---- what is being edited ------------------------------------------------------
 
@@ -338,11 +351,15 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 	case tea.PasteMsg:
 		switch {
 		case m.mode == modeName:
-			m.name.Update(v)
+			_, _, cmd, _, _ := m.name.UpdateEx(v)
 			m.nameEr = ""
+			return m, cmd
 		case m.edit:
-			m.in.Update(v)
-			return m, m.applyText()
+			changed, cmd := m.in.Update(v)
+			if changed {
+				return m, tea.Batch(cmd, m.applyText())
+			}
+			return m, cmd
 		}
 		return m, nil
 	case saveTickMsg:
@@ -432,7 +449,31 @@ func (m *Model) selectItem(delta int) {
 	m.reveal = false
 }
 
+// VimMode implements tui.ModeReporter for the footer mode label.
+func (m *Model) VimMode() string {
+	if m.mode == modeName && m.name != nil {
+		return m.name.VimMode()
+	}
+	if m.edit && m.in != nil {
+		return m.in.VimMode()
+	}
+	return ""
+}
+
 func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	n := len(m.envs())
+	if m.tab == tabCollections {
+		n = len(m.ws().Collections)
+	}
+	m.listNav.Cursor = m.sel[m.tab]
+	if r := listmotion.Key(k, listmotion.Config{Count: n, Page: max(1, m.h-6)}, &m.listNav); r.Handled {
+		if r.Moved && n > 0 {
+			m.sel[m.tab] = m.listNav.Cursor
+			m.cur, m.top = 0, 0
+			m.reveal = false
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
 		return m.close()
@@ -495,8 +536,9 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 func (m *Model) beginName(in nameIntent, initial string) {
 	m.mode = modeName
 	m.intent = in
-	m.name = textin.New(initial)
-	m.name.Placeholder = "Environment name"
+	f, _ := screenfield.New(m.th, initial, "Environment name", false)
+	m.name = f
+	m.name.SetWidth(max(4, m.w-12))
 	m.nameEr = ""
 }
 
@@ -510,16 +552,17 @@ func (m *Model) nameTaken(name string, except model.ID) bool {
 }
 
 func (m *Model) nameKey(k tea.KeyPressMsg) tea.Cmd {
-	switch k.String() {
-	case "esc":
+	submit, changed, cmd, leave, normal := m.name.UpdateEx(k)
+	if leave || (k.String() == "esc" && normal) {
 		m.mode = modeNone
 		m.dupVs = nil
-		return nil
-	case "enter":
-		name := strings.TrimSpace(m.name.Text())
+		return cmd
+	}
+	if submit || (k.String() == "enter" && normal) {
+		name := strings.TrimSpace(m.name.Value())
 		if name == "" {
 			m.nameEr = "Give the environment a name."
-			return nil
+			return cmd
 		}
 		var except model.ID
 		if m.intent == intentRename {
@@ -527,15 +570,15 @@ func (m *Model) nameKey(k tea.KeyPressMsg) tea.Cmd {
 		}
 		if m.nameTaken(name, except) {
 			m.nameEr = "Another environment already has that name."
-			return nil
+			return cmd
 		}
 		m.mode = modeNone
-		return m.applyName(name)
+		return tea.Batch(cmd, m.applyName(name))
 	}
-	if m.name.Update(k) {
+	if changed {
 		m.nameEr = ""
 	}
-	return nil
+	return cmd
 }
 
 func (m *Model) applyName(name string) tea.Cmd {
@@ -676,7 +719,7 @@ func (m *Model) onHydrated(h hydratedMsg) tea.Cmd {
 		}
 		m.beginName(intentDuplicate, src+" copy")
 		return note
-	case thenReveal, thenUnsecret:
+	case thenReveal, thenUnsecret, thenEdit:
 		if h.owner != m.ownerKey() {
 			return nil
 		}
@@ -697,11 +740,19 @@ func (m *Model) onHydrated(h hydratedMsg) tea.Cmd {
 				cur[i].Value = h.vars[i].Value
 			}
 		}
-		if h.then == thenUnsecret && m.cur < len(cur) && cur[m.cur].IsSecret() {
-			cur[m.cur].Type = model.VarDefault
-			cur[m.cur].SecretRef = ""
-			if k, ok := m.saveTarget(); ok {
-				return m.touch(k)
+		*l = cur
+		switch h.then {
+		case thenUnsecret:
+			if m.cur < len(cur) && cur[m.cur].IsSecret() {
+				cur[m.cur].Type = model.VarDefault
+				cur[m.cur].SecretRef = ""
+				if k, ok := m.saveTarget(); ok {
+					return m.touch(k)
+				}
+			}
+		case thenEdit:
+			if m.edit {
+				m.beginEdit(m.col)
 			}
 		}
 	}

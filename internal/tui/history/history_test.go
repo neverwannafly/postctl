@@ -66,6 +66,18 @@ func TestHistoryListAndFilter(t *testing.T) {
 	}
 }
 
+func TestViewIsPure(t *testing.T) {
+	m := New(tui.ScreenEnv{PaneEnv: tui.PaneEnv{Theme: ui.NewTheme(true, false, false)}}, Deps{})
+	m.SetSize(80, 24)
+	m.items = []history.Entry{{ID: "1", RequestName: "A"}}
+	m.cur = 1
+	before := m.cur
+	first, second := m.View(), m.View()
+	if first != second || m.cur != before {
+		t.Fatal("View mutated history list state")
+	}
+}
+
 func TestHistoryListVimNavigation(t *testing.T) {
 	m := New(tui.ScreenEnv{PaneEnv: tui.PaneEnv{Theme: ui.NewTheme(true, true, false)}}, Deps{})
 	m.items = make([]history.Entry, 4)

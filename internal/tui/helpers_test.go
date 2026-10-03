@@ -248,6 +248,18 @@ func (h *harness) keys(names ...string) {
 	}
 }
 
+// overlayDismiss closes a vim overlay field (insert → normal → close).
+func (h *harness) overlayDismiss() {
+	h.t.Helper()
+	h.keys("esc", "esc")
+}
+
+// treeFilterDismiss exits the tree filter and clears a kept query.
+func (h *harness) treeFilterDismiss() {
+	h.t.Helper()
+	h.keys("esc", "esc", "esc")
+}
+
 // typeText types s one rune at a time.
 func (h *harness) typeText(s string) {
 	h.t.Helper()

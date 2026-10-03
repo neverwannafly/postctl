@@ -117,7 +117,7 @@ func TestTreeFilterNoMatchExplains(t *testing.T) {
 	h.typeText("zzzz")
 	h.mustHave("No matches")
 	h.mustHave("Esc clears the filter")
-	h.keys("esc")
+	h.treeFilterDismiss()
 	h.mustHave("List charges")
 }
 
@@ -255,7 +255,7 @@ func TestPromptValidatesName(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.keys("space", "a", "enter")
 	h.mustHave("Enter a name.")
-	h.keys("esc")
+	h.overlayDismiss()
 	if h.a.ov != nil || len(h.be.saved) != 0 {
 		t.Fatal("cancel must not write anything")
 	}

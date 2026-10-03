@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
@@ -22,9 +24,11 @@ import (
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/diffview"
+	"github.com/shubham/postctl/internal/tui/envedit"
 	tuihistory "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
 	"github.com/shubham/postctl/internal/tui/response"
+	"github.com/shubham/postctl/internal/tui/runner"
 	"github.com/shubham/postctl/internal/tui/tuiengine"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -297,6 +301,55 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	shell, _ = shell.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	shell, _ = shell.Update(tui.OpenSwitcherMsg{})
 	frames["switcher"] = shell.View().Content
+
+	leakTheme := ui.NewTheme(true, true, false)
+	envEditScr := tui.ScreenEnv{
+		PaneEnv: tui.PaneEnv{
+			Theme: leakTheme,
+			Backend: leakEnvHydrator{
+				Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
+				secrets: secrets,
+			},
+		},
+		Workspace: ws, ActiveEnv: env.ID,
+	}
+	maskGlyph := ui.NewTheme(true, true, false).Glyphs.Mask
+	for _, w := range []int{80, 140} {
+		var envEdit tui.Screen = envedit.New(envEditScr, envedit.Deps{})
+		envEdit.SetSize(w, 40)
+		envEdit = driveScreen(t, envEdit, tea.KeyPressMsg{Code: tea.KeyEnter})
+		envEdit = driveScreen(t, envEdit, tea.KeyPressMsg{Code: 'j', Text: "j"})
+		envEdit = driveScreen(t, envEdit, tea.KeyPressMsg{Code: tea.KeyEnter})
+		frames[fmt.Sprintf("env editor secret insert %d", w)] = envEdit.View()
+		envEdit = driveScreen(t, envEdit, tea.KeyPressMsg{Code: tea.KeyEsc})
+		frames[fmt.Sprintf("env editor secret normal %d", w)] = envEdit.View()
+		envEdit = driveScreen(t, envEdit, tea.KeyPressMsg{Code: 'v', Text: "v"})
+		frames[fmt.Sprintf("env editor secret visual %d", w)] = envEdit.View()
+	}
+	var histScr tui.Screen = tuihistory.New(tui.ScreenEnv{
+		PaneEnv: tui.PaneEnv{Theme: leakTheme}, Workspace: ws, ActiveEnv: env.ID,
+	}, tuihistory.Deps{
+		Log:  func() (tui.HistoryReader, error) { return log, nil },
+		Curl: tuihistory.DefaultCurl,
+	})
+	histScr.SetSize(140, 40)
+	histScr = driveScreen(t, histScr, tui.ScreenOpenedMsg{})
+	histScr = driveScreen(t, histScr, tea.KeyPressMsg{Code: '/', Text: "/"})
+	frames["history filter field"] = histScr.View()
+	runScr := tui.ScreenEnv{
+		PaneEnv: tui.PaneEnv{
+			Theme:   leakTheme,
+			Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
+		},
+		Workspace: ws, ActiveEnv: env.ID,
+		RunScope: &tui.RunScope{Collection: coll},
+	}
+	var runSc tui.Screen = runner.New(runScr, runner.Deps{})
+	runSc.SetSize(140, 40)
+	runSc, _ = runSc.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	runSc, _ = runSc.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	runSc, _ = runSc.Update(tea.KeyPressMsg{Code: tea.KeyTab, Text: "\t"})
+	frames["runner setup data path"] = runSc.View()
 	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
 	for _, secret := range []string{sentinel, folderSentinel} {
@@ -312,6 +365,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 				continue // the in-memory body is exempt: it shows what the server sent
 			}
 			assertAbsent(t, secret, name+" frame", []byte(frame))
+			if strings.HasPrefix(name, "env editor secret") {
+				assertEnvSecretFieldMask(t, maskGlyph, name+" frame", frame)
+			}
 			if strings.HasSuffix(name, "response cookies") {
 				// The cookie column clips long values, so also look for the start.
 				assertAbsent(t, secret[:16], name+" frame (clipped value)", []byte(frame))
@@ -501,9 +557,29 @@ func assertWorkspaceFilesClean(t *testing.T, root, sentinel string) {
 
 func assertAbsent(t *testing.T, sentinel, artifact string, raw []byte) {
 	t.Helper()
-	if strings.Contains(string(raw), sentinel) {
+	text := string(raw)
+	stripped := ansi.Strip(text)
+	if strings.Contains(text, sentinel) || strings.Contains(stripped, sentinel) {
 		t.Errorf("secret leaked to %s", artifact)
 	}
+}
+
+func assertEnvSecretFieldMask(t *testing.T, glyph, artifact, frame string) {
+	t.Helper()
+	if glyph == "" {
+		t.Errorf("empty mask glyph for %s", artifact)
+		return
+	}
+	for _, line := range strings.Split(ansi.Strip(frame), "\n") {
+		if !strings.Contains(line, "Value (secret)") {
+			continue
+		}
+		if !strings.Contains(line, glyph) {
+			t.Errorf("expected mask glyph on the secret value field line in %s", artifact)
+		}
+		return
+	}
+	t.Errorf("no Value (secret) field line in %s", artifact)
 }
 
 func assertMaskGlyphsAbsent(t *testing.T, root string) {
@@ -586,8 +662,6 @@ func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileErro
 	return b.ws, nil, nil
 }
 
-// v3Case is one request whose response pane frames the V3 sweep captures, and
-// the secret its engine redactor knows.
 type v3Case struct {
 	req    *model.Request
 	secret string
@@ -609,7 +683,6 @@ func renderResponseV3Frames(
 	theme := ui.NewTheme(true, true, false)
 	frames := map[string]string{}
 	for _, c := range cases {
-		// Two sends, so the second has a previous history entry to diff with.
 		var out *engine.Outcome
 		for range 2 {
 			var err error
@@ -634,7 +707,6 @@ func renderResponseV3Frames(
 		_ = pane.Focus()
 		prefix := "v3 " + c.req.Name + " "
 
-		// History tab, with a server reason phrase that echoes the secret.
 		echoLog, err := history.Open(filepath.Join(t.TempDir(), "history"), history.Options{})
 		if err != nil {
 			t.Fatal(err)
@@ -664,7 +736,6 @@ func renderResponseV3Frames(
 			}
 		}
 
-		// Diff with previous: body, then headers.
 		runResponseAction(t, pane, "response.diff")
 		frames[prefix+"diff body"] = pane.View()
 		driveResponsePane(t, pane, tea.KeyPressMsg{Code: 'h', Text: "h"})
@@ -674,7 +745,6 @@ func renderResponseV3Frames(
 		}
 		driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape})
 
-		// jq: the whole document, then the fields that carry the secret.
 		for i, filter := range []string{".", ".jwt, .queryEcho, .folderHeader, .requestPath"} {
 			runResponseAction(t, pane, "response.jq")
 			for _, r := range filter {
@@ -692,13 +762,12 @@ func renderResponseV3Frames(
 				t.Fatalf("%s: yank of the jq view copied %d times", c.req.Name, len(clips))
 			}
 			frames[name+" yank"] = clips[0]
-			driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape}) // clear the filter
+			driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape})
 		}
 	}
 	return frames
 }
 
-// runResponseAction runs a pane action the way the shell's leader key would.
 func runResponseAction(t *testing.T, p tui.Pane, id string) {
 	t.Helper()
 	src, ok := p.(tui.ActionSource)
@@ -717,7 +786,6 @@ func runResponseAction(t *testing.T, p tui.Pane, id string) {
 	t.Fatalf("action %s is not registered", id)
 }
 
-// driveResponsePane delivers msg and runs the commands it leads to.
 func driveResponsePane(t *testing.T, p tui.Pane, msg tea.Msg) {
 	t.Helper()
 	_, cmd := p.Update(msg)
@@ -743,6 +811,63 @@ func runPaneCmd(t *testing.T, p tui.Pane, cmd tea.Cmd) {
 		default:
 			_, next := p.Update(m)
 			queue = append(queue, next)
+		}
+	}
+}
+
+type leakEnvHydrator struct {
+	tui.Backend
+	secrets store.SecretStore
+}
+
+func (leakEnvHydrator) HydrateAuth(context.Context, *model.Auth) error { return nil }
+
+func (h leakEnvHydrator) HydrateVariables(ctx context.Context, vs []model.Variable) error {
+	for i := range vs {
+		if !vs[i].IsSecret() || vs[i].SecretRef == "" {
+			continue
+		}
+		v, err := h.secrets.Get(ctx, vs[i].SecretRef)
+		if err != nil {
+			return err
+		}
+		vs[i].Value = v
+	}
+	return nil
+}
+
+func driveScreen(t *testing.T, s tui.Screen, msg tea.Msg) tui.Screen {
+	t.Helper()
+	next, cmd := s.Update(msg)
+	if next != nil {
+		s = next
+	}
+	runScreenCmds(t, &s, cmd)
+	return s
+}
+
+func runScreenCmds(t *testing.T, ps *tui.Screen, cmd tea.Cmd) {
+	t.Helper()
+	queue := []tea.Cmd{cmd}
+	for steps := 0; len(queue) > 0; steps++ {
+		if steps > 500 {
+			t.Fatal("screen commands did not settle")
+		}
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		switch m := c().(type) {
+		case nil:
+		case tea.BatchMsg:
+			queue = append(queue, m...)
+		default:
+			next, cmd := (*ps).Update(m)
+			if next != nil {
+				*ps = next
+			}
+			queue = append(queue, cmd)
 		}
 	}
 }

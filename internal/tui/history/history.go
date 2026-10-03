@@ -14,8 +14,8 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/diffview"
+	"github.com/shubham/postctl/internal/tui/listmotion"
 	"github.com/shubham/postctl/internal/tui/response"
-	"github.com/shubham/postctl/internal/tui/textin"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -64,9 +64,11 @@ type Model struct {
 	cur   int
 	top   int
 
-	filter    *textin.Input
+	filter    *filterField
 	filtering bool
+	filterQ   string
 	status    statusFilter
+	listNav   listmotion.View
 	requestID model.ID
 
 	detailTab int
@@ -85,17 +87,32 @@ type Model struct {
 	diffHeaders  *diffview.Model
 	diffBodyMode bool
 	diffGen      int
-	pendingG     bool
 }
 
 // New builds the history browser.
 func New(env tui.ScreenEnv, d Deps) *Model {
-	m := &Model{th: env.Theme, env: env, deps: d, filter: textin.New(""), requestID: env.HistoryRequest}
+	m := &Model{
+		th: env.Theme, env: env, deps: d,
+		filter: newFilterField(env.Theme), requestID: env.HistoryRequest,
+	}
 	return m
 }
 
 // SetSize implements tui.Screen.
-func (m *Model) SetSize(w, h int) { m.w, m.h = w, h }
+func (m *Model) SetSize(w, h int) {
+	m.w, m.h = w, h
+	if m.filter != nil {
+		m.filter.setWidth(max(8, w-8))
+	}
+}
+
+// VimMode implements tui.ModeReporter.
+func (m *Model) VimMode() string {
+	if m.filtering && m.filter != nil {
+		return m.filter.vimMode()
+	}
+	return ""
+}
 
 // KeyHints implements tui.Screen.
 func (m *Model) KeyHints() []ui.Hint {
@@ -255,7 +272,7 @@ func (m *Model) reload() tea.Cmd {
 		if err != nil {
 			return loadedMsg{err: err}
 		}
-		f := history.Filter{Query: m.filter.Text(), Limit: 500}
+		f := history.Filter{Query: m.filterQ, Limit: 500}
 		if m.requestID != "" {
 			f.RequestID = m.requestID
 		}
@@ -298,35 +315,20 @@ func (m *Model) matchStatus(e history.Entry) bool {
 
 func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	m.notice = ""
-	if m.pendingG {
-		m.pendingG = false
-		if k.String() == "g" {
-			m.cur = 0
-			m.top = 0
-			return m, nil
+	m.listNav.Cursor, m.listNav.Top = m.cur, m.top
+	if r := listmotion.Key(k, listmotion.Config{Count: len(m.items), Page: max(1, m.listRows())}, &m.listNav); r.Handled {
+		if r.Moved {
+			m.cur, m.top = m.listNav.Cursor, m.listNav.Top
 		}
+		return m, nil
 	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
-	case "up", "k":
-		m.move(-1)
-	case "down", "j":
-		m.move(1)
-	case "g":
-		m.pendingG = true
-	case "home":
-		m.cur = 0
-		m.top = 0
-	case "end", "G":
-		m.cur = max(0, len(m.items)-1)
-		m.clampTop()
-	case "pgup":
-		m.move(-m.listRows())
-	case "pgdown":
-		m.move(m.listRows())
 	case "/":
 		m.filtering = true
+		m.filter.setQuery(m.filterQ)
+		return m, m.filter.ed.Focus()
 	case "f":
 		m.status = statusFilter((int(m.status) + 1) % 5)
 		return m, m.reload()
@@ -369,17 +371,19 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 }
 
 func (m *Model) filterKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
-	switch k.String() {
-	case "esc":
+	cmd, nav := m.filter.update(k)
+	switch nav {
+	case filterNavClose:
 		m.filtering = false
-		m.filter.Set("")
-		return m, m.reload()
-	case "enter":
+		m.filterQ = ""
+		m.filter.setQuery("")
+		return m, tea.Batch(cmd, m.reload())
+	case filterNavApply:
 		m.filtering = false
-		return m, m.reload()
+		m.filterQ = m.filter.query()
+		return m, tea.Batch(cmd, m.reload())
 	default:
-		m.filter.Update(k)
-		return m, nil
+		return m, cmd
 	}
 }
 
@@ -461,35 +465,7 @@ func (m *Model) current() *history.Entry {
 	return &m.items[m.cur]
 }
 
-func (m *Model) move(d int) {
-	if len(m.items) == 0 {
-		return
-	}
-	m.cur = clamp(m.cur+d, 0, len(m.items)-1)
-	m.clampTop()
-}
-
-func (m *Model) clampTop() {
-	rows := m.listRows()
-	if m.cur < m.top {
-		m.top = m.cur
-	}
-	if m.cur >= m.top+rows {
-		m.top = m.cur - rows + 1
-	}
-}
-
 func (m *Model) listRows() int { return max(1, m.h-6) }
-
-func clamp(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
 
 // View implements tui.Screen.
 func (m *Model) View() string {
@@ -518,12 +494,12 @@ func (m *Model) viewList() string {
 	if m.requestID != "" {
 		title = "History of this request"
 	}
-	if m.filter.Text() != "" {
-		title += "  /" + m.filter.Text()
+	if m.filterQ != "" {
+		title += "  /" + m.filterQ
 	}
 	body := m.screenHeader(title)
 	if m.filtering {
-		body += t.Render(ui.AccentPrimary, "Filter  "+m.filter.View(t, m.w-8, true)) + "\n"
+		body += t.Render(ui.AccentPrimary, "Filter  "+m.filter.view()) + "\n"
 	}
 	if len(m.items) == 0 {
 		body += t.EmptyState("No history yet", "Send a request with Ctrl-S; entries appear here.", "Ctrl-S Send", m.w)

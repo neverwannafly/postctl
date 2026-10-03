@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/listmotion"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -50,10 +51,11 @@ type Model struct {
 	jar  Jar
 	w, h int
 
-	list   []httpx.StoredCookie
-	cur    int
-	top    int
-	reveal bool
+	list    []httpx.StoredCookie
+	cur     int
+	top     int
+	listNav listmotion.View
+	reveal  bool
 
 	mode   mode
 	conf   ui.Confirm
@@ -122,7 +124,14 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 
 func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	m.notice = ""
-	rows := max(1, m.listRows())
+	m.listNav.Cursor, m.listNav.Top = m.cur, m.top
+	if r := listmotion.Key(k, listmotion.Config{Count: len(m.list), Page: m.listRows()}, &m.listNav); r.Handled {
+		if r.Moved {
+			m.cur, m.top = m.listNav.Cursor, m.listNav.Top
+			m.reveal = false
+		}
+		return m, nil
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
@@ -131,13 +140,13 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	case "down":
 		m.move(1)
 	case "pgup":
-		m.move(-rows)
+		m.move(-max(1, m.listRows()))
 	case "pgdown":
-		m.move(rows)
+		m.move(max(1, m.listRows()))
 	case "home":
-		m.move(-len(m.list))
+		m.cur = 0
 	case "end":
-		m.move(len(m.list))
+		m.cur = max(0, len(m.list)-1)
 	case "r":
 		m.reveal = !m.reveal
 	case "d", "delete":

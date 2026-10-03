@@ -50,7 +50,12 @@ type Options struct {
 	Highlighter Highlighter
 	Completer   Completer
 	Clipboard   func(text string) tea.Cmd
-	Redact      func(text string) string
+	// Redact transforms text before it reaches Clipboard; nil means identity.
+	Redact func(text string) string
+	// Mask is a single display glyph repeated per grapheme cluster in the buffer.
+	// Cursor, scroll and selection use cluster indexes on the real buffer; only
+	// rendering is masked. Empty means show the buffer as stored.
+	Mask string
 }
 
 // EventKind identifies the result of an Update.
@@ -189,6 +194,14 @@ func New(th ui.Theme, opts Options) *Model {
 	return m
 }
 
+// SetClipboard replaces the clipboard hook (for tests and custom hosts).
+func (m *Model) SetClipboard(fn func(text string) tea.Cmd) {
+	if fn == nil {
+		fn = tea.SetClipboard
+	}
+	m.opts.Clipboard = fn
+}
+
 // SetSize sets the drawing area and updates scroll offsets.
 func (m *Model) SetSize(w, h int) {
 	m.width, m.height = max(1, w), max(1, h)
@@ -217,6 +230,14 @@ func (m *Model) Value() string { return strings.Join(m.lines, "\n") }
 // Focus focuses the editor.
 func (m *Model) Focus() tea.Cmd {
 	m.focused = true
+	return nil
+}
+
+// FocusNormal focuses the editor in normal mode.
+func (m *Model) FocusNormal() tea.Cmd {
+	m.focused = true
+	m.mode = Normal
+	m.clearPending()
 	return nil
 }
 

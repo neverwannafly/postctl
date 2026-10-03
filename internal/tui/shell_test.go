@@ -309,9 +309,10 @@ func TestFooterHintsAreContextual(t *testing.T) {
 	h.selectByName("Charges")
 	h.mustHave("Enter Fold")
 	h.keys("/")
-	h.mustHave("Esc Clear filter")
+	h.mustHave("Esc Normal or close")
 	h.mustNotHave("q Quit")
-	h.keys("esc", "space", "e")
+	h.keys("enter") // keep empty filter results and leave insert mode
+	h.keys("space", "e")
 	h.mustNotHave("Space a New")
 	h.mustHave("Enter Use")
 }

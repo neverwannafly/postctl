@@ -1,7 +1,7 @@
 # Keyboard Shortcut Reference
 
 `postctl` is designed for fast, keyboard-first navigation without requiring a mouse.
-Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Text fields insert what you type, including Space, `g`, `q` and `:`; modal editing inside text fields is a separate workstream and is not advertised here until it ships.
+Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Single-line fields on overlays and full screens (environment editor, runner, history filter, palette) use modal vim editing: `i`/`a` insert, `Esc` back to normal, `y` yank; list screens also use `j`/`k`, `gg`/`G`, and `Ctrl-d`/`Ctrl-u`.
 
 For tmux pane handoff (**Ctrl-h/j/k/l** at the layout edge), Ghostty, and **Ctrl-Enter** / clipboard setup, see [`docs/terminal.md`](terminal.md).
 
@@ -279,7 +279,8 @@ Managing workspace environments, globals, and collection variables.
 | --- | --- | --- |
 | `[, ]` | Switch tab | Cycle between Environments, Globals, and Collections tabs |
 | `1, 2, 3` | Jump to tab | 1: Environments, 2: Globals, 3: Collections |
-| `↑, ↓, Left, Right` | Select environment | In list: move selection between environments/collections |
+| `j, k, ↑, ↓, gg, G, Ctrl-d/u` | Move selection | In environment list: vim list motions |
+| `Left, Right` | Select environment | Move between environments/collections |
 | `Enter, Tab` | Focus variables | Move focus from environment list to variables table |
 | `n` | New environment | Create and name a new environment (Environments tab) |
 | `r, F2` | Rename environment | Rename the highlighted environment |
@@ -306,7 +307,7 @@ Inspecting and clearing persistent workspace cookies (.postctl/cookies.json).
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `↑, ↓` | Move selection | Select previous or next cookie in list |
+| `j, k, ↑, ↓, gg, G, Ctrl-d/u` | Move selection | Select previous or next cookie in list |
 | `PgUp, PgDn` | Page up / down | Scroll cookie list by page |
 | `Home, End` | First / last cookie | Jump to first or last stored cookie |
 | `r` | Reveal cookie value | Toggle display of obscured cookie value |
@@ -323,7 +324,9 @@ Configuring, executing, and analyzing multi-request runs like newman.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `Tab, Shift-Tab` | Navigate fields | Cycle through Iterations, Data file, Delay, Bail, Persist |
+| `j, k, Tab, Shift-Tab` | Navigate fields | Vim motions or Tab through Iterations, Data file, Delay, Bail, Persist |
+| `Esc (field)` | Leave field | Insert → normal → leave field without closing the screen |
+| `Enter (field)` | Edit field | Re-enter insert mode from normal on a setup or export field |
 | `Space` | Toggle option | Toggle Bail (stop on failure) and Persist variables options |
 | `Ctrl-Enter` | Start run | Begin executing the collection run (needs enhanced keyboard reporting) |
 | `Enter (last field)` | Start run | Begin collection run from bottom of setup form |

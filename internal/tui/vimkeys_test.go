@@ -371,7 +371,7 @@ func TestEscLadder(t *testing.T) {
 	// An overlay next.
 	h = newHarness(t, demo(), 160, 30)
 	h.keys("ctrl+p")
-	h.keys("esc")
+	h.overlayDismiss()
 	if h.a.ov != nil {
 		t.Fatal("Esc closes the palette")
 	}
@@ -485,7 +485,7 @@ func TestColonOpensThePaletteWithTheCommandLine(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.keys(":")
 	h.mustHave(":")
-	h.keys("esc")
+	h.overlayDismiss()
 	if h.a.ov != nil {
 		t.Fatal("Esc closes the command line")
 	}

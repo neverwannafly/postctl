@@ -510,12 +510,14 @@ func (a *app) onPaste(msg tea.PasteMsg) tea.Cmd {
 	if a.ov != nil {
 		return a.updateOverlay(msg)
 	}
-	if a.focus == SlotSidebar {
-		if a.tree.filtering {
-			var cmd tea.Cmd
-			a.tree.filter, cmd = a.tree.filter.Update(msg)
-			return cmd
+	if a.focus == SlotSidebar && a.tree.filtering {
+		cmd, moved := a.tree.filterPaste(msg)
+		if moved {
+			return tea.Batch(cmd, a.syncSelection(false))
 		}
+		return cmd
+	}
+	if a.focus == SlotSidebar {
 		return nil
 	}
 	return a.updateFocused(msg)
@@ -552,11 +554,18 @@ func (a *app) editing() bool {
 // or tree-filter field being edited, or an overlay built around a text input
 // (palette, request switcher, prompts).
 func (a *app) insertActive() bool {
-	switch a.ov.(type) {
-	case *pickerOverlay, *promptOverlay, *switcherOverlay:
-		return true
+	switch o := a.ov.(type) {
+	case *pickerOverlay:
+		return o.input.inserting()
+	case *promptOverlay:
+		return o.input.inserting()
+	case *switcherOverlay:
+		return o.input.inserting()
 	case nil:
-		return a.editing() || (a.tree != nil && a.tree.filtering)
+		if a.editing() {
+			return true
+		}
+		return a.tree != nil && a.tree.filterInserting()
 	}
 	return false
 }

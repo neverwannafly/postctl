@@ -52,7 +52,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
-| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | PROGRESS (review fixes) | ws/ux-v2b-screens | 2026-10-03 20:40 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
@@ -1019,6 +1019,30 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
 - Next: none for T.
 
+### 2026-10-03 20:15 IST · UX-V2b · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/ux-v2b-screens at `/Users/shubham/work/postctl-wt/ux-v2b-screens`; not pushed.
+- Did: Read brief and design-language key map; scoped parallel owners (skip `internal/tui/history/` for H1).
+- Next: vimtext overlays, listmotion helper, envedit/cookies/runner screens, leak sweep frame, goldens and gate.
+
+### 2026-10-03 20:27 IST · UX-V2b · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Converted palette, switcher, prompts, tree filter, env editor, cookies and runner form fields to `vimtext` via `pickInput`/`promptInput` and `screenfield`; shared `listmotion` for j/k, gg/G, Ctrl-d/u; overlay Esc ladder (insert → normal → close); footer mode labels; vimtext fixes (full-line visibility after SetValue, display redaction for masked single-line fields). Extended `internal/qa/secret_leak_test.go` with an env-editor secret-cell frame. Skipped `internal/tui/history/` per brief (H1).
+- Files: `internal/tui/{pickinput,listmotion,screenfield,overlays,palette,switcher,tree,app,layout,pane}.go`, `internal/tui/{envedit,cookies,runner}/`, `internal/tui/vimtext/render.go`, `internal/qa/secret_leak_test.go`, tests and goldens.
+- Tests: `task agents:check` green; `task tui:smoke` PASS; 21 golden files updated.
+- Next: orchestrator merge after V2a/M1/T land.
+
+### 2026-10-03 20:36 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; merged main (H1, T, V3 brief); not pushed.
+- Did: Review fixes on 1c5c795 — envedit `applyTextIfChanged` + unhydrated-secret test; vimtext `Options.Mask` (reverted render Redact); leak sweep hydrates sentinel, env-editor normal/insert/visual at 80/140, runner setup + switcher, mask-glyph asserts (stub Mask to prove); runner field Esc/Enter ladder + listmotion on setup/summary; View purity sizing in SetSize; history vim filter + listmotion + VimMode; listmotion empty/shrink; keys.md via genkeys; Ctrl-R reveal before vimtext in envedit.
+- Tests: `task agents:check` green; `task tui:smoke` PASS. Leak proofs: sentinel absent and mask glyph present on env-editor frames; workspace files still mask-glyph-clean via `assertMaskGlyphsAbsent`.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:40 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Removed ledger conflict markers; runner setup routes keys to focused insert/visual fields before listmotion (blurred fields, Enter→normal); listmotion shrink reports Moved; vimtext ensureVisible EOL vs on-char; runner goldens refreshed.
+- Tests: `task agents:check` green; `task tui:smoke` PASS; `VIMTEXT_NVIM=1` differential green.
+- Next: orchestrator re-review.
+
 ### 2026-10-03 20:19 IST · UX-V3 · Sonnet 5.5 (high) · STARTED
 - Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
 - Did: read the brief, AGENTS files and the response, history, diffview and leader code. Starting items 1-3 (History tab, diff with previous, jq filter). Item 4 (read-only vimtext body) waits for V2a on main.
@@ -1043,3 +1067,15 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Reviews: security approved (about 60 jq filters checked for leaks through error text; diff and jq leak cases re-proven by stubbing). Correctness raised one item (jq Esc); declined because the code follows the Esc ladder, and the brief was corrected (f44a1d3).
 - Decisions: the on-screen response Body tab stays unmasked (INT4 decision, leak-sweep exemption); yank, diff, jq and every external path stay masked. Follow-ups for item 4: no clock read in the History tab `View`; document that gojq has no memory cap.
 - Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+
+### 2026-10-03 21:05 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; merged main (V3 1–3); not pushed.
+- Did: Security re-check fixes — leak sweep hydrates secret via `thenEdit`/`hydrate` (no Ctrl-R), captures insert/normal/visual env-editor frames and history vim filter; Esc once stays in field. Fixed mask: per-glyph while editing, fixed four-glyph `Redact` for yank; narrow-width `ensureVisible`; edit-mode purity tests (envedit, runner, screenfield). History merge keeps vim filter + per-request filter.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential. Leak stub proofs (/tmp copy): unset `screenfield` `Options.Mask` fails env-editor insert 80+140; vimtext render mask disabled fails insert 80+140; identity `Redact` does not fail display frames (yank length covered by `TestYankMaskedSecretUsesFixedMask`).
+- Next: orchestrator merge.
+
+### 2026-10-03 21:15 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Leak `assertAbsent` checks raw and ANSI-stripped text; env-editor mask assert targets the `Value (secret)` line only. Runner setup `i`/`a`/`I`/`A` focus fields in insert; vimtext EOL scroll uses cell widths; screenfield yank test via `New`+`SetClipboard`.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential green. Stub `Options.Mask` off: all six env-editor frames fail (insert/normal/visual × 80/140). Full sweep with ANSI strip: no other frame regressions.
+- Next: orchestrator merge.

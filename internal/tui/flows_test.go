@@ -146,7 +146,7 @@ func TestPaletteNoMatchAndEsc(t *testing.T) {
 	h.keys("ctrl+p")
 	h.typeText("qqqqzzzz")
 	h.mustHave("No matches")
-	h.keys("esc")
+	h.overlayDismiss()
 	h.mustNotHave("Command palette")
 }
 

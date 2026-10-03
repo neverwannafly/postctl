@@ -242,7 +242,7 @@ func (m *Model) selectorLine(w int) string {
 func (m *Model) nameLine(w int) string {
 	th := m.th
 	label := map[nameIntent]string{intentNew: "New name", intentRename: "Rename to", intentDuplicate: "Copy name"}[m.intent]
-	line := th.Render(ui.TextSecondary, th.Fit(label, 11)) + m.name.View(th, max(4, w-12), true)
+	line := th.Render(ui.TextSecondary, th.Fit(label, 11)) + m.name.View()
 	if m.nameEr != "" {
 		line += "\n" + th.Render(ui.StatusWarning, th.Truncate(th.Glyphs.Warn+" "+m.nameEr, w))
 	}
@@ -303,7 +303,7 @@ func (m *Model) statusLine(rows []model.Variable, w int) string {
 		if m.col == 1 && m.cur < len(rows) && rows[m.cur].IsSecret() {
 			label = "Value (secret)"
 		}
-		return "\n" + t.Render(ui.TextSecondary, t.Fit(label, 15)) + m.in.View(t, max(4, w-15), true)
+		return "\n" + t.Render(ui.TextSecondary, t.Fit(label, 15)) + m.in.View()
 	}
 	secrets, off := 0, 0
 	for _, v := range rows {

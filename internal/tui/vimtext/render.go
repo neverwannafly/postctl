@@ -73,6 +73,7 @@ func (m *Model) View() string {
 func (m *Model) renderLine(row, width int) string {
 	line := m.lines[row]
 	cs := clusters(line)
+	mask := m.opts.Mask
 	from := min(m.left, len(cs))
 	var b strings.Builder
 	used := 0
@@ -80,7 +81,9 @@ func (m *Model) renderLine(row, width int) string {
 	for i := from; i < len(cs); i++ {
 		source := cs[i]
 		cell := source
-		if source == "\t" {
+		if mask != "" && source != "\t" {
+			cell = mask
+		} else if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
 		}
 		cw := max(1, uniseg.StringWidth(cell))
@@ -168,6 +171,29 @@ func (m *Model) ensureVisible() {
 		m.left++
 	}
 	if m.left < 0 {
+		m.left = 0
+	}
+	// When the whole line fits, keep the start visible (SetValue/cursorEnd often
+	// run before the widget is given its final width).
+	total := 0
+	for _, c := range cs {
+		total += clusterWidth(c, m.opts.TabText)
+	}
+	pastEnd := col >= len(cs)
+	if pastEnd {
+		if total+cursorWidth <= room {
+			m.left = 0
+		} else {
+			need := total + cursorWidth - room
+			left := 0
+			widthBefore := 0
+			for left < len(cs) && widthBefore < need {
+				widthBefore += clusterWidth(cs[left], m.opts.TabText)
+				left++
+			}
+			m.left = left
+		}
+	} else if total <= room {
 		m.left = 0
 	}
 }
