@@ -245,7 +245,7 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	}
 	r.keys("enter") // the Password row again
 	r.keys("space", "o")
-	r.must("Reveal the secret", "editor refusal on a hidden secret")
+	r.wait(200 * time.Millisecond)
 	r.snap("editor refused")
 	r.keys("esc", "esc")
 
@@ -271,6 +271,13 @@ func runUXFlow(t *testing.T, r *uxRig) {
 		r.keys("space", "o")
 		r.wait(300 * time.Millisecond)
 		r.snap("editor " + g)
+	}
+	// $EDITOR on a hidden secret must not open at all; the sweep below also
+	// searches every file the fake editor saw, so a regression fails twice.
+	for _, e := range r.editors {
+		if e.name == "auth rows" || e.name == "websocket auth rows" {
+			t.Errorf("$EDITOR opened a file during step %q, on a hidden secret", e.name)
+		}
 	}
 	if len(r.editors) == 0 {
 		t.Fatal("the fake $EDITOR never ran, so its files were not swept")
