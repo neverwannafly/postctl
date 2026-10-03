@@ -54,7 +54,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
-| UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
+| UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Started | ws/ux-v3-response | 2026-10-03 20:20 IST |
 
 ## Entries
@@ -997,3 +997,17 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Correction: the entry above stamped "2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE" was written at about 18:49 IST; later rounds were by GPT-5.6 Sol.
 - Tests: `task agents:check` green on main; `postctl --help` ok.
 - Next: UX-V3 (response pane vim, per-request History tab, diff with previous, jq) and V2b may convert the history screen.
+
+### 2026-10-03 20:14 IST · UX-T · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-t-terminal
+- Did: review fixes — real vim-tmux-navigator tmux.conf (ps-based is_postctl, copy-mode-vi); CheckSettings continues on per-option errors; tmux 3.5+ note for extended-keys-format; Ghostty config lines; HandoffPane uses injected env.
+- Tests: `task agents:check` green; tmux snippet validated on `-L postctl-check` private socket.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:11 IST · UX-T · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-t-terminal · ~/work/postctl-wt/ux-t-terminal
+- Did: tmux pane handoff on layout edge via `Options.OnEdge` (`tmux select-pane -L|-D|-U|-R`, skips zoomed windows); one-shot tmux settings check in Init (300 ms, fake runner in tests); `docs/terminal.md` for Ghostty/tmux and fallbacks; links from README and keys.md.
+- Files: `internal/termx/*`, `cmd/postctl/{wire,terminal}.go`, `internal/tui/{app,startup_test}.go`, `docs/terminal.md`, `cmd/genkeys/main.go`, `docs/keys.md`, `README.md`, `docs/ledger.md`
+- Decisions: reuse footer toast for the notice; `StartupCmd` + `StartupNoopMsg` in Options/Init; no real tmux in tests.
+- Tests: `task agents:check` green (build, race, lint 0).
+- Next: orchestrator merge; not pushed.

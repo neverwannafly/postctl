@@ -192,6 +192,7 @@ func init() {
 	base := launchUI
 	launchUI = func(o tui.Options) error {
 		wireEditors(&o)
+		wireTerminal(&o)
 		return base(o)
 	}
 }

@@ -3,6 +3,8 @@
 `postctl` is designed for fast, keyboard-first navigation without requiring a mouse.
 Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Text fields insert what you type, including Space, `g`, `q` and `:`; modal editing inside text fields is a separate workstream and is not advertised here until it ships.
 
+For tmux pane handoff (**Ctrl-h/j/k/l** at the layout edge), Ghostty, and **Ctrl-Enter** / clipboard setup, see [`docs/terminal.md`](terminal.md).
+
 ## Quick Reference Cheat Sheet
 
 | Key | Action |
