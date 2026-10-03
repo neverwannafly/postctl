@@ -3,6 +3,7 @@ package screenfield
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/rivo/uniseg"
@@ -12,7 +13,8 @@ import (
 
 // Field is a single-line vimtext editor for screen forms and tables.
 type Field struct {
-	ed *vimtext.Model
+	ed    *vimtext.Model
+	mouse vimtext.Mouse
 }
 
 // New builds a field and focuses it in insert mode.
@@ -135,3 +137,26 @@ func (f *Field) UpdateEx(msg tea.Msg) (submit, changed bool, cmd tea.Cmd, leave 
 
 // Mode returns the underlying vim mode.
 func (f *Field) Mode() vimtext.Mode { return f.ed.Mode() }
+
+// Cursor returns the zero-based buffer row and grapheme column.
+func (f *Field) Cursor() (row, col int) { return f.ed.Cursor() }
+
+// SetCursor places the cursor at a zero-based buffer row and grapheme column.
+func (f *Field) SetCursor(row, col int) { f.ed.SetCursor(row, col) }
+
+// HandleMouse applies a field-relative click, drag or release. It preserves
+// insert mode on a click and leaves a drag selected in visual mode.
+func (f *Field) HandleMouse(msg tea.MouseMsg, x, y int, now time.Time) bool {
+	switch m := msg.(type) {
+	case tea.MouseClickMsg:
+		f.mouse.Release()
+		return m.Button == tea.MouseLeft && f.mouse.Press(f.ed, x, y, now)
+	case tea.MouseMotionMsg:
+		return m.Button == tea.MouseLeft && f.mouse.Motion(x, y)
+	case tea.MouseReleaseMsg:
+		return f.mouse.Release()
+	case tea.MouseWheelMsg:
+		return f.mouse.Active()
+	}
+	return false
+}

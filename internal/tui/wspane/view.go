@@ -11,6 +11,7 @@ import (
 
 const (
 	badgeW = 6
+	urlX   = 2 + badgeW + 2
 	// actionW fits "Disconnect" and the marker before it.
 	actionW = 11
 	// chrome is the rows above the tab content: bar, status row, tab labels
@@ -59,7 +60,7 @@ func (p *Pane) View() string {
 	out := p.th.Block(b.String(), p.w, p.h)
 	if pop := p.url.Popup(p.urlWidth()); p.urlE && len(pop) > 0 {
 		// The URL field's completion menu draws over the rows under the bar.
-		out = strings.Join(vimfield.Overlay(strings.Split(out, "\n"), 0, 2+badgeW+2, pop), "\n")
+		out = strings.Join(vimfield.Overlay(strings.Split(out, "\n"), 0, urlX, pop), "\n")
 	}
 	return out
 }

@@ -3,10 +3,29 @@ package screenfield
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
+
+func TestMousePlacesCursorAndKeepsInsertMode(t *testing.T) {
+	f, _ := New(ui.NewTheme(true, true, false), "abcdef", "", false)
+	f.SetWidth(10)
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	if !f.HandleMouse(tea.MouseClickMsg{X: 3, Y: 0, Button: tea.MouseLeft}, 3, 0, now) {
+		t.Fatal("click was not handled")
+	}
+	if f.Mode() != vimtext.Insert {
+		t.Fatalf("click changed mode to %v", f.Mode())
+	}
+	f.HandleMouse(tea.MouseMotionMsg{X: 5, Y: 0, Button: tea.MouseLeft}, 5, 0, now)
+	f.HandleMouse(tea.MouseReleaseMsg{X: 5, Y: 0, Button: tea.MouseLeft}, 5, 0, now)
+	if f.Mode() != vimtext.Visual {
+		t.Fatalf("drag mode = %v", f.Mode())
+	}
+}
 
 func TestViewIsPureInEditMode(t *testing.T) {
 	th := ui.NewTheme(true, true, false)

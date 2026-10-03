@@ -179,11 +179,14 @@ type Pane struct {
 	chain []model.Container
 	sc    *scope
 
-	zone zone
-	tab  tabID
-	url  *vimfield.Field
-	urlE bool // the URL field has input focus
-	msel *methodSel
+	zone   zone
+	tab    tabID
+	url    *vimfield.Field
+	urlE   bool // the URL field has input focus
+	msel   *methodSel
+	mouse  vimfield.Mouse
+	mouseX int
+	mouseY int
 
 	// fieldKey is the field whose edits belong to the open request-level undo
 	// step; see recordIn.

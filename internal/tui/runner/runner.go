@@ -27,6 +27,8 @@ import (
 // Deps are injectable runner effects.
 type Deps struct {
 	Runner tui.CollectionRunner
+	// Now supplies the clock for mouse click counting; nil means time.Now.
+	Now func() time.Time
 }
 
 // Factory returns a screen factory using d.
@@ -35,6 +37,13 @@ func Factory(d Deps) tui.ScreenFactory {
 }
 
 type phase int
+
+const (
+	runnerHeaderRows = 2
+	exportPathRow    = runnerHeaderRows + 2
+)
+
+var setupLabels = [...]string{"Scope", "Environment", "Iterations", "Data file", "Delay (ms)", "Bail on failure", "Persist variables"}
 
 const (
 	phSetup phase = iota
@@ -102,6 +111,9 @@ type Model struct {
 	runCh      <-chan engine.RunEvent
 	runEvents  []engine.RunEvent
 	exportPath *screenfield.Field
+	mouseField *screenfield.Field
+	mouseX     int
+	mouseY     int
 	listNav    listmotion.View
 	exportXML  bool
 	conf       ui.Confirm
@@ -109,6 +121,13 @@ type Model struct {
 	fail       bool
 	elapsed    time.Duration
 	runStart   time.Time
+}
+
+func (m *Model) now() time.Time {
+	if m.deps.Now != nil {
+		return m.deps.Now()
+	}
+	return time.Now()
 }
 
 // New builds the runner screen.
@@ -262,6 +281,36 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// HandleMouse implements tui.ScreenMouseHandler for runner form fields.
+func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if _, ok := msg.(tea.MouseClickMsg); ok {
+		m.mouseField = nil
+		switch m.phase {
+		case phSetup:
+			idx := y - runnerHeaderRows
+			if idx >= 2 && idx <= 4 {
+				if m.field != idx {
+					m.blurSetupFields()
+					m.field = idx
+				}
+				m.mouseField, m.mouseX, m.mouseY = m.activeField(), 2+ui.Width(setupLabels[idx])+3, runnerHeaderRows+idx
+				if m.mouseField != nil && !m.mouseField.Focused() {
+					_ = m.mouseField.FocusNormal()
+				}
+			}
+		case phExport:
+			m.mouseField, m.mouseX, m.mouseY = m.exportPath, 0, exportPathRow
+		}
+	}
+	if m.mouseField != nil {
+		m.mouseField.HandleMouse(msg, x-m.mouseX, y-m.mouseY, m.now())
+	}
+	if _, ok := msg.(tea.MouseReleaseMsg); ok {
+		m.mouseField = nil
+	}
+	return nil
 }
 
 // VimMode implements tui.ModeReporter.
@@ -889,13 +938,13 @@ func (m *Model) viewSetup() string {
 	t := m.th
 	body := m.header("Run collection")
 	lines := []string{
-		fieldLine(t, m.field == 0, "Scope", m.scopeLabel),
-		fieldLine(t, m.field == 1, "Environment", m.envLabel()),
-		fieldLine(t, m.field == 2, "Iterations", runnerField(m.iterations, 20)),
-		fieldLine(t, m.field == 3, "Data file", runnerField(m.dataPath, m.w-20)),
-		fieldLine(t, m.field == 4, "Delay (ms)", runnerField(m.delayMS, 12)),
-		fieldLine(t, m.field == 5, "Bail on failure", checkbox(m.bail)),
-		fieldLine(t, m.field == 6, "Persist variables", checkbox(m.persist)),
+		fieldLine(t, m.field == 0, setupLabels[0], m.scopeLabel),
+		fieldLine(t, m.field == 1, setupLabels[1], m.envLabel()),
+		fieldLine(t, m.field == 2, setupLabels[2], runnerField(m.iterations, 20)),
+		fieldLine(t, m.field == 3, setupLabels[3], runnerField(m.dataPath, m.w-20)),
+		fieldLine(t, m.field == 4, setupLabels[4], runnerField(m.delayMS, 12)),
+		fieldLine(t, m.field == 5, setupLabels[5], checkbox(m.bail)),
+		fieldLine(t, m.field == 6, setupLabels[6], checkbox(m.persist)),
 	}
 	body += strings.Join(lines, "\n")
 	body += "\n" + t.Render(ui.TextSecondary, "Review  Environment  "+m.envLabel())

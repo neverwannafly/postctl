@@ -4,11 +4,14 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	hist "github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
+
+var headerSecrets = hist.NewRedactor(nil)
 
 // kvKind picks which list of the request a key-value table edits.
 type kvKind int
@@ -126,6 +129,10 @@ func (k *kvView) cellText(it kvItem, col int) string {
 	return it.Value
 }
 
+func (k *kvView) secretCell(it kvItem, col int) bool {
+	return k.kind == kvHeaders && col == 1 && headerSecrets.Sensitive(it.Key)
+}
+
 // beginEdit opens a cell. start is "" for normal mode or "i", "a", "A", "I".
 func (k *kvView) beginEdit(p *Pane, items []kvItem, col int, start string) {
 	if k.cur >= len(items) {
@@ -136,8 +143,10 @@ func (k *kvView) beginEdit(p *Pane, items []kvItem, col int, start string) {
 	}
 	k.edit = true
 	k.col = col
-	k.in = p.newField(fieldSpec{single: true, placeholder: [...]string{"name", "value"}[col]})
+	secret := k.secretCell(items[k.cur], col)
+	k.in = p.newField(fieldSpec{single: true, secret: secret, placeholder: [...]string{"name", "value"}[col]})
 	k.in.Set(k.cellText(items[k.cur], col))
+	k.in.SetMask(secret)
 	k.in.Fit(cellWidth(p), 1)
 	k.in.Begin(start)
 }
@@ -404,6 +413,7 @@ func (k *kvView) view(p *Pane, w, h int) string {
 				r.Description = "path variable"
 			}
 		}
+		r.Secret = k.secretCell(it, 1)
 		rows = append(rows, r)
 	}
 	focus := -1

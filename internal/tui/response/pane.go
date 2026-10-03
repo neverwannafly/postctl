@@ -19,6 +19,7 @@ import (
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -104,6 +105,9 @@ type Pane struct {
 	fold                 foldState
 	vimLatest            *atomic.Int64 // generation of the newest wanted build; older builds stop early
 	yanked               bool          // the buffer wrote to the clipboard during this key
+	mouse                vimfield.Mouse
+	mouseX               int
+	mouseY               int
 	th                   ui.Theme
 	w, h                 int
 	focused              bool
@@ -777,7 +781,7 @@ func (p *Pane) tabContent(r tui.SendResult, w int) string {
 }
 
 func (p *Pane) contentHeight() int {
-	h := p.h - 3 // summary + tabs
+	h := p.h - responseChromeRows
 	if p.pathActive {
 		h--
 	}

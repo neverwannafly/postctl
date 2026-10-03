@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,13 +22,17 @@ func mouseWheel(x, y int, btn tea.MouseButton) tea.MouseWheelMsg {
 
 type fakeMousePane struct {
 	Pane
-	clicked bool
-	wheeled bool
-	lastX   int
-	lastY   int
+	clicked  bool
+	wheeled  bool
+	released bool
+	lastX    int
+	lastY    int
 }
 
 func (f *fakeMousePane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if _, ok := msg.(tea.MouseReleaseMsg); ok {
+		f.released = true
+	}
 	m := msg.Mouse()
 	switch m.Button {
 	case tea.MouseLeft:
@@ -37,6 +42,18 @@ func (f *fakeMousePane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 	}
 	f.lastX = x
 	f.lastY = y
+	return nil
+}
+
+type releaseMouseScreen struct {
+	fakeScreen
+	released bool
+}
+
+func (s *releaseMouseScreen) HandleMouse(msg tea.MouseMsg, _, _ int) tea.Cmd {
+	if _, ok := msg.(tea.MouseReleaseMsg); ok {
+		s.released = true
+	}
 	return nil
 }
 
@@ -257,6 +274,79 @@ func TestPaneMouseDelegation(t *testing.T) {
 	}
 	if respP.lastX != 12 || respP.lastY != 7 {
 		t.Errorf("response relative coords = (%d, %d), want (12, 7)", respP.lastX, respP.lastY)
+	}
+}
+
+func TestOverlayReleaseEndsUnderlyingPaneDrag(t *testing.T) {
+	req := &fakeMousePane{}
+	hs := newHarness(t, demo(), 140, 40)
+	hs.a.request = req
+	r := hs.a.hitRegions()
+	hs.msg(mouseClick(r.request.x+5, r.request.y+5, tea.MouseLeft))
+	if !hs.a.mouse.dragging {
+		t.Fatal("request press did not start root drag routing")
+	}
+	screen := &releaseMouseScreen{}
+	hs.a.ov = &screenOverlay{s: screen}
+	hs.msg(tea.MouseReleaseMsg{X: 0, Y: 0, Button: tea.MouseLeft})
+	if hs.a.mouse.dragging || !req.released || !screen.released {
+		t.Fatalf("overlay release left dragging=%v paneRelease=%v overlayRelease=%v",
+			hs.a.mouse.dragging, req.released, screen.released)
+	}
+}
+
+func TestPaletteInputMousePlacesCursor(t *testing.T) {
+	hs := newHarness(t, demo(), 100, 30)
+	hs.msg(tea.KeyPressMsg{Code: 'p', Mod: tea.ModCtrl})
+	p, ok := hs.a.ov.(*pickerOverlay)
+	if !ok {
+		t.Fatal("palette did not open")
+	}
+	p.input.ed.SetValue("abcdef")
+	g := hs.a.geo()
+	hs.msg(mouseClick(g.inset+ui.Width(p.input.prompt)+3, headerRows+1, tea.MouseLeft))
+	if row, col := p.input.ed.Cursor(); row != 0 || col != 3 {
+		t.Fatalf("palette click cursor = %d,%d, want 0,3", row, col)
+	}
+}
+
+func TestBreakpointClicksReachVisiblePane(t *testing.T) {
+	for _, width := range []int{99, 100, 139, 140} {
+		t.Run(strconv.Itoa(width), func(t *testing.T) {
+			req := &fakeMousePane{}
+			resp := &fakeMousePane{}
+			hs := newHarness(t, demo(), width, 30, func(o *Options) {
+				o.NewRequestPane = func(PaneEnv) Pane { return req }
+				o.NewResponsePane = func(PaneEnv) Pane { return resp }
+			})
+			r := hs.a.hitRegions()
+			switch hs.a.layoutKind() {
+			case ui.LayoutSingle:
+				hs.msg(mouseClick(r.switcher.x+22, r.switcher.y, tea.MouseLeft))
+				r = hs.a.hitRegions()
+			case ui.LayoutTwoPane:
+				hs.msg(mouseClick(r.switcher.x+2, r.switcher.y, tea.MouseLeft))
+				r = hs.a.hitRegions()
+			}
+			hs.msg(mouseClick(r.request.x+2, r.request.y+2, tea.MouseLeft))
+			if !req.clicked || hs.a.focus != SlotRequest {
+				t.Fatalf("request click missed at width %d", width)
+			}
+		})
+	}
+}
+
+func TestASCIISwitcherClickSelectsResponse(t *testing.T) {
+	hs := newHarness(t, demo(), 100, 30, func(o *Options) { o.ASCII = true })
+	r := hs.a.hitRegions()
+	ranges := hs.a.theme.TabRanges(r.switcher.w, []ui.Tab{
+		{Label: "  [2] Request"},
+		{Label: "  [3] Response"},
+	})
+	x := r.switcher.x + ranges[1].Start + 1
+	hs.msg(mouseClick(x, r.switcher.y, tea.MouseLeft))
+	if hs.a.focus != SlotResponse {
+		t.Fatalf("ASCII response tab click focused %v", hs.a.focus)
 	}
 }
 

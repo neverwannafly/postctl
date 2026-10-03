@@ -9,6 +9,8 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
+	"github.com/shubham/postctl/internal/ui"
 )
 
 func TestRequestPaneMouseTabsAndWheel(t *testing.T) {
@@ -234,8 +236,9 @@ func TestWheelScrollsAFocusedEditorInNormalMode(t *testing.T) {
 	}
 }
 
-// While a field is in insert or visual mode the wheel does nothing at all.
-func TestWheelIsIgnoredWhileAnEditorIsInInsertOrVisualMode(t *testing.T) {
+// The wheel over the focused field scrolls it in insert and visual mode
+// without editing it or changing mode.
+func TestWheelScrollsFocusedEditorInInsertOrVisualMode(t *testing.T) {
 	for _, tc := range wheelCases() {
 		for _, mode := range []struct{ name, key, want string }{{"insert", "i", "INSERT"}, {"visual", "v", "VISUAL"}} {
 			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
@@ -248,21 +251,40 @@ func TestWheelIsIgnoredWhileAnEditorIsInInsertOrVisualMode(t *testing.T) {
 					t.Fatalf("mode = %q, want %q", ed.ModeName(), mode.want)
 				}
 				top := ed.Top()
-				row, col := ed.Cursor()
 				before := tc.text(h)
 				nSaves := len(h.saves())
 				h.wheel(true)
 				h.wheel(false)
 				h.wheel(true)
-				r2, c2 := ed.Cursor()
-				if ed.Top() != top || r2 != row || c2 != col {
-					t.Fatal("the wheel moved the view or the cursor of a field being typed into")
+				if ed.Top() == top {
+					t.Fatal("the wheel did not scroll the focused field")
 				}
 				if ed.ModeName() != mode.want || tc.text(h) != before || len(h.saves()) != nSaves {
 					t.Fatal("the wheel changed the mode, the text or the saves")
 				}
 			})
 		}
+	}
+}
+
+func TestWheelOnlyScrollsGraphQLFieldUnderPointer(t *testing.T) {
+	h := newHarness(t)
+	h.req.Body = model.Body{Mode: model.BodyGraphQL, GraphQL: &model.GraphQLBody{
+		Query: longText(80), Variables: longText(80),
+	}}
+	h.p.reloadAll()
+	h.gotoTab(tabBody)
+	b := h.p.views[tabBody].(*bodyView)
+	h.p.setZone(zBody)
+	b.cur = 1
+	b.focusZone(h.p, zkQuery, "")
+	_, bodyH := h.p.bodySize()
+	qh, _ := gqHeights(max(1, bodyH-2))
+	before := b.gq.Top()
+	y := chrome + 3 + qh
+	h.p.HandleMouse(tea.MouseWheelMsg{X: 2, Y: y, Button: tea.MouseWheelDown}, 2, y)
+	if b.gq.Top() != before {
+		t.Fatal("wheel over GraphQL variables scrolled the query field")
 	}
 }
 
@@ -356,5 +378,178 @@ func TestClickAwayFromAFieldInInsertModeSavesTheEdit(t *testing.T) {
 				t.Fatalf("the typed text shows %d times after coming back", got)
 			}
 		})
+	}
+}
+
+func TestMousePlacesURLCursorAndDragsScriptSelection(t *testing.T) {
+	h := newHarness(t)
+	urlX := 2 + methodW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 3, Y: 0, Button: tea.MouseLeft}, urlX+3, 0)
+	if row, col := h.p.url.Cursor(); row != 0 || col != 3 || h.p.url.ModeName() != "NORMAL" {
+		t.Fatalf("URL click = cursor %d,%d mode %q", row, col, h.p.url.ModeName())
+	}
+
+	h.req.Scripts.PreRequest = &model.Script{Source: "alpha beta\ngamma"}
+	h.p.reloadAll()
+	h.gotoTab(tabPre)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 3, Y: chrome, Button: tea.MouseLeft}, 3, chrome)
+	if !h.p.mouse.Active() {
+		t.Fatal("script press did not start")
+	}
+	if row, col := h.p.views[tabPre].(*scriptView).ed.Cursor(); row != 0 || col != 1 {
+		t.Fatalf("press cursor = %d,%d", row, col)
+	}
+	if _, _, ok := h.p.views[tabPre].(*scriptView).ed.PosAt(6, 1); !ok {
+		t.Fatal("second script row is not mapped")
+	}
+	motion := tea.MouseMotionMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}
+	if motion.Mouse().Button != tea.MouseLeft {
+		t.Fatal("motion does not report held left button")
+	}
+	h.p.HandleMouse(motion, 6, chrome+1)
+	if got := h.p.views[tabPre].(*scriptView).ed.ModeName(); got != "VISUAL" {
+		row, col := h.p.views[tabPre].(*scriptView).ed.Cursor()
+		t.Fatalf("motion mode/cursor = %q/%d,%d, want VISUAL", got, row, col)
+	}
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: 99, Y: 99, Button: tea.MouseLeft}, 99, 99)
+	ed := h.p.views[tabPre].(*scriptView).ed
+	if ed.ModeName() != "VISUAL" {
+		t.Fatalf("drag mode = %q, want VISUAL", ed.ModeName())
+	}
+	if h.p.mouse.Active() {
+		t.Fatal("release outside did not end drag")
+	}
+}
+
+func TestMouseOpensKVCellAtPointer(t *testing.T) {
+	h := newHarness(t)
+	kv := h.p.views[tabParams].(*kvView)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}, 6, chrome+1)
+	if !kv.edit || kv.col != 0 || kv.in == nil {
+		t.Fatal("clicking the first key cell did not open it")
+	}
+	if row, col := kv.in.Cursor(); row != 0 || col != 0 || kv.in.ModeName() != "NORMAL" {
+		t.Fatalf("KV click = cursor %d,%d mode %q", row, col, kv.in.ModeName())
+	}
+	kv.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 7, Y: chrome + 1, Button: tea.MouseLeft}, 7, chrome+1)
+	if kv.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the open key cell left insert mode")
+	}
+}
+
+func TestScriptEdgeDragScrollsOneLineAndViewStaysPure(t *testing.T) {
+	h := newHarness(t)
+	h.req.Scripts.PreRequest = &model.Script{Source: longText(40)}
+	h.p.reloadAll()
+	h.gotoTab(tabPre)
+	script := h.p.views[tabPre].(*scriptView)
+	script.enter(h.p)
+	script.size(h.p)
+	script.ed.SetCursor(12, 0)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}, 6, chrome+1)
+	start := script.ed.Top()
+	for i := 1; i <= 3; i++ {
+		h.p.HandleMouse(tea.MouseMotionMsg{X: 6, Y: h.p.h + 2, Button: tea.MouseLeft}, 6, h.p.h+2)
+		if got := script.ed.Top(); got != start+i {
+			t.Fatalf("down motion %d moved top from %d to %d", i, start, got)
+		}
+		if i == 1 {
+			row, col := script.ed.Cursor()
+			mode, active := script.ed.Mode(), h.p.mouse.Active()
+			first, second := h.p.View(), h.p.View()
+			if first != second || !active || !h.p.mouse.Active() {
+				t.Fatal("View mutated pane drag state")
+			}
+			if r, c := script.ed.Cursor(); r != row || c != col || script.ed.Mode() != mode {
+				t.Fatal("View mutated the script selection")
+			}
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		h.p.HandleMouse(tea.MouseMotionMsg{X: 6, Y: chrome - 1, Button: tea.MouseLeft}, 6, chrome-1)
+		if got := script.ed.Top(); got != start+3-i {
+			t.Fatalf("up motion %d moved top from %d to %d", i, start+3, got)
+		}
+	}
+}
+
+func TestMouseClickKeepsFocusedURLInInsertMode(t *testing.T) {
+	h := newHarness(t)
+	h.p.setZone(zBar)
+	h.p.url.Begin("i")
+	urlX := 2 + methodW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 2, Y: 0, Button: tea.MouseLeft}, urlX+2, 0)
+	if h.p.url.Mode() != vimtext.Insert {
+		t.Fatalf("URL click changed mode to %v", h.p.url.Mode())
+	}
+}
+
+func TestMouseOpensFormRowAndMasksHiddenYanks(t *testing.T) {
+	const sentinel = "mouse-hidden-form-sentinel"
+	h := newHarness(t)
+	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Password: sentinel}}
+	h.p.reloadAll()
+	h.gotoTab(tabAuth)
+	h.p.setZone(zBody)
+	labelW := min(20, max(10, h.p.w/3))
+	valueX := 2 + labelW + 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX, Y: chrome + 1, Button: tea.MouseLeft}, valueX, chrome+1)
+	auth := h.p.views[tabAuth].(*authView)
+	if !auth.f.edit || auth.f.cur != 1 || auth.f.in == nil {
+		t.Fatal("clicking an auth text row did not open its editor")
+	}
+	auth.f.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX + 1, Y: chrome + 1, Button: tea.MouseLeft}, valueX+1, chrome+1)
+	if auth.f.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused auth row left insert mode")
+	}
+	auth.f.edit = false
+	secretY := chrome + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX, Y: secretY, Button: tea.MouseLeft}, valueX, secretY)
+	h.p.HandleMouse(tea.MouseMotionMsg{X: valueX + 4, Y: secretY, Button: tea.MouseLeft}, valueX+4, secretY)
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: valueX + 4, Y: secretY, Button: tea.MouseLeft}, valueX+4, secretY)
+	res := auth.f.in.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	h.run(res.Cmd)
+	if strings.Contains(h.p.View(), sentinel) || len(h.clip) != 1 || h.clip[0] != h.theme.Glyphs.Mask {
+		t.Fatal("hidden auth yank did not produce the fixed mask")
+	}
+
+	h.req.Headers[0].Key = "Authorization"
+	h.p.reloadAll()
+	h.gotoTab(tabHeaders)
+	kv := h.p.views[tabHeaders].(*kvView)
+	items := kv.items(h.p)
+	keyW := 0
+	for _, it := range items {
+		keyW = max(keyW, ui.Width(it.Key))
+	}
+	keyW = min(max(keyW, 3), max(8, (h.p.w-6)*35/100))
+	headerValueX := 6 + keyW + ui.SpaceSM
+	headerY := chrome + 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: headerValueX, Y: headerY, Button: tea.MouseLeft}, headerValueX, headerY)
+	if kv.in == nil {
+		t.Fatal("clicking a secret header value did not open its editor")
+	}
+	kv.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	statusY := h.p.h - 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: 13, Y: statusY, Button: tea.MouseLeft}, 13, statusY)
+	if kv.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused header field left insert mode")
+	}
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: 13, Y: statusY, Button: tea.MouseLeft}, 13, statusY)
+	h.p.HandleMouse(tea.MouseClickMsg{X: headerValueX, Y: headerY, Button: tea.MouseLeft}, headerValueX, headerY)
+	h.p.HandleMouse(tea.MouseMotionMsg{X: headerValueX + 4, Y: headerY, Button: tea.MouseLeft}, headerValueX+4, headerY)
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: headerValueX + 4, Y: headerY, Button: tea.MouseLeft}, headerValueX+4, headerY)
+	res = kv.in.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	h.run(res.Cmd)
+	if strings.Contains(h.p.View(), h.req.Headers[0].Value) {
+		t.Fatal("hidden header was revealed in the frame")
+	}
+	if len(h.clip) != 2 || h.clip[1] != h.theme.Glyphs.Mask {
+		t.Fatal("hidden header yank did not produce the fixed mask")
 	}
 }

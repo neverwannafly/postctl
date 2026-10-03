@@ -15,6 +15,13 @@ type screenOverlay struct {
 func (o *screenOverlay) setSize(w, h int) { o.s.SetSize(w, h) }
 
 func (o *screenOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
+	if mouse, ok := msg.(tea.MouseMsg); ok {
+		if h, ok := o.s.(ScreenMouseHandler); ok {
+			g := a.geo()
+			return o, h.HandleMouse(mouse, mouse.Mouse().X-g.inset, mouse.Mouse().Y-headerRows)
+		}
+		return o, nil
+	}
 	next, cmd := o.s.Update(msg)
 	if next == nil {
 		return nil, tea.Batch(cmd, a.afterScreen())

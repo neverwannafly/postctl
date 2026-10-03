@@ -319,6 +319,14 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 - Discoverability: pressing the leader or a prefix (`Space`, `g`, `[`, `]`) shows a which-key popup listing the next keys after a short delay; pane titles show their jump number (`[1]`, `[2]`, `[3]`).
 - Support keyboard-only operation. Mouse support is on by default (plan U3) and never required.
 
+Mouse: a click focuses a pane or text field and places its cursor without
+entering insert mode (an already-insert field stays insert). Drag selects
+characters and leaves the field in visual mode; double-click selects a word
+and triple-click selects a line. The wheel scrolls the field under the pointer
+in every mode, except during a drag. Use Shift-drag in Ghostty/tmux or
+Option-drag in iTerm2 for native terminal text selection. `--no-mouse` disables
+all application mouse handling.
+
 ## Key map
 
 This is the binding spec; `docs/keys.md` is generated from code and must match it. Terminal notes: `Ctrl-i` equals `Tab` and `Ctrl-h` equals Backspace in legacy key encoding, so every such key has a fallback (plan U4).
