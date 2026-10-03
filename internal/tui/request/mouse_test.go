@@ -234,8 +234,9 @@ func TestWheelScrollsAFocusedEditorInNormalMode(t *testing.T) {
 	}
 }
 
-// While a field is in insert or visual mode the wheel does nothing at all.
-func TestWheelIsIgnoredWhileAnEditorIsInInsertOrVisualMode(t *testing.T) {
+// The wheel over the focused field scrolls it in insert and visual mode
+// without editing it or changing mode.
+func TestWheelScrollsFocusedEditorInInsertOrVisualMode(t *testing.T) {
 	for _, tc := range wheelCases() {
 		for _, mode := range []struct{ name, key, want string }{{"insert", "i", "INSERT"}, {"visual", "v", "VISUAL"}} {
 			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
@@ -248,15 +249,13 @@ func TestWheelIsIgnoredWhileAnEditorIsInInsertOrVisualMode(t *testing.T) {
 					t.Fatalf("mode = %q, want %q", ed.ModeName(), mode.want)
 				}
 				top := ed.Top()
-				row, col := ed.Cursor()
 				before := tc.text(h)
 				nSaves := len(h.saves())
 				h.wheel(true)
 				h.wheel(false)
 				h.wheel(true)
-				r2, c2 := ed.Cursor()
-				if ed.Top() != top || r2 != row || c2 != col {
-					t.Fatal("the wheel moved the view or the cursor of a field being typed into")
+				if ed.Top() == top {
+					t.Fatal("the wheel did not scroll the focused field")
 				}
 				if ed.ModeName() != mode.want || tc.text(h) != before || len(h.saves()) != nSaves {
 					t.Fatal("the wheel changed the mode, the text or the saves")
@@ -356,5 +355,57 @@ func TestClickAwayFromAFieldInInsertModeSavesTheEdit(t *testing.T) {
 				t.Fatalf("the typed text shows %d times after coming back", got)
 			}
 		})
+	}
+}
+
+func TestMousePlacesURLCursorAndDragsScriptSelection(t *testing.T) {
+	h := newHarness(t)
+	urlX := 2 + methodW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 3, Y: 0, Button: tea.MouseLeft}, urlX+3, 0)
+	if row, col := h.p.url.Cursor(); row != 0 || col != 3 || h.p.url.ModeName() != "NORMAL" {
+		t.Fatalf("URL click = cursor %d,%d mode %q", row, col, h.p.url.ModeName())
+	}
+
+	h.req.Scripts.PreRequest = &model.Script{Source: "alpha beta\ngamma"}
+	h.p.reloadAll()
+	h.gotoTab(tabPre)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 3, Y: chrome, Button: tea.MouseLeft}, 3, chrome)
+	if !h.p.mouse.Active() {
+		t.Fatal("script press did not start")
+	}
+	if row, col := h.p.views[tabPre].(*scriptView).ed.Cursor(); row != 0 || col != 1 {
+		t.Fatalf("press cursor = %d,%d", row, col)
+	}
+	if _, _, ok := h.p.views[tabPre].(*scriptView).ed.PosAt(6, 1); !ok {
+		t.Fatal("second script row is not mapped")
+	}
+	motion := tea.MouseMotionMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}
+	if motion.Mouse().Button != tea.MouseLeft {
+		t.Fatal("motion does not report held left button")
+	}
+	h.p.HandleMouse(motion, 6, chrome+1)
+	if got := h.p.views[tabPre].(*scriptView).ed.ModeName(); got != "VISUAL" {
+		row, col := h.p.views[tabPre].(*scriptView).ed.Cursor()
+		t.Fatalf("motion mode/cursor = %q/%d,%d, want VISUAL", got, row, col)
+	}
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: 99, Y: 99, Button: tea.MouseLeft}, 99, 99)
+	ed := h.p.views[tabPre].(*scriptView).ed
+	if ed.ModeName() != "VISUAL" {
+		t.Fatalf("drag mode = %q, want VISUAL", ed.ModeName())
+	}
+	if h.p.mouse.Active() {
+		t.Fatal("release outside did not end drag")
+	}
+}
+
+func TestMouseOpensKVCellAtPointer(t *testing.T) {
+	h := newHarness(t)
+	kv := h.p.views[tabParams].(*kvView)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}, 6, chrome+1)
+	if !kv.edit || kv.col != 0 || kv.in == nil {
+		t.Fatal("clicking the first key cell did not open it")
+	}
+	if row, col := kv.in.Cursor(); row != 0 || col != 0 || kv.in.ModeName() != "NORMAL" {
+		t.Fatalf("KV click = cursor %d,%d mode %q", row, col, kv.in.ModeName())
 	}
 }

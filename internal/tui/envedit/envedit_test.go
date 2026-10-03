@@ -74,6 +74,22 @@ func newHarness(t *testing.T, w, h int) *harness {
 	return hh
 }
 
+func TestMouseOpensEnvironmentCellAtPointer(t *testing.T) {
+	h := newHarness(t, 120, 30)
+	h.scr.zone = zTable
+	x := listW + 3 + 6
+	h.scr.HandleMouse(tea.MouseClickMsg{X: x, Y: 4, Button: tea.MouseLeft}, x, 4)
+	if !h.scr.edit || h.scr.col != 0 || h.scr.in == nil {
+		t.Fatal("clicking the environment key cell did not open it")
+	}
+	if row, col := h.scr.in.Cursor(); row != 0 || col != 0 {
+		t.Fatalf("environment cell cursor = %d,%d, want 0,0", row, col)
+	}
+	if got := h.scr.in.VimMode(); got != "NORMAL" {
+		t.Fatalf("environment cell mode = %q, want NORMAL", got)
+	}
+}
+
 func (h *harness) send(msg tea.Msg) {
 	h.t.Helper()
 	next, cmd := h.m.Update(msg)

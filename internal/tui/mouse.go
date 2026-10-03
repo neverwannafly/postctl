@@ -13,6 +13,10 @@ import (
 type mouseState struct {
 	lastTreeRow  model.ID
 	lastTreeTime time.Time
+	dragSlot     Slot
+	dragging     bool
+	dragX        int
+	dragY        int
 }
 
 type rect struct {
@@ -166,7 +170,7 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 
-	var isClick, isWheel bool
+	var isClick, isWheel, isMotion, isRelease bool
 	var m tea.Mouse
 	switch event := msg.(type) {
 	case tea.MouseClickMsg:
@@ -182,15 +186,52 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 			return nil
 		}
 		isWheel = true
+	case tea.MouseMotionMsg:
+		m = event.Mouse()
+		if (!a.mouse.dragging && a.ov == nil) || m.Button != tea.MouseLeft {
+			return nil
+		}
+		isMotion = true
+	case tea.MouseReleaseMsg:
+		m = event.Mouse()
+		if !a.mouse.dragging && a.ov == nil {
+			return nil
+		}
+		isRelease = true
 	default:
 		return nil
 	}
 
 	x, y := m.X, m.Y
+	if (isMotion || isRelease) && a.ov != nil {
+		switch a.ov.(type) {
+		case *promptOverlay, *pickerOverlay, *screenOverlay:
+			return a.updateOverlay(msg)
+		default:
+			return nil
+		}
+	}
+	if (isMotion || isRelease) && a.ov == nil {
+		slot := a.mouse.dragSlot
+		if isRelease {
+			defer func() { a.mouse.dragging = false }()
+		}
+		switch slot {
+		case SlotRequest:
+			if h, ok := a.request.(MouseHandler); ok {
+				return h.HandleMouse(msg, x-a.mouse.dragX, y-a.mouse.dragY)
+			}
+		case SlotResponse:
+			if h, ok := a.response.(MouseHandler); ok {
+				return h.HandleMouse(msg, x-a.mouse.dragX, y-a.mouse.dragY)
+			}
+		}
+		return nil
+	}
 	regions := a.hitRegions()
 
 	if regions.hasOverlay {
-		if regions.overlay.contains(x, y) {
+		if regions.overlay.contains(x, y) || isMotion || isRelease {
 			return a.updateOverlay(msg)
 		}
 		if regions.isModal {
@@ -198,6 +239,24 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		if isClick {
 			return a.closeOverlay()
+		}
+		return nil
+	}
+
+	if isMotion || isRelease {
+		slot := a.mouse.dragSlot
+		if isRelease {
+			defer func() { a.mouse.dragging = false }()
+		}
+		switch slot {
+		case SlotRequest:
+			if h, ok := a.request.(MouseHandler); ok {
+				return h.HandleMouse(msg, x-regions.request.x, y-regions.request.y)
+			}
+		case SlotResponse:
+			if h, ok := a.response.(MouseHandler); ok {
+				return h.HandleMouse(msg, x-regions.response.x, y-regions.response.y)
+			}
 		}
 		return nil
 	}
@@ -257,6 +316,8 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 			return a.handleTreeClick(x-regions.sidebar.x, y-regions.sidebar.y)
 		}
 		if regions.request.contains(x, y) {
+			a.mouse.dragSlot, a.mouse.dragging = SlotRequest, true
+			a.mouse.dragX, a.mouse.dragY = regions.request.x, regions.request.y
 			var cmds []tea.Cmd
 			if a.focus != SlotRequest {
 				cmds = append(cmds, a.setFocus(SlotRequest))
@@ -269,6 +330,8 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 			return tea.Batch(cmds...)
 		}
 		if regions.response.contains(x, y) {
+			a.mouse.dragSlot, a.mouse.dragging = SlotResponse, true
+			a.mouse.dragX, a.mouse.dragY = regions.response.x, regions.response.y
 			var cmds []tea.Cmd
 			if a.focus != SlotResponse {
 				cmds = append(cmds, a.setFocus(SlotResponse))

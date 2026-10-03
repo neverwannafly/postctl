@@ -3,12 +3,62 @@ package vimfield
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
+
+func TestMouseClickDragAndClickCounts(t *testing.T) {
+	f := New(theme(), vimtext.Options{})
+	f.Set("one two\nthree")
+	f.Fit(12, 2)
+	var mouse Mouse
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+
+	if !mouse.Press(f, 5, 0, now) {
+		t.Fatal("press was not handled")
+	}
+	if row, col := f.Cursor(); row != 0 || col != 5 || f.Mode() != vimtext.Normal {
+		t.Fatalf("single click cursor/mode = %d,%d %v", row, col, f.Mode())
+	}
+	mouse.Motion(2, 1)
+	mouse.Release()
+	if f.Mode() != vimtext.Visual {
+		t.Fatalf("drag mode = %v, want visual", f.Mode())
+	}
+
+	mouse.Press(f, 5, 0, now.Add(100*time.Millisecond))
+	mouse.Release()
+	if f.Mode() != vimtext.Visual {
+		t.Fatalf("double-click mode = %v, want visual", f.Mode())
+	}
+	mouse.Press(f, 5, 0, now.Add(200*time.Millisecond))
+	mouse.Release()
+	if f.Mode() != vimtext.VisualLine {
+		t.Fatalf("triple-click mode = %v, want visual line", f.Mode())
+	}
+}
+
+func TestMouseKeepsInsertModeAndScrollsPastEdge(t *testing.T) {
+	f := New(theme(), vimtext.Options{SingleLine: true, StartInsert: true})
+	f.Set("abcdefgh")
+	f.Fit(4, 1)
+	f.Focus()
+	var mouse Mouse
+	now := time.Date(2026, 10, 3, 12, 0, 0, 0, time.UTC)
+	mouse.Press(f, 1, 0, now)
+	if f.Mode() != vimtext.Insert {
+		t.Fatalf("click changed insert mode to %v", f.Mode())
+	}
+	mouse.Motion(5, 0)
+	mouse.Release()
+	if f.Mode() != vimtext.Visual {
+		t.Fatalf("drag mode = %v, want visual", f.Mode())
+	}
+}
 
 func theme() ui.Theme { return ui.NewTheme(true, true, false) }
 

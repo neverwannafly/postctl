@@ -170,8 +170,15 @@ func TestWheelIsIgnoredWhileAFieldOrPromptIsBeingTyped(t *testing.T) {
 				if l.log.sel != sel || l.log.query != query {
 					t.Fatal("the wheel moved the log or its search")
 				}
-				if h.p.comp.Top() != top || h.p.comp.Text() != text {
-					t.Fatal("the wheel scrolled or edited the composer")
+				wantScroll := pos.name == "over composer" && (c.name == "composer insert" || c.name == "composer visual")
+				if wantScroll && h.p.comp.Top() == top {
+					t.Fatal("the wheel did not scroll the focused composer")
+				}
+				if !wantScroll && h.p.comp.Top() != top {
+					t.Fatal("the wheel scrolled a field other than the one under the pointer")
+				}
+				if h.p.comp.Text() != text {
+					t.Fatal("the wheel edited the composer")
 				}
 				if len(h.saves()) != 0 || h.p.confirm != nil {
 					t.Fatal("the wheel committed something")
@@ -223,5 +230,19 @@ func TestWheelStillMovesTheLogAndLists(t *testing.T) {
 	h.wheel(true, 5, 10)
 	if h.p.headers.cur == 0 {
 		t.Fatal("the wheel did not move the headers list")
+	}
+}
+
+func TestMousePlacesCursorInURLAndComposer(t *testing.T) {
+	h := newHarness(t)
+	urlX := 2 + badgeW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 2, Y: 0, Button: tea.MouseLeft}, urlX+2, 0)
+	if _, col := h.p.url.Cursor(); col != 2 || h.p.VimMode() != "NORMAL" {
+		t.Fatalf("URL click cursor/mode = %d/%q", col, h.p.VimMode())
+	}
+	h.p.comp.Set("first\nsecond")
+	h.p.HandleMouse(tea.MouseClickMsg{X: 3, Y: chrome + 2, Button: tea.MouseLeft}, 3, chrome+2)
+	if row, col := h.p.comp.Cursor(); row != 1 || col != 3 || h.p.VimMode() != "NORMAL" {
+		t.Fatalf("composer click = %d,%d/%q", row, col, h.p.VimMode())
 	}
 }

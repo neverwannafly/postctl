@@ -2,6 +2,7 @@ package history
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/tui/vimtext"
@@ -9,8 +10,24 @@ import (
 )
 
 type filterField struct {
-	ed *vimtext.Model
-	w  int
+	ed    *vimtext.Model
+	w     int
+	mouse vimtext.Mouse
+}
+
+func (f *filterField) mouseUpdate(msg tea.MouseMsg, x, y int, now time.Time) bool {
+	switch m := msg.(type) {
+	case tea.MouseClickMsg:
+		f.mouse.Release()
+		return m.Button == tea.MouseLeft && f.mouse.Press(f.ed, x, y, now)
+	case tea.MouseMotionMsg:
+		return m.Button == tea.MouseLeft && f.mouse.Motion(x, y)
+	case tea.MouseReleaseMsg:
+		return f.mouse.Release()
+	case tea.MouseWheelMsg:
+		return f.mouse.Active()
+	}
+	return false
 }
 
 func newFilterField(th ui.Theme) *filterField {

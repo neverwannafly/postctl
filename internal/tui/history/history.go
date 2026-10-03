@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
@@ -25,6 +26,15 @@ type Deps struct {
 	Log func() (tui.HistoryReader, error)
 	// Curl builds a redacted curl command for an entry.
 	Curl func(ctx context.Context, e *history.Entry) (string, error)
+	// Now supplies the clock for mouse click counting; nil means time.Now.
+	Now func() time.Time
+}
+
+func (d Deps) now() time.Time {
+	if d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
 }
 
 // Factory returns a screen factory wired with d.
@@ -249,6 +259,15 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		return m, m.reload()
 	}
 	return m, nil
+}
+
+// HandleMouse implements tui.ScreenMouseHandler for the history filter.
+func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if !m.filtering || m.filter == nil {
+		return nil
+	}
+	m.filter.mouseUpdate(msg, x-8, y-2, m.deps.now())
+	return nil
 }
 
 // start loads the list and, when the screen was opened on an entry, that

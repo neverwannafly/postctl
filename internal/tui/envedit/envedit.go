@@ -15,6 +15,7 @@ import (
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/listmotion"
 	"github.com/shubham/postctl/internal/tui/screenfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -382,6 +383,83 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		m.th = v.Theme
 	}
 	return m, nil
+}
+
+// HandleMouse implements tui.ScreenMouseHandler for the active name or
+// variable field. Coordinates are relative to the full screen body.
+func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if click, ok := msg.(tea.MouseClickMsg); ok && click.Button == tea.MouseLeft &&
+		m.mode == modeNone && m.zone == zTable {
+		contentX, contentW := 0, m.w
+		if m.wide() && m.tab != tabGlobals {
+			contentX, contentW = listW+3, m.w-listW-3
+		}
+		firstRowY := 4
+		tableH := m.h - 3
+		if !m.wide() && m.tab != tabGlobals {
+			firstRowY++
+			tableH--
+		}
+		row := y - firstRowY
+		rows := m.rows()
+		rh := max(1, tableH-4)
+		top := scroll(m.top, m.cur, rh, len(rows))
+		if row >= 0 && top+row < len(rows) && x >= contentX && x < contentX+contentW {
+			localX := x - contentX
+			keyW := 0
+			for _, v := range rows {
+				keyW = max(keyW, ui.Width(v.Key))
+			}
+			keyW = min(max(keyW, 3), max(8, (contentW-6)*35/100))
+			rest := contentW - 6 - keyW - ui.SpaceSM
+			descW := 0
+			if rest >= 40 {
+				descW = rest * 30 / 100
+			}
+			valW := max(1, rest)
+			if descW > 0 {
+				valW = max(1, rest-descW-ui.SpaceSM)
+			}
+			col, start, width := 0, 6, keyW
+			valueStart := 6 + keyW + ui.SpaceSM
+			if localX >= valueStart {
+				col, start, width = 1, valueStart, valW
+			}
+			descStart := valueStart + valW + ui.SpaceSM
+			if descW > 0 && localX >= descStart {
+				col, start, width = 2, descStart, descW
+			}
+			if localX < start || localX >= start+width {
+				return nil
+			}
+			m.cur = top + row
+			m.col = col
+			cmd := m.beginEditWithHydrate(m.col)
+			if m.in != nil {
+				m.in.FocusNormal()
+				m.in.HandleMouse(msg, localX-start, 0, m.clock())
+			}
+			return cmd
+		}
+	}
+	var f *screenfield.Field
+	originX, originY := 0, m.h-1
+	switch {
+	case m.mode == modeName && m.name != nil:
+		f, originX = m.name, 11
+		if m.nameEr != "" {
+			originY--
+		}
+	case m.edit && m.in != nil:
+		f, originX = m.in, 15
+		if m.wide() && m.tab != tabGlobals {
+			originX += listW + 3
+		}
+	default:
+		return nil
+	}
+	f.HandleMouse(msg, x-originX, y-originY, m.clock())
+	return nil
 }
 
 func (m *Model) close() (tui.Screen, tea.Cmd) {
@@ -752,7 +830,16 @@ func (m *Model) onHydrated(h hydratedMsg) tea.Cmd {
 			}
 		case thenEdit:
 			if m.edit {
+				normal := m.in != nil && m.in.Mode() != vimtext.Insert
+				row, col := 0, 0
+				if m.in != nil {
+					row, col = m.in.Cursor()
+				}
 				m.beginEdit(m.col)
+				if normal && m.in != nil {
+					m.in.FocusNormal()
+					m.in.SetCursor(row, col)
+				}
 			}
 		}
 	}

@@ -9,6 +9,12 @@ import (
 	"github.com/shubham/postctl/internal/ui"
 )
 
+const (
+	responseSummaryRows = 1
+	responseTabsRows    = 2
+	responseChromeRows  = responseSummaryRows + responseTabsRows
+)
+
 // HandleMouse implements tui.MouseHandler. Coordinates are relative to the
 // pane's inner body (below its header).
 func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
@@ -17,8 +23,24 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 		if msg.Button != tea.MouseLeft {
 			return nil
 		}
+		p.mouse.Release()
 		if p.diff.open {
 			return nil
+		}
+		if v := p.readyVim(); v != nil && p.vimOnScreen() {
+			originY := responseChromeRows
+			if st := p.current(); st != nil {
+				originY += len(st.result.Warnings)
+				if st.result.Response != nil && st.result.Response.BodyTruncated {
+					originY++
+				}
+			}
+			if y >= originY && y < originY+v.h {
+				if p.mouse.Press(v.f, x, y-originY, p.deps.now()) {
+					p.mouseX, p.mouseY = 0, originY
+				}
+				return nil
+			}
 		}
 		w := max(10, p.w)
 		tabs := p.buildTabs()
@@ -33,7 +55,7 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 		}
 
 		if collapsed {
-			if y == 1 {
+			if y == responseSummaryRows {
 				label := tabs[p.tabIndex()].Label
 				selText := fmt.Sprintf("[%d/%d] %s  ] next", p.tabIndex()+1, len(tabs), label)
 				if x >= 0 && x < ui.Width(selText) {
@@ -44,7 +66,7 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 			return nil
 		}
 
-		if y == 1 || y == 2 {
+		if y >= responseSummaryRows && y < responseChromeRows {
 			hit := p.th.TabAt(w, tabs, x)
 			if hit >= 0 && hit < len(tabs) {
 				delta := hit - p.tabIndex()
@@ -54,7 +76,16 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 				}
 			}
 		}
+	case tea.MouseMotionMsg:
+		if msg.Button == tea.MouseLeft && p.mouse.Active() {
+			p.mouse.Motion(x-p.mouseX, y-p.mouseY)
+		}
+	case tea.MouseReleaseMsg:
+		p.mouse.Release()
 	case tea.MouseWheelMsg:
+		if p.mouse.Active() {
+			return nil
+		}
 		if p.diff.open {
 			switch msg.Button {
 			case tea.MouseWheelUp:

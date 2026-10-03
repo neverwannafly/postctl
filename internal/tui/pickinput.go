@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/tui/vimtext"
@@ -27,6 +28,22 @@ type pickInput struct {
 	ed     *vimtext.Model
 	prompt string
 	width  int
+	mouse  vimtext.Mouse
+}
+
+func (p *pickInput) mouseUpdate(msg tea.MouseMsg, x, y int, now time.Time) bool {
+	switch m := msg.(type) {
+	case tea.MouseClickMsg:
+		p.mouse.Release()
+		return m.Button == tea.MouseLeft && p.mouse.Press(p.ed, x-ui.Width(p.prompt), y, now)
+	case tea.MouseMotionMsg:
+		return m.Button == tea.MouseLeft && p.mouse.Motion(x-ui.Width(p.prompt), y)
+	case tea.MouseReleaseMsg:
+		return p.mouse.Release()
+	case tea.MouseWheelMsg:
+		return p.mouse.Active()
+	}
+	return false
 }
 
 func newPickInput(th ui.Theme, ascii bool, prompt, placeholder string) (*pickInput, tea.Cmd) {

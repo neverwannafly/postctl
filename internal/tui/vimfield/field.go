@@ -8,6 +8,7 @@ package vimfield
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -313,3 +314,111 @@ func PureRef(text string) bool {
 
 // SetCursor moves the cursor to a clamped zero-based row and column.
 func (f *Field) SetCursor(row, col int) { f.m.SetCursor(row, col) }
+
+// PosAt maps a cell in the field's frame to a buffer position.
+func (f *Field) PosAt(x, y int) (row, col int, ok bool) { return f.m.PosAt(x, y) }
+
+// Mouse tracks one field mouse gesture and click count. A tracker belongs to
+// one pane or screen and is updated only from Update/HandleMouse paths.
+type Mouse struct {
+	field       *Field
+	anchorRow   int
+	anchorCol   int
+	moved       bool
+	lastField   *Field
+	lastRow     int
+	lastCol     int
+	lastClick   time.Time
+	clicks      int
+	pressClicks int
+}
+
+// Active reports whether a press that began in a field is awaiting release.
+func (m *Mouse) Active() bool { return m.field != nil }
+
+// Press begins a gesture at x,y in f. An existing insert-mode field stays in
+// insert mode; every other click focuses normal mode. Consecutive clicks on
+// the same grapheme within 400 ms select its Vim inner word, then its line.
+func (m *Mouse) Press(f *Field, x, y int, now time.Time) bool {
+	if f == nil {
+		return false
+	}
+	row, col, ok := f.PosAt(x, y)
+	if !ok {
+		return false
+	}
+	if m.lastField == f && m.lastRow == row && m.lastCol == col &&
+		!m.lastClick.IsZero() && now.Sub(m.lastClick) <= 400*time.Millisecond {
+		m.clicks++
+		if m.clicks > 3 {
+			m.clicks = 1
+		}
+	} else {
+		m.clicks = 1
+	}
+	m.lastField, m.lastRow, m.lastCol, m.lastClick = f, row, col, now
+	m.field, m.anchorRow, m.anchorCol, m.moved, m.pressClicks = f, row, col, false, m.clicks
+
+	keepInsert := f.Focused() && f.Mode() == vimtext.Insert && m.clicks == 1
+	if !keepInsert {
+		_ = f.m.FocusNormal()
+	} else {
+		f.Focus()
+	}
+	f.m.SetCursor(row, col)
+	switch m.clicks {
+	case 2:
+		_, _ = f.m.Update(tea.KeyPressMsg(tea.Key{Code: 'v', Text: "v"}))
+		_, _ = f.m.Update(tea.KeyPressMsg(tea.Key{Code: 'i', Text: "i"}))
+		_, _ = f.m.Update(tea.KeyPressMsg(tea.Key{Code: 'w', Text: "w"}))
+	case 3:
+		_, _ = f.m.Update(tea.KeyPressMsg(tea.Key{Code: 'V', Text: "V"}))
+	}
+	return true
+}
+
+// Motion extends a pressed single click as a charwise visual selection.
+// Motion beyond an edge scrolls one row, or one column for a single-line
+// field, before mapping the clamped edge cell.
+func (m *Mouse) Motion(x, y int) bool {
+	f := m.field
+	if f == nil || m.pressClicks != 1 {
+		return false
+	}
+	if f.single {
+		switch {
+		case x < 0:
+			f.m.ScrollColumns(-1)
+		case x >= f.w:
+			f.m.ScrollColumns(1)
+		}
+	} else {
+		switch {
+		case y < 0:
+			f.m.ScrollLines(-1)
+		case y >= f.h:
+			f.m.ScrollLines(1)
+		}
+	}
+	x = min(max(0, x), f.w-1)
+	y = min(max(0, y), f.h-1)
+	row, col, ok := f.PosAt(x, y)
+	if !ok {
+		return false
+	}
+	if !m.moved && row == m.anchorRow && col == m.anchorCol {
+		return true
+	}
+	m.moved = true
+	f.m.Select(m.anchorRow, m.anchorCol, row, col)
+	return true
+}
+
+// Release ends the active gesture. A drag remains in visual mode.
+func (m *Mouse) Release() bool {
+	if m.field == nil {
+		return false
+	}
+	m.field = nil
+	return true
+}

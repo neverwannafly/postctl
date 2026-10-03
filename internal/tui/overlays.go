@@ -89,6 +89,25 @@ func newPrompt(a *app, title, note, initial string, kinds []string, submit func(
 func (o *promptOverlay) overlayVimMode() string { return o.input.vimMode() }
 
 func (o *promptOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
+	if mouse, ok := msg.(tea.MouseMsg); ok {
+		line := 2
+		if o.note != "" {
+			line++
+		}
+		if len(o.kinds) > 1 {
+			line += 2
+		}
+		g := a.geo()
+		width := min(g.width-2, 64)
+		contentLines := line + 1
+		if o.err != "" {
+			contentLines++
+		}
+		originX := g.inset + max(0, (g.width-width)/2)
+		originY := headerRows + max(0, (g.bodyH-(contentLines+2))/3)
+		o.input.mouseUpdate(mouse, mouse.Mouse().X-originX-2, mouse.Mouse().Y-originY-line-1, a.now())
+		return o, nil
+	}
 	if k, ok := msg.(tea.KeyPressMsg); ok {
 		switch k.String() {
 		case "tab":
@@ -224,6 +243,13 @@ func (p *pickerOverlay) pick(a *app) (overlay, tea.Cmd) {
 }
 
 func (p *pickerOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
+	if mouse, ok := msg.(tea.MouseMsg); ok {
+		g := a.geo()
+		if p.input.mouseUpdate(mouse, mouse.Mouse().X-g.inset, mouse.Mouse().Y-headerRows-1, a.now()) {
+			return p, nil
+		}
+		return p, nil
+	}
 	page := max(1, p.lastPage-1)
 	cmd, nav := p.input.update(msg, page)
 	switch nav {

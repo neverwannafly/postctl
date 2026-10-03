@@ -27,6 +27,8 @@ import (
 // Deps are injectable runner effects.
 type Deps struct {
 	Runner tui.CollectionRunner
+	// Now supplies the clock for mouse click counting; nil means time.Now.
+	Now func() time.Time
 }
 
 // Factory returns a screen factory using d.
@@ -102,6 +104,9 @@ type Model struct {
 	runCh      <-chan engine.RunEvent
 	runEvents  []engine.RunEvent
 	exportPath *screenfield.Field
+	mouseField *screenfield.Field
+	mouseX     int
+	mouseY     int
 	listNav    listmotion.View
 	exportXML  bool
 	conf       ui.Confirm
@@ -109,6 +114,13 @@ type Model struct {
 	fail       bool
 	elapsed    time.Duration
 	runStart   time.Time
+}
+
+func (m *Model) now() time.Time {
+	if m.deps.Now != nil {
+		return m.deps.Now()
+	}
+	return time.Now()
 }
 
 // New builds the runner screen.
@@ -262,6 +274,37 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// HandleMouse implements tui.ScreenMouseHandler for runner form fields.
+func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if _, ok := msg.(tea.MouseClickMsg); ok {
+		m.mouseField = nil
+		switch m.phase {
+		case phSetup:
+			idx := y - 2
+			if idx >= 2 && idx <= 4 {
+				if m.field != idx {
+					m.blurSetupFields()
+					m.field = idx
+				}
+				label := [...]string{"", "", "Iterations", "Data file", "Delay (ms)"}[idx]
+				m.mouseField, m.mouseX, m.mouseY = m.activeField(), 2+ui.Width(label)+3, 2+idx
+				if m.mouseField != nil && !m.mouseField.Focused() {
+					_ = m.mouseField.FocusNormal()
+				}
+			}
+		case phExport:
+			m.mouseField, m.mouseX, m.mouseY = m.exportPath, 0, 4
+		}
+	}
+	if m.mouseField != nil {
+		m.mouseField.HandleMouse(msg, x-m.mouseX, y-m.mouseY, m.now())
+	}
+	if _, ok := msg.(tea.MouseReleaseMsg); ok {
+		m.mouseField = nil
+	}
+	return nil
 }
 
 // VimMode implements tui.ModeReporter.

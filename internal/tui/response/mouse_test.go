@@ -9,6 +9,7 @@ import (
 	"github.com/shubham/postctl/internal/httpx"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -102,5 +103,22 @@ func TestResponseCollapsedTabsAndHistory(t *testing.T) {
 	pWithHist.HandleMouse(tea.MouseClickMsg{X: clickX, Y: 1, Button: tea.MouseLeft}, clickX, 1)
 	if pWithHist.tab != tabHistory {
 		t.Errorf("clicking History tab should switch to tabHistory, got %v", pWithHist.tab)
+	}
+}
+
+func TestResponseBodyMousePlacesReadOnlyCursor(t *testing.T) {
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	v3Pump(t, p, tui.SendResultMsg{Result: v3Result(id, vimDoc, "", nil)})
+	v := p.readyVim()
+	if v == nil {
+		t.Fatal("response body vim field was not ready")
+	}
+	wantRow, wantCol, ok := v.f.PosAt(5, 0)
+	if !ok {
+		t.Fatal("response body target did not map")
+	}
+	p.HandleMouse(tea.MouseClickMsg{X: 5, Y: responseChromeRows, Button: tea.MouseLeft}, 5, responseChromeRows)
+	if row, col := v.f.Cursor(); row != wantRow || col != wantCol || v.f.Mode() != vimtext.Normal {
+		t.Fatalf("response click = cursor %d,%d mode %v, want %d,%d normal", row, col, v.f.Mode(), wantRow, wantCol)
 	}
 }
