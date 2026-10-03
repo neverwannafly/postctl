@@ -347,6 +347,8 @@ This is the binding spec; `docs/keys.md` is generated from code and must match i
 
 **Section jumps (`g` prefix):** `gu` URL · `gp` Params · `ga` Auth · `gh` Headers · `gb` Body · `gs` Pre-request script · `gt` Tests · `gS` Settings · `gm` WebSocket messages · `gr` response Body · `gH` response History. `gg` stays "top".
 
+**Tab steps (`[` and `]` prefixes):** `[` and `]` step to the previous or next tab of the focused pane; pressing `[` or `]` again keeps stepping. Any other key ends the repeat and is handled as if no prefix was pending (it is not swallowed). Unlike `Space` and `g`, these prefixes do not report "No binding".
+
 **Leader (`Space`, normal mode outside insert):**
 
 | Key | Action | Key | Action |

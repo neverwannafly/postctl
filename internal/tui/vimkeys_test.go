@@ -341,7 +341,7 @@ func TestBracketsStepSectionsAndRepeat(t *testing.T) {
 	if fmt.Sprint(deltas) != "[1 1 -1]" {
 		t.Fatalf("section steps = %v", deltas)
 	}
-	h.keys("x") // any other key ends the repeat (and says "No binding for ]x")
+	h.keys("x") // any other key ends the repeat and is handled normally
 	if h.a.pend != nil {
 		t.Fatal("prefix still pending")
 	}
