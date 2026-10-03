@@ -226,7 +226,8 @@ func (p *Pane) confirmView(w, h int) string {
 
 // ---- palette ------------------------------------------------------------------
 
-// Actions implements tui.ActionSource.
+// Actions implements tui.ActionSource. The IDs for the leader keys (Space y,
+// Y, o, v, i) are listed in docs/design-language.md.
 func (p *Pane) Actions() []tui.Action {
 	ok := p.editable
 	sendKeys := "Ctrl-S"
@@ -234,13 +235,15 @@ func (p *Pane) Actions() []tui.Action {
 		sendKeys = "Ctrl-Enter"
 	}
 	acts := []tui.Action{
-		{ID: "request.send", Title: "Send request", Group: "Request", Keys: sendKeys, Enabled: ok, Run: p.sendNow},
-		{ID: "request.copyCurl", Title: "Copy as curl", Group: "Request", Keys: "y", Enabled: ok, Run: func() tea.Cmd { return p.copyCurl(false) }},
-		{ID: "request.copyCurlSecrets", Title: "Copy as curl (with secrets)", Group: "Request", Enabled: ok, Run: func() tea.Cmd { return p.copyCurl(true) }},
-		{ID: "request.undo", Title: "Undo edit", Group: "Request", Keys: "Ctrl-Z", Enabled: ok, Run: p.undoStep},
-		{ID: "request.redo", Title: "Redo edit", Group: "Request", Keys: "Ctrl-Y", Enabled: ok, Run: p.redoStep},
-		{ID: "request.editor", Title: "Edit in $EDITOR", Group: "Request", Keys: "e / Ctrl-O", Enabled: ok, Run: p.openEditor},
-		{ID: "request.focusURL", Title: "Edit URL", Group: "Request", Keys: "Ctrl-L", Enabled: ok, Run: func() tea.Cmd {
+		{ID: "request.send", Title: "Send request", Group: "Request", Keys: sendKeys + " / Space s", Enabled: ok, Run: p.sendNow},
+		{ID: "request.curl", Title: "Copy as curl", Group: "Request", Keys: "Space y", Enabled: ok, Run: func() tea.Cmd { return p.copyCurl(false) }},
+		{ID: "request.curl.reveal", Title: "Copy as curl (with secrets)", Group: "Request", Keys: "Space Y", Enabled: ok, Run: func() tea.Cmd { return p.copyCurl(true) }},
+		{ID: "request.undo", Title: "Undo edit", Group: "Request", Keys: "u", Enabled: ok, Run: p.undoStep},
+		{ID: "request.redo", Title: "Redo edit", Group: "Request", Keys: "Ctrl-r", Enabled: ok, Run: p.redoStep},
+		{ID: "request.editor", Title: "Edit in $EDITOR", Group: "Request", Keys: "Space o", Enabled: ok, Run: p.openEditor},
+		{ID: "request.reveal", Title: "Reveal or hide secrets", Group: "Request", Keys: "Space v", Enabled: p.canReveal, Run: p.toggleReveal},
+		{ID: "request.snippet", Title: "Insert script snippet", Group: "Request", Keys: "Space i", Enabled: p.onScriptTab, Run: p.openSnippets},
+		{ID: "request.focusURL", Title: "Edit URL", Group: "Request", Keys: "gu", Enabled: ok, Run: func() tea.Cmd {
 			p.stopViews()
 			p.setZone(zBar)
 			return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
@@ -256,7 +259,8 @@ func (p *Pane) Actions() []tui.Action {
 	}
 	for i := range numTabs {
 		acts = append(acts, tui.Action{
-			ID: "request.tab." + strings.ToLower(tabNames[i]), Title: "Go to " + tabNames[i] + " tab", Group: "Request", Enabled: ok,
+			ID: "request.tab." + strings.ToLower(tabNames[i]), Title: "Go to " + tabNames[i] + " tab", Group: "Request",
+			Keys: "g" + tabKeys[i], Enabled: ok,
 			Run: func() tea.Cmd {
 				p.stopViews()
 				p.tab = i
@@ -267,4 +271,48 @@ func (p *Pane) Actions() []tui.Action {
 		})
 	}
 	return acts
+}
+
+// canReveal reports whether the open tab has masked secret fields to show.
+func (p *Pane) canReveal() bool {
+	if !p.editable() {
+		return false
+	}
+	_, ok := p.views[p.tab].(revealer)
+	return ok
+}
+
+// revealer is a tab with masked secret fields. toggleReveal reports whether it
+// changed anything.
+type revealer interface{ toggleReveal() bool }
+
+// toggleReveal is the request.reveal action: show or hide secret fields of the
+// open tab. Reveal resets whenever the cursor moves back to the tab.
+func (p *Pane) toggleReveal() tea.Cmd {
+	if r, ok := p.views[p.tab].(revealer); ok {
+		r.toggleReveal()
+	}
+	return nil
+}
+
+// onScriptTab reports whether the open tab is a script tab.
+func (p *Pane) onScriptTab() bool {
+	if !p.editable() {
+		return false
+	}
+	_, ok := p.views[p.tab].(*scriptView)
+	return ok
+}
+
+// openSnippets is the request.snippet action: show the snippet list of the
+// open script tab.
+func (p *Pane) openSnippets() tea.Cmd {
+	sv, ok := p.views[p.tab].(*scriptView)
+	if !ok {
+		return nil
+	}
+	p.setZone(zBody)
+	sv.ed.set(sv.source(p))
+	sv.openSnippets()
+	return msgCmd(tui.FocusPaneMsg{Slot: tui.SlotRequest})
 }

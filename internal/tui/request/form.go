@@ -132,12 +132,6 @@ func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, 
 				f.beginEdit(p, rs[f.cur])
 			}
 			return true, false, nil
-		case "ctrl+r":
-			if r.secret {
-				f.reveal = !f.reveal
-				f.in.Mask = f.maskFor(r, f.in.Text())
-			}
-			return true, false, nil
 		}
 		if f.in.Update(m) {
 			if r.set != nil {
@@ -161,9 +155,6 @@ func (f *form) key(p *Pane, rows func() []formRow, m tea.KeyPressMsg) (handled, 
 	case "end":
 		f.cur = len(rs) - 1
 		f.clamp(rs)
-		return true, false, nil
-	case "r":
-		f.reveal = !f.reveal
 		return true, false, nil
 	case "left", "right", "space", " ", "enter":
 		switch r.kind {

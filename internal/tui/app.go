@@ -53,6 +53,10 @@ type Options struct {
 	NewRunner, NewHistory ScreenFactory
 	// Registry receives palette actions; a fresh one is used when nil.
 	Registry *Registry
+	// OnEdge is called when Ctrl-h/j/k/l is pressed and postctl has no pane
+	// in that direction (plan U2). The terminal-handoff workstream sets it to
+	// hand the move to tmux. Nil does nothing.
+	OnEdge func(dir Direction) tea.Cmd
 	// NoWatch disables file watching (tests).
 	NoWatch bool
 	// Light assumes a light terminal background until the terminal answers;
@@ -124,6 +128,14 @@ type app struct {
 	toast    *toastState
 	toastSeq int
 
+	pend          *pendingKeys // a prefix key waiting for its follow-up
+	pendSeq       int
+	whichKeyDelay time.Duration
+	lastCtrlC     time.Time // the first press of a Ctrl-C quit
+	jumps         jumpList
+	jumping       bool // a jump-list move is opening a request
+	enhanced      bool // the terminal reports disambiguated keys (Ctrl-i)
+
 	foldSeq        int
 	sends          map[model.ID]*flight
 	saver          saveQueue
@@ -152,6 +164,8 @@ func newApp(opts Options) *app {
 		rightShow:  SlotRequest,
 		registry:   opts.Registry,
 		now:        time.Now,
+
+		whichKeyDelay: whichKeyDelay,
 	}
 	if a.registry == nil {
 		a.registry = &Registry{}
@@ -236,6 +250,12 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.setDark(msg.IsDark())
 	case tea.KeyPressMsg:
 		return a, tea.Batch(a.onKey(msg), a.syncFold())
+	case whichKeyMsg:
+		a.onWhichKey(msg)
+		return a, nil
+	case tea.KeyboardEnhancementsMsg:
+		a.enhanced = msg.SupportsKeyDisambiguation()
+		return a, a.forward(msg)
 	case tea.PasteMsg:
 		return a, a.onPaste(msg)
 	case showLoadingMsg:
@@ -510,10 +530,46 @@ func (a *app) editing() bool {
 	}
 }
 
-func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
-	if key.Matches(msg, a.keys.ForceQuit) {
-		return a.quit(a.quitting) // a second Ctrl-C while saving forces the exit
+// insertActive reports whether a text field has the keyboard in a way that
+// makes Ctrl-C act as Esc: a pane or tree-filter field being edited, or an
+// overlay built around a text input (palette, prompts).
+func (a *app) insertActive() bool {
+	switch a.ov.(type) {
+	case *pickerOverlay, *promptOverlay:
+		return true
+	case nil:
+		return a.editing()
 	}
+	return false
+}
+
+// ctrlC is the Ctrl-C ladder: it acts as Esc while typing; elsewhere the first
+// press asks for a second one within a second.
+func (a *app) ctrlC() tea.Cmd {
+	switch {
+	case a.phase != phaseReady, a.quitting:
+		return a.quit(a.quitting) // nothing to lose, or a second press while saving
+	case a.pend != nil:
+		a.pend = nil
+		return nil
+	case a.insertActive():
+		return a.onKey(keyNamed(tea.KeyEscape))
+	}
+	now := a.now()
+	if !a.lastCtrlC.IsZero() && now.Sub(a.lastCtrlC) <= time.Second {
+		a.lastCtrlC = time.Time{}
+		return a.quit(false)
+	}
+	a.lastCtrlC = now
+	return a.toastInfo("Press Ctrl-C again to quit.")
+}
+
+func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
+	s := msg.String()
+	if s == "ctrl+c" {
+		return a.ctrlC()
+	}
+	a.lastCtrlC = time.Time{} // any other key starts the ladder over
 	if a.toast != nil && a.toast.sticky {
 		a.toast = nil // any key acknowledges an error
 	}
@@ -528,7 +584,7 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		switch {
 		case key.Matches(msg, a.keys.Quit):
 			return a.quit(true)
-		case msg.String() == "r", key.Matches(msg, a.keys.Reload), msg.String() == "enter":
+		case s == "r", s == "enter":
 			a.phase = phaseLoading
 			return a.loadCmd(nil)
 		}
@@ -536,6 +592,7 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 
 	if a.ov != nil {
+		a.pend = nil
 		if key.Matches(msg, a.keys.Palette) {
 			a.ov = nil // Ctrl-P again closes the palette
 			return nil
@@ -543,8 +600,16 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.updateOverlay(msg)
 	}
 
+	// A prefix key (Space, g, [, ]) is waiting for its follow-up.
+	if p := a.pend; p != nil {
+		a.pend = nil
+		if cmd, ok := a.followUp(p, msg); ok {
+			return cmd
+		}
+	}
+
 	// Shortcuts that work even while typing.
-	switch s := msg.String(); {
+	switch {
 	case key.Matches(msg, a.keys.Palette):
 		return a.openPalette()
 	case key.Matches(msg, a.keys.Sidebar):
@@ -555,6 +620,8 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.setFocus(SlotRequest)
 	case s == "alt+3":
 		return a.setFocus(SlotResponse)
+	case s == "ctrl+s" || s == "ctrl+enter":
+		return a.sendKey(msg)
 	}
 	if a.editing() {
 		if a.focus == SlotSidebar {
@@ -563,6 +630,9 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.updateFocused(msg)
 	}
 
+	if cmd, ok := a.commonKey(msg); ok {
+		return cmd
+	}
 	if a.isFirstRun() {
 		return a.firstRunKey(msg)
 	}
@@ -572,7 +642,21 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 	if a.focus == SlotSidebar {
 		return a.sidebarKey(msg)
 	}
-	return a.updateFocused(msg)
+	return a.paneKey(msg)
+}
+
+// sendKey is Ctrl-S or Ctrl-Enter: the focused pane sends; from the tree (or
+// when the response pane has nothing to retry) the shell runs the send action.
+func (a *app) sendKey(msg tea.KeyPressMsg) tea.Cmd {
+	switch a.focus {
+	case SlotRequest:
+		return a.updateFocused(msg)
+	case SlotResponse:
+		if cmd := a.updateFocused(msg); cmd != nil {
+			return cmd
+		}
+	}
+	return a.runAction("request.send", "ws.send", "ws.connect")
 }
 
 // updateOverlay routes input to the open overlay. An overlay may open another
@@ -587,39 +671,104 @@ func (a *app) updateOverlay(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-// globalKey handles shortcuts that apply on every pane while nothing is being
-// typed.
-func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
-	switch {
+// commonKey handles the keys that mean the same on the first-run guide and on
+// the main screen while nothing is being typed: Space, ?, : and q.
+func (a *app) commonKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	switch s := msg.String(); {
+	case s == "space" || s == " ":
+		return a.startPending(prefixLeader), true
 	case key.Matches(msg, a.keys.Help):
 		a.ov = &helpOverlay{}
 		return nil, true
-	case key.Matches(msg, a.keys.Env):
-		a.ov = newEnvOverlay(a)
-		return nil, true
-	case key.Matches(msg, a.keys.EnvEdit) && a.opts.NewEnvEditor != nil:
-		return a.openEnvEditor(""), true
+	case key.Matches(msg, a.keys.Ex):
+		return a.openPaletteEx(), true
 	case key.Matches(msg, a.keys.Quit):
 		return a.quit(false), true
+	}
+	return nil, false
+}
+
+// globalKey handles shortcuts that apply on every pane while nothing is being
+// typed.
+func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	s := msg.String()
+	switch {
 	case key.Matches(msg, a.keys.Next):
 		return a.cycleFocus(1), true
 	case key.Matches(msg, a.keys.Prev):
 		return a.cycleFocus(-1), true
-	case key.Matches(msg, a.keys.Reload):
-		return a.reload(), true
 	case key.Matches(msg, a.keys.Filter):
 		cmds := []tea.Cmd{a.setFocus(SlotSidebar), a.tree.startFilter()}
 		return tea.Batch(cmds...), true
-	case key.Matches(msg, a.keys.History) && a.opts.NewHistory != nil:
-		return a.openHistory(), true
-	case msg.String() == "1":
+	case s == "1":
 		return a.setFocus(SlotSidebar), true
-	case msg.String() == "2":
+	case s == "2":
 		return a.setFocus(SlotRequest), true
-	case msg.String() == "3":
+	case s == "3":
 		return a.setFocus(SlotResponse), true
+	case s == "g":
+		return a.startPending(prefixGoto), true
+	case s == "[" || s == "]":
+		if a.focus == SlotSidebar {
+			return nil, false
+		}
+		delta := -1
+		if s == "]" {
+			delta = 1
+		}
+		return tea.Batch(a.stepSection(delta), a.startPending(s)), true
+	case key.Matches(msg, a.keys.JumpBack):
+		return a.jump(-1), true
+	case a.enhanced && key.Matches(msg, a.keys.JumpForward):
+		return a.jump(1), true
+	case key.Matches(msg, a.keys.PaneLeft), s == "backspace":
+		return a.movePane(DirLeft), true
+	case key.Matches(msg, a.keys.PaneDown):
+		return a.movePane(DirDown), true
+	case key.Matches(msg, a.keys.PaneUp):
+		return a.movePane(DirUp), true
+	case key.Matches(msg, a.keys.PaneRight):
+		return a.movePane(DirRight), true
+	case a.focus == SlotSidebar && key.Matches(msg, a.keys.Undo):
+		return a.runAction("request.undo"), true
+	case a.focus == SlotSidebar && key.Matches(msg, a.keys.Redo):
+		return a.runAction("request.redo"), true
 	}
 	return nil, false
+}
+
+// paneKey sends a key to the focused Request or Response pane, translating the
+// vim motions the existing widgets do not know yet into the keys they do:
+// j k h l to the arrows, G to End, Ctrl-d and Ctrl-u to the page keys. (gg
+// arrives as a Home key from the g prefix.)
+func (a *app) paneKey(msg tea.KeyPressMsg) tea.Cmd {
+	if a.focus == SlotRequest {
+		if t, ok := vimMotion(msg.String()); ok {
+			return a.updateFocused(keyNamed(t))
+		}
+	}
+	return a.updateFocused(msg)
+}
+
+// vimMotion maps a vim motion key to the standard key with the same effect.
+func vimMotion(s string) (rune, bool) {
+	switch s {
+	case "j":
+		return tea.KeyDown, true
+	case "k":
+		return tea.KeyUp, true
+	case "h":
+		return tea.KeyLeft, true
+	case "l":
+		return tea.KeyRight, true
+	case "G":
+		return tea.KeyEnd, true
+	case "ctrl+d":
+		return tea.KeyPgDown, true
+	case "ctrl+u":
+		return tea.KeyPgUp, true
+	}
+	return 0, false
 }
 
 // ---- focus ------------------------------------------------------------------
@@ -747,6 +896,9 @@ func (a *app) syncSelection(open bool) tea.Cmd {
 		return nil
 	}
 	a.lastSel = sig
+	if open {
+		a.recordJump(ref)
+	}
 	a.layoutPanes()
 	cmds := []tea.Cmd{a.broadcast(SelectionMsg{Ref: ref, Open: open})}
 	if open || (a.responseHidden() && a.focus == SlotResponse) {

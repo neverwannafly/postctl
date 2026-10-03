@@ -65,7 +65,7 @@ func TestShellOverRealStore(t *testing.T) {
 	h.mustHave("Internal admin")
 
 	h.selectByName("Charges")
-	h.keys("n")
+	h.keys("space", "a")
 	h.typeText("Capture charge")
 	h.keys("enter")
 	waitSaved(t, a)
@@ -82,7 +82,7 @@ func TestShellOverRealStore(t *testing.T) {
 	if find(ws.Collections[0], "Capture charge") == nil {
 		t.Fatal("the request was not written to disk")
 	}
-	h.keys("ctrl+r")
+	h.keys("space", "l")
 	h.mustHave("Capture charge")
 }
 

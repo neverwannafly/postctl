@@ -5,24 +5,25 @@ import (
 	"github.com/shubham/postctl/internal/ui"
 )
 
-// keyMap is the single source of truth for shortcuts: input handling matches
-// against it, the footer hints and the help screen are generated from it. No
-// vim bindings (plan §0, Q11).
+// keyMap is the single source of truth for the shell's own shortcuts: input
+// handling matches against it, the footer hints and the help screen are
+// generated from it. The map follows the vim key map in
+// docs/design-language.md (plan §0 U1). The leader (Space) and g-prefix tables
+// live in leader.go.
 type keyMap struct {
 	// Global.
-	Help, Palette, Env, EnvEdit, Quit, ForceQuit, Next, Prev, Sidebar, Filter, Reload key.Binding
-	Pane1, Pane2, Pane3                                                               key.Binding
-	Back                                                                              key.Binding
+	Help, Palette, Ex, Leader, Quit, ForceQuit, Next, Prev, Sidebar, Filter key.Binding
+	Pane1, Pane2, Pane3                                                     key.Binding
+	Back                                                                    key.Binding
+	Goto, SectionPrev, SectionNext                                          key.Binding
+	JumpBack, JumpForward                                                   key.Binding
+	PaneLeft, PaneDown, PaneUp, PaneRight                                   key.Binding
+	Undo, Redo                                                              key.Binding
+	Send                                                                    key.Binding
 
 	// Tree.
-	Up, Down, PageUp, PageDown, Home, End, Fold, Unfold, Open, Toggle key.Binding
-	New, Rename, Duplicate, Move, Delete, MoveUp, MoveDown            key.Binding
-	RunCollection                                                     key.Binding
-
-	// Reserved for the request and response panes (WS6); listed in help so
-	History key.Binding
-	// the shell's keys never collide with them.
-	Send, Edit key.Binding
+	Up, Down, PageUp, PageDown, Home, End, Fold, Unfold, Open key.Binding
+	ReorderUp, ReorderDown                                    key.Binding
 }
 
 func newKeyMap(ascii bool) keyMap {
@@ -36,42 +37,43 @@ func newKeyMap(ascii bool) keyMap {
 	return keyMap{
 		Help:      b("?", "Help", "?"),
 		Palette:   b("Ctrl-P", "Command palette", "ctrl+p"),
-		Env:       b("E", "Environments", "E"),
-		EnvEdit:   b("Ctrl-E", "Edit environments", "ctrl+e"),
+		Ex:        b(":", "Command line (q, q!, w, wq)", ":"),
+		Leader:    b("Space", "Actions menu (which-key)", "space"),
 		Quit:      b("q", "Quit", "q"),
-		ForceQuit: b("Ctrl-C", "Quit", "ctrl+c"),
+		ForceQuit: b("Ctrl-C", "Quit (twice), or Esc while typing", "ctrl+c"),
 		Next:      b("Tab", "Next pane", "tab"),
 		Prev:      b("Shift-Tab", "Previous pane", "shift+tab"),
 		Sidebar:   b("Ctrl-B", "Show or hide collections", "ctrl+b"),
 		Filter:    b("/", "Filter requests", "/"),
-		Reload:    b("Ctrl-R", "Reload from disk", "ctrl+r"),
 		Pane1:     b("1", "Collections", "1", "alt+1"),
 		Pane2:     b("2", "Request", "2", "alt+2"),
 		Pane3:     b("3", "Response", "3", "alt+3"),
 		Back:      b("Esc", "Back or cancel", "esc"),
 
-		Up:            b(up, "Move up", "up"),
-		Down:          b(down, "Move down", "down"),
-		PageUp:        b("PgUp", "Page up", "pgup"),
-		PageDown:      b("PgDn", "Page down", "pgdown"),
-		Home:          b("Home", "First row", "home"),
-		End:           b("End", "Last row", "end"),
-		Fold:          b(left, "Fold folder or go to parent", "left"),
-		Unfold:        b(right, "Unfold folder", "right"),
-		Open:          b("Enter", "Open request or toggle folder", "enter"),
-		Toggle:        b("Space", "Fold or unfold", "space"),
-		New:           b("n", "New request, folder or collection", "n"),
-		Rename:        b("r", "Rename", "r"),
-		Duplicate:     b("D", "Duplicate", "D"),
-		Move:          b("m", "Move to another folder", "m"),
-		Delete:        b("d", "Delete", "d"),
-		MoveUp:        b("Alt-"+up, "Move up in its folder", "alt+up"),
-		MoveDown:      b("Alt-"+down, "Move down in its folder", "alt+down"),
-		RunCollection: b("R", "Run collection", "R"),
+		Goto:        b("g", "Go to a section (gu gp ga gh gb gs gt gS gm gr)", "g"),
+		SectionPrev: b("[", "Previous section tab", "["),
+		SectionNext: b("]", "Next section tab", "]"),
+		JumpBack:    b("Ctrl-o", "Back to the previous request", "ctrl+o"),
+		JumpForward: b("Ctrl-i", "Forward to the next request", "ctrl+i"),
+		PaneLeft:    b("Ctrl-h", "Move to the pane on the left", "ctrl+h"),
+		PaneDown:    b("Ctrl-j", "Move to the pane below", "ctrl+j"),
+		PaneUp:      b("Ctrl-k", "Move to the pane above", "ctrl+k"),
+		PaneRight:   b("Ctrl-l", "Move to the pane on the right", "ctrl+l"),
+		Undo:        b("u", "Undo request edit", "u"),
+		Redo:        b("Ctrl-r", "Redo request edit", "ctrl+r"),
+		Send:        b("Ctrl-Enter", "Send request (also Ctrl-S)", "ctrl+enter", "ctrl+s"),
 
-		History: b("H", "History", "H"),
-		Send:    b("Ctrl-Enter", "Send request (also Ctrl-S)", "ctrl+enter", "ctrl+s"),
-		Edit:    b("e", "Edit in $EDITOR", "e"),
+		Up:          b("k "+up, "Move up", "up", "k"),
+		Down:        b("j "+down, "Move down", "down", "j"),
+		PageUp:      b("Ctrl-u", "Half page up", "pgup", "ctrl+u"),
+		PageDown:    b("Ctrl-d", "Half page down", "pgdown", "ctrl+d"),
+		Home:        b("gg", "First row", "home"),
+		End:         b("G", "Last row", "end", "G"),
+		Fold:        b("h "+left, "Fold folder or go to parent", "left", "h"),
+		Unfold:      b("l "+right, "Unfold folder", "right", "l"),
+		Open:        b("Enter", "Open request or toggle folder", "enter"),
+		ReorderUp:   b("Alt-"+up, "Move up in its folder", "alt+up"),
+		ReorderDown: b("Alt-"+down, "Move down in its folder", "alt+down"),
 	}
 }
 
@@ -94,28 +96,50 @@ func rows(bs ...key.Binding) []helpRow {
 
 // helpGroups builds the help screen from the key map, grouped by context.
 // focusHints are the focused pane's own hints, appended as their own group.
-func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, responseHidden ...bool) []helpGroup {
+// leader lists the leader rows that are currently available.
+func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, leader []helpRow, responseHidden ...bool) []helpGroup {
 	groups := []helpGroup{
-		{"Everywhere", rows(k.Palette, k.Env, k.EnvEdit, k.History, k.Filter, k.Next, k.Prev, k.Pane1, k.Sidebar, k.Reload, k.Help, k.Quit)},
-		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.New, k.Rename, k.Duplicate, k.Move, k.Delete, k.MoveUp, k.RunCollection)},
-		{"Request and response", rows(k.Send, k.Edit)},
+		{"Everywhere", rows(k.Palette, k.Ex, k.Leader, k.Filter, k.Next, k.Prev, k.Pane1, k.PaneLeft, k.JumpBack, k.Sidebar, k.Goto, k.SectionPrev, k.Help, k.Quit, k.ForceQuit)},
+		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.End, k.ReorderUp)},
+		{"Request and response", rows(k.Send, k.Undo, k.Redo)},
 		{"Lists and dialogs", []helpRow{
 			{"Enter", "Choose"}, {"Esc", "Close or cancel"}, {k.Up.Help().Key + " " + k.Down.Help().Key, "Move"},
 		}},
 	}
-	groups[1].Rows = replaceRow(groups[1].Rows, k.MoveUp.Help().Key, helpRow{k.MoveUp.Help().Key + " " + k.MoveDown.Help().Key, "Move up or down in its folder"})
-	// The overview rows for the pane numbers read better as one line.
-	if len(responseHidden) > 0 && responseHidden[0] {
-		groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2", "Jump to Collections or WebSocket"})
-		groups[2].Title = "WebSocket"
-	} else {
-		groups[0].Rows = replaceRow(groups[0].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
+	if len(leader) > 0 {
+		groups = append(groups[:2], append([]helpGroup{{"After Space", leader}}, groups[2:]...)...)
 	}
-	groups[1].Rows = replaceRow(groups[1].Rows, k.PageUp.Help().Key, helpRow{"PgUp PgDn", "Page up or down"})
+	idx := func(title string) int {
+		for i, g := range groups {
+			if g.Title == title {
+				return i
+			}
+		}
+		return 0
+	}
+	groups[idx("Collections")].Rows = replaceRow(groups[idx("Collections")].Rows, k.ReorderUp.Help().Key, helpRow{k.ReorderUp.Help().Key + " " + k.ReorderDown.Help().Key, "Move up or down in its folder"})
+	// The overview rows for the pane numbers and moves read better as one line.
+	ev := idx("Everywhere")
+	if len(responseHidden) > 0 && responseHidden[0] {
+		groups[ev].Rows = replaceRow(groups[ev].Rows, k.Pane1.Help().Key, helpRow{"1 2", "Jump to Collections or WebSocket"})
+		groups[idx("Lists and dialogs")].Title = "WebSocket"
+	} else {
+		groups[ev].Rows = replaceRow(groups[ev].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
+	}
+	groups[ev].Rows = replaceRow(groups[ev].Rows, k.PaneLeft.Help().Key, helpRow{"Ctrl-h j k l", "Move to the neighbouring pane"})
+	groups[ev].Rows = replaceRow(groups[ev].Rows, k.JumpBack.Help().Key, helpRow{"Ctrl-o Ctrl-i", "Back and forward through opened requests"})
+	groups[ev].Rows = replaceRow(groups[ev].Rows, k.SectionPrev.Help().Key, helpRow{"[ ]", "Previous and next section tab"})
+	co := idx("Collections")
+	groups[co].Rows = replaceRow(groups[co].Rows, k.PageUp.Help().Key, helpRow{"Ctrl-u Ctrl-d", "Half page up or down"})
+	groups[co].Rows = replaceRow(groups[co].Rows, k.Home.Help().Key, helpRow{"gg G", "First and last row"})
+	groups[co].Rows = dropRow(groups[co].Rows, k.End.Help().Key)
+	rr := idx("Request and response")
+	groups[rr].Rows = replaceRow(groups[rr].Rows, k.Undo.Help().Key, helpRow{"u Ctrl-r", "Undo and redo request edits"})
+	groups[rr].Rows = dropRow(groups[rr].Rows, k.Redo.Help().Key)
 	if len(focusHints) > 0 {
 		var extra []helpRow
 		seen := map[string]bool{}
-		for _, r := range groups[0].Rows {
+		for _, r := range groups[ev].Rows {
 			seen[r.Key] = true
 		}
 		for _, h := range focusHints {
@@ -137,4 +161,14 @@ func replaceRow(rs []helpRow, key string, with helpRow) []helpRow {
 		}
 	}
 	return rs
+}
+
+func dropRow(rs []helpRow, key string) []helpRow {
+	out := rs[:0:0]
+	for _, r := range rs {
+		if r.Key != key {
+			out = append(out, r)
+		}
+	}
+	return out
 }

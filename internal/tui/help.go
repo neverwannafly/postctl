@@ -25,26 +25,36 @@ func (o *helpOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	switch k.String() {
 	case "esc", "?", "q", "enter":
 		return nil, nil
-	case "up":
+	case "up", "k":
 		o.scroll--
-	case "down":
+	case "down", "j":
 		o.scroll++
-	case "pgup":
+	case "pgup", "ctrl+u":
 		o.scroll -= max(1, o.page-1)
-	case "pgdown", "space":
+	case "pgdown", "space", "ctrl+d":
 		o.scroll += max(1, o.page-1)
-	case "home":
+	case "home", "g":
 		o.scroll = 0
-	case "end":
+	case "end", "G":
 		o.scroll = o.lines
 	}
 	o.scroll = max(0, min(o.scroll, max(0, o.lines-o.page)))
 	return o, nil
 }
 
+// helpGroups builds the groups shown by the help overlay: the key map, the
+// leader keys that work right now, and the focused pane's own hints.
+func (a *app) helpGroups() []helpGroup {
+	var leader []helpRow
+	for _, e := range a.leaderEntries() {
+		leader = append(leader, helpRow{Key: "Space " + e.Key, Desc: e.Label})
+	}
+	return a.keys.helpGroups(a.focusTitle(), a.focusHints(), leader, a.responseHidden())
+}
+
 func (o *helpOverlay) measure(a *app) {
 	g := a.geo()
-	groups := a.keys.helpGroups(a.focusTitle(), a.focusHints(), a.responseHidden())
+	groups := a.helpGroups()
 	o.lines = 0
 	if g.width >= 110 {
 		left, right := 0, 0
@@ -68,7 +78,7 @@ func (o *helpOverlay) measure(a *app) {
 
 func (o *helpOverlay) view(a *app, w, h int) string {
 	t := a.theme
-	groups := a.keys.helpGroups(a.focusTitle(), a.focusHints(), a.responseHidden())
+	groups := a.helpGroups()
 
 	keyW := 0
 	for _, g := range groups {

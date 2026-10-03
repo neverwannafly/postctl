@@ -1,6 +1,6 @@
 postctl  payments-api                                                  env  none
 --------------------------------------------------------------------------------
-> 1 Collections    2 Request    3 Response
+> [1] Collections    [2] Request    [3] Response
   v Payments                                                                   8
     v Charges                                                                  4
         GET   List charges                                                      
@@ -21,4 +21,4 @@ postctl  payments-api                                                  env  none
                                                                                 
 --------------------------------------------------------------------------------
 
-Enter Open   n New   / Filter   Esc Close   ? Help   Ctrl-P Palette
+Enter Open   Space a New   / Filter   Esc Close   ? Help   Ctrl-P Palette

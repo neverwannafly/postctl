@@ -53,7 +53,7 @@ func TestAuthSwitchTypeAndFillBearer(t *testing.T) {
 	}
 	// Literal secrets are masked until revealed.
 	h.mustNotHave("abc123")
-	h.key("r")
+	h.action("request.reveal")
 	h.mustHave("abc123")
 	// Leaving and returning hides them again.
 	h.gotoTab(tabHeaders)
@@ -69,19 +69,20 @@ func TestAuthVariableReferencesAreShown(t *testing.T) {
 	h.mustHave("{{token}}")
 }
 
-func TestAuthSecretMaskedWhileTypingAndRevealWithCtrlR(t *testing.T) {
+func TestAuthSecretMaskedWhileTypingAndRevealWithAction(t *testing.T) {
 	h := newHarness(t)
 	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Username: "bob"}}
 	h.gotoTab(tabAuth)
 	h.key("down", "down", "down", "enter") // Password
 	h.typ("hunter2")
 	h.mustNotHave("hunter2")
-	h.key("ctrl+r")
-	h.mustHave("hunter2")
 	h.key("esc")
 	if h.req.Auth.Basic.Password != "hunter2" {
 		t.Fatal("password not stored")
 	}
+	h.mustNotHave("hunter2")
+	h.action("request.reveal")
+	h.mustHave("hunter2")
 }
 
 func TestAuthTypeSwitchRestoresEnteredValues(t *testing.T) {
@@ -191,8 +192,7 @@ func TestOAuthWaitingStateShowsLinkAndCancels(t *testing.T) {
 	h, _, _ := oauthHarness(t, fetch)
 	// Start the flow without running its blocking command; feed events by hand.
 	h.key("down")
-	_, cmd := h.p.Update(keyMsg("g"))
-	_ = cmd
+	_ = h.actionCmd("request.getToken")
 	run := h.p.oauth
 	if run == nil {
 		t.Fatal("flow not started")
@@ -240,7 +240,8 @@ func TestOAuthFailureIsShownCalmly(t *testing.T) {
 		return nil, oauth2.ErrTimeout
 	}
 	h, _, _ := oauthHarness(t, fetch)
-	h.key("down", "g")
+	h.key("down")
+	h.action("request.getToken")
 	h.mustHave("Timed out waiting for the browser")
 	if h.req.Auth.OAuth2.Token != nil {
 		t.Fatal("token set on failure")
@@ -254,7 +255,8 @@ func TestOAuthWithoutSecretStoreExplains(t *testing.T) {
 	h := newHarness(t, func(h *harness) { h.deps.Fetch = fetch })
 	h.req.Auth = &model.Auth{Type: model.AuthOAuth2, OAuth2: &model.OAuth2Config{GrantType: model.GrantClientCredentials}}
 	h.gotoTab(tabAuth)
-	h.key("down", "g")
+	h.key("down")
+	h.action("request.getToken")
 	h.mustHave("no secret store")
 }
 
@@ -305,7 +307,7 @@ func curlHarness(t *testing.T) *harness {
 
 func TestCopyCurlMasksSecretsByDefault(t *testing.T) {
 	h := curlHarness(t)
-	h.key("y")
+	h.action("request.curl")
 	if len(h.clip) != 1 {
 		t.Fatalf("clipboard = %v", h.clip)
 	}
@@ -326,7 +328,7 @@ func TestCopyCurlMasksSecretsByDefault(t *testing.T) {
 
 func TestCopyCurlWithSecrets(t *testing.T) {
 	h := curlHarness(t)
-	h.key("Y")
+	h.action("request.curl.reveal")
 	if len(h.clip) != 1 || !strings.Contains(h.clip[0], "Authorization: Bearer s3cr3t-value") {
 		t.Fatalf("clipboard = %v", h.clip)
 	}
@@ -336,12 +338,12 @@ func TestCopyCurlWithSecrets(t *testing.T) {
 func TestCopyCurlMasksLiteralAuthCredentials(t *testing.T) {
 	h := curlHarness(t)
 	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Username: "bob", Password: "hunter2"}}
-	h.key("y")
+	h.action("request.curl")
 	c := h.clip[0]
 	if strings.Contains(c, "hunter2") || !strings.Contains(c, "--user 'bob:****'") {
 		t.Fatalf("curl = %s", c)
 	}
-	h.key("Y")
+	h.action("request.curl.reveal")
 	if !strings.Contains(h.clip[1], "--user 'bob:hunter2'") {
 		t.Fatalf("curl = %s", h.clip[1])
 	}
@@ -350,7 +352,7 @@ func TestCopyCurlMasksLiteralAuthCredentials(t *testing.T) {
 func TestCopyCurlAPIKeyInQuery(t *testing.T) {
 	h := curlHarness(t)
 	h.req.Auth = &model.Auth{Type: model.AuthAPIKey, APIKey: &model.APIKeyAuth{Key: "k", Value: "v1", In: model.APIKeyQuery}}
-	h.key("Y")
+	h.action("request.curl.reveal")
 	m := regexp.MustCompile(`--url '([^']*)'`).FindStringSubmatch(h.clip[0])
 	if m == nil {
 		t.Fatalf("curl = %s", h.clip[0])

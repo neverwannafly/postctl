@@ -117,7 +117,7 @@ func TestKeysDocCoversWebSocketPane(t *testing.T) {
 	doc := string(data)
 	required := []string{
 		"Ctrl-S, Ctrl-Enter",
-		"Ctrl-L",
+		"gu",
 		"Enter (URL bar)",
 		"c (tab bar)",
 		"Ctrl-T (composer)",

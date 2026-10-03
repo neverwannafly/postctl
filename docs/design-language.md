@@ -161,7 +161,7 @@ Each status combines a stable symbol and text. Examples: `● Ready`, `… Runni
 
 ### Key-value table
 
-Headers, query params, urlencoded and form fields share one table: enabled marker, key, value, description. A disabled row shows `[ ]` (ASCII and Unicode) and secondary text; an enabled row shows `[x]`. `Space` toggles, `n` adds, `d` deletes. Secret values render as `••••` (ASCII `****`) and reveal only while the reveal key is held.
+Headers, query params, urlencoded and form fields share one table: enabled marker, key, value, description. A disabled row shows `[ ]` (ASCII and Unicode) and secondary text; an enabled row shows `[x]`. `x` toggles (`Space` is the leader), `a` adds, `d` deletes. Secret values render as `••••` (ASCII `****`) and reveal only while the reveal key is held.
 
 ### Modal
 

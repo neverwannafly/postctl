@@ -109,7 +109,8 @@ func TestLateDialAfterCancelIsAborted(t *testing.T) {
 	h.key("ctrl+s")
 	h.waitState(stOpen)
 	first := h.client
-	h.key("ctrl+l", "enter") // disconnect from the URL bar
+	h.send(tui.FocusSectionMsg{Section: tui.SectionURL})
+	h.key("enter") // disconnect from the URL bar
 	h.waitState(stIdle)
 	if codes := first.closeCodes(); len(codes) != 1 || codes[0] != wsx.CloseNormal {
 		t.Fatalf("close codes = %v", codes)
@@ -1239,3 +1240,24 @@ func TestMessageEventsAreBatched(t *testing.T) {
 }
 
 var _ = tea.Batch
+
+func TestSectionsFocusAndStepTabs(t *testing.T) {
+	h := newHarness(t)
+	for i, name := range tabSections {
+		h.send(tui.FocusSectionMsg{Section: name})
+		if h.p.tab != tabID(i) {
+			t.Errorf("%s: tab = %v, want %v", name, h.p.tab, tabID(i))
+		}
+	}
+	h.send(tui.SectionStepMsg{Delta: 1})
+	if h.p.tab != 0 {
+		t.Fatalf("] after the last tab -> %v", h.p.tab)
+	}
+	h.send(tui.FocusSectionMsg{Section: tui.SectionURL})
+	if h.p.zone != zBar {
+		t.Fatalf("gu: zone = %v", h.p.zone)
+	}
+	if len(h.p.Sections()) != 1+len(tabSections) {
+		t.Fatalf("Sections = %v", h.p.Sections())
+	}
+}

@@ -222,3 +222,13 @@ func TestSpinnerHasFrames(t *testing.T) {
 		t.Error("ascii spinner must use ASCII frames")
 	}
 }
+
+// A hint without a label is a status (the vim mode): the footer shows the bare
+// key, with no trailing space or empty label.
+func TestKeyHintWithoutLabelRendersTheKeyOnly(t *testing.T) {
+	th := NewTheme(true, true, false)
+	got := ansi.Strip(th.KeyHints(80, []Hint{{Key: "INSERT"}, {Key: "Esc", Label: "Done"}}))
+	if !strings.HasPrefix(got, "INSERT") || !strings.Contains(got, "Esc Done") {
+		t.Fatalf("hints = %q", got)
+	}
+}

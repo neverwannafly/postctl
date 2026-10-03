@@ -166,9 +166,6 @@ func (s *scriptView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 			s.on = false
 			s.ed.blur()
 			return true, false, nil
-		case "ctrl+g":
-			s.pick, s.sel = true, 0
-			return true, false, nil
 		case "tab":
 			// Insert two spaces rather than moving focus.
 			s.ed.insertText("  ")
@@ -186,11 +183,13 @@ func (s *scriptView) key(p *Pane, m tea.KeyPressMsg) (bool, bool, tea.Cmd) {
 		s.on = true
 		s.ed.focus()
 		return true, false, nil
-	case "s":
-		s.pick, s.sel = true, 0
-		return true, false, nil
 	}
 	return false, false, nil
+}
+
+// openSnippets opens the snippet list (the request.snippet action).
+func (s *scriptView) openSnippets() {
+	s.pick, s.sel = true, 0
 }
 
 func (s *scriptView) hints(p *Pane) []ui.Hint {
@@ -198,9 +197,9 @@ func (s *scriptView) hints(p *Pane) []ui.Hint {
 	case s.pick:
 		return []ui.Hint{{Key: "Enter", Label: "Insert", Priority: 1}, {Key: "Esc", Label: "Close", Priority: 1}, {Key: "↑↓", Label: "Choose", Priority: 3}}
 	case s.on:
-		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Ctrl-G", Label: "Snippets", Priority: 3}, {Key: "Ctrl-O", Label: "$EDITOR", Priority: 4}}
+		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}}
 	}
-	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "s", Label: "Snippets", Priority: 3}, {Key: "Ctrl-O", Label: "$EDITOR", Priority: 4}}
+	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "Space i", Label: "Snippets", Priority: 3}, {Key: "Space o", Label: "$EDITOR", Priority: 4}}
 }
 
 func (s *scriptView) view(p *Pane, w, h int) string {
@@ -218,7 +217,7 @@ func (s *scriptView) view(p *Pane, w, h int) string {
 		l, c := s.ed.pos()
 		status = "Line " + itoa(l) + ", column " + itoa(c) + " " + th.Glyphs.Dot + " " + itoa(s.ed.lineCount()) + " lines"
 	case strings.TrimSpace(s.source(p)) == "":
-		status = "JavaScript runs " + when + ". Press Enter to write one, s for snippets."
+		status = "JavaScript runs " + when + ". Press Enter to write one, Space i for snippets."
 	default:
 		status = "JavaScript runs " + when
 	}

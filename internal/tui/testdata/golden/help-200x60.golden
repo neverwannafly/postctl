@@ -3,41 +3,41 @@
  Help                                                                                                                                                                                         Esc Close
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
    Everywhere                                                                                           Collections                                                                                    
-   Ctrl-P       Command palette                                                                         ↑            Move up                                                                           
-   E            Environments                                                                            ↓            Move down                                                                         
-   Ctrl-E       Edit environments                                                                       →            Unfold folder                                                                     
-   H            History                                                                                 ←            Fold folder or go to parent                                                       
-   /            Filter requests                                                                         Enter        Open request or toggle folder                                                     
-   Tab          Next pane                                                                               PgUp PgDn    Page up or down                                                                   
-   Shift-Tab    Previous pane                                                                           Home         First row                                                                         
-   1 2 3        Jump to Collections, Request, Response                                                  n            New request, folder or collection                                                 
-   Ctrl-B       Show or hide collections                                                                r            Rename                                                                            
-   Ctrl-R       Reload from disk                                                                        D            Duplicate                                                                         
-   ?            Help                                                                                    m            Move to another folder                                                            
-   q            Quit                                                                                    d            Delete                                                                            
-                                                                                                        Alt-↑ Alt-↓  Move up or down in its folder                                                     
-   Request and response                                                                                 R            Run collection                                                                    
-   Ctrl-Enter   Send request (also Ctrl-S)                                                                                                                                                             
-   e            Edit in $EDITOR                                                                         Lists and dialogs                                                                              
-                                                                                                        Enter        Choose                                                                            
-   Collections (focused)                                                                                Esc          Close or cancel                                                                   
-   Enter        Fold                                                                                    ↑ ↓          Move                                                                              
-   n            New                                                                                                                                                                                    
-   r            Rename                                                                                                                                                                                 
-   d            Delete                                                                                                                                                                                 
-   m            Move                                                                                                                                                                                   
-   D            Duplicate                                                                                                                                                                              
-   R            Run collection                                                                                                                                                                         
+   Ctrl-P         Command palette                                                                       k ↑            Move up                                                                         
+   :              Command line (q, q!, w, wq)                                                           j ↓            Move down                                                                       
+   Space          Actions menu (which-key)                                                              l →            Unfold folder                                                                   
+   /              Filter requests                                                                       h ←            Fold folder or go to parent                                                     
+   Tab            Next pane                                                                             Enter          Open request or toggle folder                                                   
+   Shift-Tab      Previous pane                                                                         Ctrl-u Ctrl-d  Half page up or down                                                            
+   1 2 3          Jump to Collections, Request, Response                                                gg G           First and last row                                                              
+   Ctrl-h j k l   Move to the neighbouring pane                                                         Alt-↑ Alt-↓    Move up or down in its folder                                                   
+   Ctrl-o Ctrl-i  Back and forward through opened requests                                                                                                                                             
+   Ctrl-B         Show or hide collections                                                              Request and response                                                                           
+   g              Go to a section (gu gp ga gh gb gs gt gS gm gr)                                       Ctrl-Enter     Send request (also Ctrl-S)                                                      
+   [ ]            Previous and next section tab                                                         u Ctrl-r       Undo and redo request edits                                                     
+   ?              Help                                                                                                                                                                                 
+   q              Quit                                                                                  Collections (focused)                                                                          
+   Ctrl-C         Quit (twice), or Esc while typing                                                     Enter          Fold                                                                            
+                                                                                                        Space a        New                                                                             
+   After Space                                                                                          Space r        Rename                                                                          
+   Space p        Command palette                                                                       Space d        Delete                                                                          
+   Space e        Switch environment                                                                    Space m        Move                                                                            
+   Space a        New request or folder                                                                 Space D        Duplicate                                                                       
+   Space r        Rename                                                                                                                                                                               
+   Space d        Delete                                                                                                                                                                               
+   Space D        Duplicate                                                                                                                                                                            
+   Space m        Move to folder                                                                                                                                                                       
+   Space b        Toggle sidebar                                                                                                                                                                       
+   Space l        Reload workspace                                                                                                                                                                     
+   Space q        Quit                                                                                                                                                                                 
+   Space [        Back (jump list)                                                                                                                                                                     
+   Space ]        Forward (jump list)                                                                                                                                                                  
+   Space ?        All keys                                                                                                                                                                             
                                                                                                                                                                                                        
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
-                                                                                                                                                                                                       
+   Lists and dialogs                                                                                                                                                                                   
+   Enter          Choose                                                                                                                                                                               
+   Esc            Close or cancel                                                                                                                                                                      
+   k ↑ j ↓        Move                                                                                                                                                                                 
                                                                                                                                                                                                        
                                                                                                                                                                                                        
                                                                                                                                                                                                        

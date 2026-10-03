@@ -62,6 +62,9 @@ func (r *kindRouter) Update(msg tea.Msg) (Pane, tea.Cmd) {
 		return r, r.update(r.active, msg)
 	case SelectionMsg:
 		return r, r.onSelection(m)
+	case FocusSectionMsg, SectionStepMsg:
+		// Only the pane on screen has the section.
+		return r, r.update(r.active, msg)
 	}
 	cmds := make([]tea.Cmd, len(r.panes))
 	for i := range r.panes {
@@ -132,6 +135,22 @@ func (r *kindRouter) Title() string {
 func (r *kindRouter) Editing() bool {
 	e, ok := r.panes[r.active].(Editor)
 	return ok && e.Editing()
+}
+
+// VimMode implements ModeReporter for the active pane.
+func (r *kindRouter) VimMode() string {
+	if m, ok := r.panes[r.active].(ModeReporter); ok {
+		return m.VimMode()
+	}
+	return ""
+}
+
+// Sections implements SectionLister for the active pane.
+func (r *kindRouter) Sections() []string {
+	if l, ok := r.panes[r.active].(SectionLister); ok {
+		return l.Sections()
+	}
+	return nil
 }
 
 // BlurCmd runs the active pane's save-on-blur command.

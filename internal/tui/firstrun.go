@@ -39,23 +39,13 @@ func (a *app) firstRunKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return tea.Batch(tea.SetClipboard(act.cmd),
 			a.toastOK("Copied: "+act.cmd+". Run it in another terminal; this screen updates when the files appear."))
-	case key.Matches(msg, k.New):
-		return a.openNew()
-	case key.Matches(msg, k.Help):
-		a.ov = &helpOverlay{}
-	case key.Matches(msg, k.Env):
-		a.ov = newEnvOverlay(a)
-	case key.Matches(msg, k.Reload):
-		return a.reload()
-	case key.Matches(msg, k.Quit):
-		return a.quit(false)
 	}
 	return nil
 }
 
 func (a *app) firstRunHints() []ui.Hint {
 	return []ui.Hint{
-		hint("Enter", "Choose", 0), hint(arrowsUD(a.ascii), "Move", 2), hint("n", "New", 1),
+		hint("Enter", "Choose", 0), hint(arrowsUD(a.ascii), "Move", 2), hint("Space a", "New", 1),
 		hint("Ctrl-P", "Palette", 3), hint("?", "Help", 0), hint("q", "Quit", 4),
 	}
 }

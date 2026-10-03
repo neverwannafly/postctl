@@ -197,6 +197,10 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		return p, p.onSelection(m)
 	case tea.KeyboardEnhancementsMsg:
 		p.enhanced = m.SupportsKeyDisambiguation()
+	case tui.FocusSectionMsg:
+		return p, p.onFocusSection(m)
+	case tui.SectionStepMsg:
+		return p, p.onSectionStep(m)
 	case tea.KeyPressMsg:
 		return p, p.onKey(m)
 	case tea.PasteMsg:

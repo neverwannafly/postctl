@@ -240,13 +240,14 @@ func renderLeakSweepFrames(
 	}})
 	_, _ = responsePane.Update(tui.SendResultMsg{Result: tuiengine.OutcomeToResult(out)})
 	_ = responsePane.Focus()
-	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight}) // Headers
+	step := tui.SectionStepMsg{Delta: 1} // what ] sends to the focused pane
+	_, _ = responsePane.Update(step)     // Headers
 	headersFrame := responsePane.View()
 	for range 3 {
-		_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+		_, _ = responsePane.Update(step)
 	}
 	consoleFrame := responsePane.View()
-	_, _ = responsePane.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	_, _ = responsePane.Update(step)
 	timelineFrame := responsePane.View()
 
 	historyScreen := tuihistory.New(tui.ScreenEnv{

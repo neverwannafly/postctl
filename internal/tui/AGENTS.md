@@ -31,6 +31,8 @@ Read the root [`AGENTS.md`](../../AGENTS.md) and [`docs/design-language.md`](../
 
 Global bindings are `keyMap` in `keys.go`; each pane has its own `keys.go`. The reference `docs/keys.md` is generated from the hand-kept `KeyCatalog` in `cmd/genkeys/main.go`: add the key there, run `task keys`, commit the diff. `TestGeneratedKeysDocMatchesFile` and `TestAllCodeKeyBindingsDocumentedInKeysDoc` fail on drift. `Ctrl-S` always sends; `Ctrl-Enter` needs enhanced keyboard reporting.
 
+Input order in `app.onKey` (`app.go`): Ctrl-C ladder, load/fatal phases, overlay, pending prefix follow-up, always-keys (Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S, Ctrl-Enter), the focused text field (`Editor.Editing`), then `commonKey` (Space, ?, :, q), `globalKey` (Tab, 1-3, g, [ ], Ctrl-o/i, Ctrl-h/j/k/l), and the sidebar or pane. Leader keys live in `leaderBindings` (`leader.go`) as ordered action ID candidates; a key whose action is missing or disabled is hidden from which-key and does nothing, so a pane or screen adds a leader key by registering an `Action` with the right ID (never by handling a letter itself). Panes expose `SectionLister`/`ModeReporter` and handle `FocusSectionMsg`/`SectionStepMsg`; a new tab needs a `g` key in `gotoSections` only if it is a real section. Single letters that conflict with the leader or with typing must not be added to pane key handlers.
+
 ## Tests
 
 ```sh

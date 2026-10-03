@@ -115,6 +115,19 @@ func (p *Pane) Focus() tea.Cmd {
 // Blur implements [tui.Pane].
 func (p *Pane) Blur() { p.focused = false }
 
+// VimMode implements [tui.ModeReporter]. The search and path boxes are not
+// modal yet, so editing one reports INSERT.
+func (p *Pane) VimMode() string {
+	if p.Editing() {
+		return "INSERT"
+	}
+	return ""
+}
+
+// Sections implements [tui.SectionLister]: g jumps can reach the Body tab; [
+// and ] step through every tab.
+func (p *Pane) Sections() []string { return []string{tui.SectionRespBody} }
+
 // Editing implements [tui.Editor].
 func (p *Pane) Editing() bool { return p.searchActive || p.pathActive }
 
@@ -173,6 +186,14 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	case tui.ThemeChangedMsg:
 		p.th = msg.Theme
 		p.spin = p.th.NewSpinner()
+	case tui.FocusSectionMsg:
+		if msg.Section == tui.SectionRespBody {
+			p.tab = tabBody
+		}
+	case tui.SectionStepMsg:
+		if !p.Editing() && msg.Delta != 0 {
+			p.tab = tab((int(p.tab) + msg.Delta + int(tabCount)) % int(tabCount))
+		}
 	case tui.SendStartedMsg:
 		p.sendingID = msg.RequestID
 		p.sendStep = "Starting"
@@ -263,10 +284,6 @@ func (p *Pane) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return p.cmdCopyBody()
 	case s == "w":
 		p.wrap = !p.wrap
-	case s == "tab" || s == "right":
-		p.tab = (p.tab + 1) % tabCount
-	case s == "shift+tab" || s == "left":
-		p.tab = (p.tab + tabCount - 1) % tabCount
 	case s >= "1" && s <= "6":
 		p.tab = tab(s[0] - '1')
 	case s == "/":
@@ -277,7 +294,7 @@ func (p *Pane) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		p.searchNext(-1)
 	case s == ".":
 		p.beginPathFilter()
-	case s == " ":
+	case s == "enter":
 		p.toggleFoldCursor()
 	case s == "left", s == "h":
 		p.foldCursor(true)
@@ -287,11 +304,16 @@ func (p *Pane) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		p.scrollUp()
 	case s == "down", s == "j":
 		p.scrollDown()
-	case s == "pgup":
+	case s == "pgup", s == "ctrl+u":
 		p.scroll -= max(1, p.contentHeight()/2)
 		p.clampScroll()
-	case s == "pgdown":
+	case s == "pgdown", s == "ctrl+d":
 		p.scroll += max(1, p.contentHeight()/2)
+		p.clampScroll()
+	case s == "home":
+		p.scroll = 0
+	case s == "end", s == "G":
+		p.scroll = p.scrollTotal()
 		p.clampScroll()
 	case s == "r":
 		p.togglePrettyRaw()
@@ -314,7 +336,7 @@ func (p *Pane) KeyHints() []ui.Hint {
 		return []ui.Hint{{Key: "Ctrl-S", Label: "Retry", Priority: 0}, {Key: "?", Label: "Help", Priority: 5}}
 	}
 	h := []ui.Hint{
-		{Key: "Tab", Label: "Next tab", Priority: 3},
+		{Key: "[ ]", Label: "Tab", Priority: 3},
 		{Key: "/", Label: "Search", Priority: 2},
 		{Key: "y", Label: "Copy body", Priority: 4},
 	}
@@ -439,7 +461,7 @@ func (p *Pane) tabsBar(w int) string {
 	}
 	// Collapsed selector at narrow widths.
 	label := tabs[int(p.tab)].Label
-	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  Tab next", int(p.tab)+1, tabCount, label))
+	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  ] next", int(p.tab)+1, tabCount, label))
 }
 
 func (p *Pane) buildTabs() []ui.Tab {

@@ -64,16 +64,14 @@ func (p *Pane) onKey(m tea.KeyPressMsg) tea.Cmd {
 		return p.undoStep()
 	case "ctrl+y":
 		return p.redoStep()
-	case "ctrl+o":
-		return p.openEditor()
-	case "e":
+	case "u":
 		if !p.Editing() {
-			return p.openEditor()
+			return p.undoStep()
 		}
-	case "ctrl+l":
-		p.stopViews()
-		p.setZone(zBar)
-		return nil
+	case "ctrl+r":
+		if !p.Editing() {
+			return p.redoStep()
+		}
 	case "esc":
 		if p.oauth != nil {
 			return p.cancelOAuth()
@@ -227,10 +225,6 @@ func (p *Pane) tabsKey(m tea.KeyPressMsg) tea.Cmd {
 		p.views[p.tab].enter(p)
 	case "m":
 		p.msel = newMethodSel(p.req.Method)
-	case "y":
-		return p.copyCurl(false)
-	case "Y", "shift+y":
-		return p.copyCurl(true)
 	}
 	return nil
 }
@@ -265,10 +259,6 @@ func (p *Pane) bodyKey(m tea.KeyPressMsg) tea.Cmd {
 		case "right":
 			p.tab = (p.tab + 1) % numTabs
 			p.views[p.tab].enter(p)
-		case "y":
-			cmds = append(cmds, p.copyCurl(false))
-		case "Y", "shift+y":
-			cmds = append(cmds, p.copyCurl(true))
 		}
 	}
 	return tea.Batch(cmds...)
@@ -319,7 +309,7 @@ func (p *Pane) KeyHints() []ui.Hint {
 		send.Key = "Ctrl-Enter"
 	}
 	if p.isSending() {
-		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}, {Key: "Ctrl-Z", Label: "Undo", Priority: 6}}
+		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 1}}
 	}
 	if !p.editable() {
 		return nil
@@ -341,16 +331,20 @@ func (p *Pane) KeyHints() []ui.Hint {
 		hs = append(hs, send)
 	case zTabs:
 		hs = []ui.Hint{
-			{Key: "←→", Label: "Tab", Priority: 2},
+			{Key: "[ ]", Label: "Tab", Priority: 2},
 			{Key: "↓", Label: "Edit", Priority: 2},
 			{Key: "m", Label: "Method", Priority: 4},
-			{Key: "y", Label: "Copy curl", Priority: 4},
+			{Key: "Space y", Label: "Copy curl", Priority: 4},
 			send,
 		}
 	default:
 		hs = append(hs, p.views[p.tab].hints(p)...)
 		hs = append(hs, send)
 	}
-	hs = append(hs, ui.Hint{Key: "Ctrl-Z", Label: "Undo", Priority: 7})
+	if p.Editing() {
+		hs = append(hs, ui.Hint{Key: "Ctrl-Z", Label: "Undo", Priority: 7})
+	} else {
+		hs = append(hs, ui.Hint{Key: "u", Label: "Undo", Priority: 7})
+	}
 	return hs
 }

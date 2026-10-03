@@ -52,10 +52,14 @@ func (a *app) sidebarKey(msg tea.KeyPressMsg) tea.Cmd {
 		tv.move(-1)
 	case key.Matches(msg, k.Down):
 		tv.move(1)
-	case key.Matches(msg, k.PageUp):
+	case msg.String() == "pgup":
 		tv.move(-max(1, tv.viewRows()-1))
-	case key.Matches(msg, k.PageDown):
+	case msg.String() == "pgdown":
 		tv.move(max(1, tv.viewRows()-1))
+	case msg.String() == "ctrl+u":
+		tv.move(-max(1, tv.viewRows()/2))
+	case msg.String() == "ctrl+d":
+		tv.move(max(1, tv.viewRows()/2))
 	case key.Matches(msg, k.Home):
 		tv.home()
 	case key.Matches(msg, k.End):
@@ -64,28 +68,14 @@ func (a *app) sidebarKey(msg tea.KeyPressMsg) tea.Cmd {
 		tv.expand()
 	case key.Matches(msg, k.Fold):
 		tv.collapse()
-	case key.Matches(msg, k.Toggle):
-		tv.toggle()
 	case key.Matches(msg, k.Open):
 		return a.openRow()
 	case key.Matches(msg, k.Back):
 		return a.sidebarBack()
-	case key.Matches(msg, k.New):
-		return a.openNew()
-	case key.Matches(msg, k.Rename):
-		return a.openRename()
-	case key.Matches(msg, k.Duplicate):
-		return a.duplicateSelected()
-	case key.Matches(msg, k.Move):
-		return a.openMove()
-	case key.Matches(msg, k.Delete):
-		return a.openDelete()
-	case key.Matches(msg, k.MoveUp):
+	case key.Matches(msg, k.ReorderUp):
 		return a.reorder(-1)
-	case key.Matches(msg, k.MoveDown):
+	case key.Matches(msg, k.ReorderDown):
 		return a.reorder(1)
-	case key.Matches(msg, k.RunCollection):
-		return a.openRunnerFromTree()
 	default:
 		return nil
 	}
@@ -102,6 +92,10 @@ func (a *app) sidebarBack() tea.Cmd {
 	}
 	if a.layoutKind() == ui.LayoutSingle {
 		return a.toggleSidebar()
+	}
+	// Nothing to close: Esc still stops the selected request's send.
+	if ref := a.currentRef(); ref.Request != nil {
+		a.cancelSend(ref.Request.ID)
 	}
 	return nil
 }

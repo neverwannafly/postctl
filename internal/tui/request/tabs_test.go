@@ -182,7 +182,7 @@ func TestScriptSnippetInsert(t *testing.T) {
 	h := newHarness(t)
 	h.gotoTab(tabTests)
 	h.key("down", "esc") // focus then leave editing
-	h.key("s")
+	h.action("request.snippet")
 	h.mustHave("Insert a snippet")
 	h.mustHave("Status code is 200")
 	h.key("enter")
@@ -263,7 +263,7 @@ func TestEditorRoundTripRawBody(t *testing.T) {
 	h := newHarness(t, editorDeps(`printf '{"edited": true}\n' > "$1"`))
 	h.gotoTab(tabBody)
 	h.key("down", "down")
-	h.key("ctrl+o")
+	h.action("request.editor")
 	if h.req.Body.Raw != `{"edited": true}` {
 		t.Fatalf("raw = %q", h.req.Body.Raw)
 	}
@@ -278,10 +278,10 @@ func TestEditorRoundTripRawBody(t *testing.T) {
 	}
 }
 
-func TestEditorShortcutEOpensCurrentRequestTab(t *testing.T) {
+func TestEditorActionOpensCurrentRequestTab(t *testing.T) {
 	h := newHarness(t, editorDeps(`printf '{"edited with e": true}\n' > "$1"`))
 	h.gotoTab(tabBody)
-	h.key("e")
+	h.action("request.editor")
 	if h.req.Body.Raw != `{"edited with e": true}` {
 		t.Fatalf("e did not open the current tab in $EDITOR: %q", h.req.Body.Raw)
 	}
@@ -305,7 +305,7 @@ func TestEditorSeesCurrentTextAndTempFileIsPrivate(t *testing.T) {
 	h.gotoTab(tabPre)
 	h.req.Scripts.PreRequest = &model.Script{Source: "console.log(1)"}
 	h.p.reloadAll()
-	h.key("ctrl+o")
+	h.action("request.editor")
 	if seen != "console.log(1)" {
 		t.Fatalf("editor saw %q", seen)
 	}
@@ -320,7 +320,7 @@ func TestEditorFailureChangesNothing(t *testing.T) {
 	h.gotoTab(tabBody)
 	h.key("down", "down")
 	before := h.req.Body.Raw
-	h.key("ctrl+o")
+	h.action("request.editor")
 	if h.req.Body.Raw != before {
 		t.Fatal("body changed after a failed editor")
 	}
@@ -330,14 +330,15 @@ func TestEditorFailureChangesNothing(t *testing.T) {
 func TestEditorNothingToOpenOnAuthTab(t *testing.T) {
 	h := newHarness(t, editorDeps("true"))
 	h.gotoTab(tabAuth)
-	h.key("ctrl+o")
+	h.action("request.editor")
 	h.mustHave("Nothing to open")
 }
 
 func TestEditorBulkHeaders(t *testing.T) {
 	h := newHarness(t, editorDeps(`printf 'A: 1\nB: 2\n' > "$1"`))
 	h.gotoTab(tabHeaders)
-	h.key("down", "ctrl+o")
+	h.key("down")
+	h.action("request.editor")
 	if len(h.req.Headers) != 2 || h.req.Headers[1].Key != "B" {
 		t.Fatalf("headers = %v", h.req.Headers)
 	}

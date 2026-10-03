@@ -1,6 +1,6 @@
  postctl  payments-api                                                                                        env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- › Collections  11 requests    │   2 Request    3 Response                                                             
+ › Collections  11 requests    │   [2] Request    [3] Response                                                         
  / charge                      │ GET     {{baseUrl}}/v1/charges?limit=10                                               
  › GET   …arges › List charges │ Payments › Charges › List charges                                                     
    POST  …rges › Create charge │                                                                                       
@@ -37,4 +37,4 @@
                                │                                                                                       
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Enter Keep results   Esc Clear filter   ↑↓ Move   Ctrl-P Palette
+ INSERT   Enter Keep results   Esc Clear filter   ↑↓ Move   Ctrl-P Palette

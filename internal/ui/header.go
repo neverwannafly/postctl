@@ -94,6 +94,10 @@ func (t Theme) KeyHints(width int, hints []Hint) string {
 	render := func(hs []Hint) string {
 		parts := make([]string, 0, len(hs))
 		for _, h := range hs {
+			if h.Label == "" {
+				parts = append(parts, t.Bold().Render(h.Key)) // a status such as the vim mode
+				continue
+			}
 			parts = append(parts, t.Bold().Render(h.Key)+" "+t.Render(TextSecondary, h.Label))
 		}
 		return strings.Join(parts, sep)

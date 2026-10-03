@@ -50,7 +50,7 @@ func screenFixture(t *testing.T) (*harness, *fakeScreen) {
 
 func TestCtrlEOpensTheEnvironmentEditorAsAnOverlay(t *testing.T) {
 	h, s := screenFixture(t)
-	h.keys("ctrl+e")
+	h.keys("space", "E")
 	h.mustHave("FAKE SCREEN")
 	h.mustHave("Leave fake") // its hints are the footer
 	if s.w < 110 || s.w > 120 || s.h < 20 {
@@ -65,7 +65,7 @@ func TestCtrlEOpensTheEnvironmentEditorAsAnOverlay(t *testing.T) {
 
 func TestScreenGetsItsKeys(t *testing.T) {
 	h, s := screenFixture(t)
-	h.keys("ctrl+e")
+	h.keys("space", "E")
 	h.keys("a", "j", "?", "E", "/", "tab")
 	got := " " + strings.Join(s.keys, " ") + " "
 	for _, want := range []string{"a", "j", "?", "E", "/", "tab"} {
@@ -83,11 +83,11 @@ func TestEscClosesTheScreenAndBroadcastsTheEnvironment(t *testing.T) {
 		o.NewEnvEditor = func(ScreenEnv) Screen { return s }
 		o.NewRequestPane = func(PaneEnv) Pane { return pane }
 	})
-	h.keys("E", "down", "enter") // pick an environment
+	h.keys("space", "e", "down", "enter") // pick an environment
 	if h.a.activeEnv == "" {
 		t.Fatal("no environment became active")
 	}
-	h.keys("ctrl+e", "esc")
+	h.keys("space", "E", "esc")
 	h.mustNotHave("FAKE SCREEN")
 	found := false
 	pane.mu.Lock()
@@ -117,11 +117,11 @@ func TestDeletingTheActiveEnvironmentInAScreenClearsIt(t *testing.T) {
 	h := newHarness(t, demo(), 120, 30, func(o *Options) {
 		o.NewEnvEditor = func(env ScreenEnv) Screen { s.env = env; return s }
 	})
-	h.keys("E", "down", "enter")
+	h.keys("space", "e", "down", "enter")
 	if h.a.activeEnv == "" {
 		t.Fatal("no environment became active")
 	}
-	h.keys("ctrl+e", "x", "esc")
+	h.keys("space", "E", "x", "esc")
 	if h.a.activeEnv != "" {
 		t.Fatalf("active environment %q survived its deletion", h.a.activeEnv)
 	}
@@ -133,7 +133,7 @@ func TestDeletingTheActiveEnvironmentInAScreenClearsIt(t *testing.T) {
 
 func TestScreenReceivesSaveDoneMessages(t *testing.T) {
 	h, s := screenFixture(t)
-	h.keys("ctrl+e")
+	h.keys("space", "E")
 	env := h.a.ws.Environments[0]
 	settle(t, h, func() tea.Msg { return SaveMsg{Kind: SaveEnvironment, ID: env.ID} })
 	got := false
@@ -149,7 +149,7 @@ func TestScreenReceivesSaveDoneMessages(t *testing.T) {
 
 func TestEnvSwitcherEditKeyFocusesTheEnvironment(t *testing.T) {
 	h, s := screenFixture(t)
-	h.keys("E", "down", "down", "e")
+	h.keys("space", "e", "down", "down", "e")
 	h.mustHave("FAKE SCREEN")
 	if s.env.Focus == "" {
 		t.Fatal("the highlighted environment was not passed as Focus")
@@ -182,7 +182,7 @@ func TestNilScreenFromFactoryDoesNothing(t *testing.T) {
 	h := newHarness(t, demo(), 120, 30, func(o *Options) {
 		o.NewEnvEditor = func(ScreenEnv) Screen { return nil }
 	})
-	h.keys("ctrl+e")
+	h.keys("space", "E")
 	h.mustNotHave("FAKE SCREEN")
 	h.keys("down") // the tree still works
 }
@@ -191,6 +191,6 @@ func TestEnvEditorNeedsAWorkspace(t *testing.T) {
 	h := newHarness(t, nil, 120, 30, func(o *Options) {
 		o.NewEnvEditor = func(ScreenEnv) Screen { return &fakeScreen{} }
 	})
-	h.keys("ctrl+e")
+	h.keys("space", "E")
 	h.mustNotHave("FAKE SCREEN")
 }
