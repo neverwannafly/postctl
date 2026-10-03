@@ -1132,3 +1132,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green (`go build ./...`, `go test -race ./...`, `golangci-lint run --allow-parallel-runners` 0 issues); `task tui:smoke` PASS.
 - Blockers / questions: none.
 - Next: Ready for re-review and merge.
+
+### 2026-10-03 21:10 IST · UX-M1 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-m1-mouse` (1f015ac) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged mouse support (plan U3): click focus, tree select/open/fold, tab clicks, wheel to the hovered pane, overlay click rules, `--no-mouse` / `POSTCTL_NO_MOUSE=1`.
+- Reviews: two rounds. Fixed: release and drag events acting as clicks (a single click opened a request), an outside click closing full-screen screens without their Esc path, the collapsed response tab bar hit-testing invisible tabs, hard-coded switcher widths, the tree wheel losing the selection, the request wheel committing a field mid-edit, an overlay render per motion event.
+- Follow-ups for M2: no wheel guard in the WebSocket pane while a field is editing; the tab rows' Y offsets are still constants; breakpoint and ASCII mouse tests are mostly geometric.
+- Process note: a reviewer ran its trial merge inside the M1 worktree (on a `trial` branch); the orchestrator discarded it before merging. Reviewer prompts must keep experiments in `/tmp` copies.
+- Tests: `task agents:check` green on main; `postctl --help` lists `--no-mouse`; `task tui:smoke` PASS.
