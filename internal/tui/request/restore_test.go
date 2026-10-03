@@ -182,29 +182,28 @@ func TestRestoreAutosavePersistence(t *testing.T) {
 	if cmd == nil {
 		t.Fatal("expected cmd")
 	}
-	for cmd != nil {
-		var msg tea.Msg
-		if c := cmd(); c != nil {
-			if batch, ok := c.(tea.BatchMsg); ok {
-				for _, sub := range batch {
-					if sub != nil {
-						msg = sub()
-					}
-				}
-			} else {
-				msg = c
-			}
+	// Run every command, and every message it produces, in order.
+	queue := []tea.Cmd{cmd}
+	for len(queue) > 0 {
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		msg := c()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			queue = append(queue, batch...)
+			continue
 		}
 		if sm, ok := msg.(tui.SaveMsg); ok {
-			c := ws.Collection(sm.Collection)
-			if err := st.SaveRequest(context.Background(), c, sm.ID); err != nil {
+			coll := ws.Collection(sm.Collection)
+			if err := st.SaveRequest(context.Background(), coll, sm.ID); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if msg != nil {
-			_, cmd = p.Update(msg)
-		} else {
-			cmd = nil
+			_, next := p.Update(msg)
+			queue = append(queue, next)
 		}
 	}
 	reloaded, err := st.Load()

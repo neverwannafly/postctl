@@ -319,12 +319,21 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 // noticeExpireMsg clears a status-row notice.
 type noticeExpireMsg time.Time
 
-// setNotice shows a short message on the status row for a few seconds. warn
-// styles it as a warning.
+// setNotice reports an action's result. The message goes to the shell toast,
+// which is drawn whichever pane has focus (a narrow layout shows only one
+// pane), and stays on the status row for a few seconds. warn styles it as a
+// warning. The text carries no values.
 func (p *Pane) setNotice(text string, warn bool) tea.Cmd {
 	p.notice, p.noticeWarn = text, warn
 	p.noticeAt = p.deps.now()
-	return p.deps.after(4*time.Second, noticeExpireMsg(p.noticeAt))
+	kind := ui.ToastInfo
+	if warn {
+		kind = ui.ToastWarning
+	}
+	return tea.Batch(
+		p.deps.after(4*time.Second, noticeExpireMsg(p.noticeAt)),
+		msgCmd(tui.ToastMsg{Kind: kind, Text: text}),
+	)
 }
 
 // ---- binding to the selected request -------------------------------------------

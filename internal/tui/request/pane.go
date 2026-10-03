@@ -369,12 +369,18 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	return p, nil
 }
 
-// setNotice shows a short message on the status row for a few seconds.
+// setNotice reports an action's result. The message goes to the shell toast,
+// which is drawn whichever pane has focus (a narrow layout shows only one pane,
+// so this pane's own status row may be off screen). It is also kept as the
+// status-row notice for a few seconds. The text carries no values.
 func (p *Pane) setNotice(text string) tea.Cmd {
 	p.notice = text
 	p.noticeAt = p.deps.now()
 	at := p.noticeAt
-	return p.deps.after(4*time.Second, noticeExpireMsg(at))
+	return tea.Batch(
+		p.deps.after(4*time.Second, noticeExpireMsg(at)),
+		msgCmd(tui.ToastMsg{Kind: ui.ToastInfo, Text: text}),
+	)
 }
 
 type noticeExpireMsg time.Time

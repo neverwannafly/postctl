@@ -132,11 +132,7 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	if len(r.clips) == clips {
 		t.Fatal("Space y wrote nothing to the clipboard")
 	}
-	if r.w >= 100 {
-		// The note belongs to the request pane, which a narrow layout hides
-		// while the response is focused (deferred finding, see the ledger).
-		r.must("Copied as curl", "copy curl")
-	}
+	r.must("Copied as curl", "copy curl") // the toast shows at any size and focus
 	r.snap("copy curl toast")
 
 	r.begin("response tabs")
