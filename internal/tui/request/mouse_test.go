@@ -431,6 +431,48 @@ func TestMouseOpensKVCellAtPointer(t *testing.T) {
 	if row, col := kv.in.Cursor(); row != 0 || col != 0 || kv.in.ModeName() != "NORMAL" {
 		t.Fatalf("KV click = cursor %d,%d mode %q", row, col, kv.in.ModeName())
 	}
+	kv.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 7, Y: chrome + 1, Button: tea.MouseLeft}, 7, chrome+1)
+	if kv.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the open key cell left insert mode")
+	}
+}
+
+func TestScriptEdgeDragScrollsOneLineAndViewStaysPure(t *testing.T) {
+	h := newHarness(t)
+	h.req.Scripts.PreRequest = &model.Script{Source: longText(40)}
+	h.p.reloadAll()
+	h.gotoTab(tabPre)
+	script := h.p.views[tabPre].(*scriptView)
+	script.enter(h.p)
+	script.size(h.p)
+	script.ed.SetCursor(12, 0)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 6, Y: chrome + 1, Button: tea.MouseLeft}, 6, chrome+1)
+	start := script.ed.Top()
+	for i := 1; i <= 3; i++ {
+		h.p.HandleMouse(tea.MouseMotionMsg{X: 6, Y: h.p.h + 2, Button: tea.MouseLeft}, 6, h.p.h+2)
+		if got := script.ed.Top(); got != start+i {
+			t.Fatalf("down motion %d moved top from %d to %d", i, start, got)
+		}
+		if i == 1 {
+			row, col := script.ed.Cursor()
+			mode, active := script.ed.Mode(), h.p.mouse.Active()
+			first, second := h.p.View(), h.p.View()
+			if first != second || !active || !h.p.mouse.Active() {
+				t.Fatal("View mutated pane drag state")
+			}
+			if r, c := script.ed.Cursor(); r != row || c != col || script.ed.Mode() != mode {
+				t.Fatal("View mutated the script selection")
+			}
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		h.p.HandleMouse(tea.MouseMotionMsg{X: 6, Y: chrome - 1, Button: tea.MouseLeft}, 6, chrome-1)
+		if got := script.ed.Top(); got != start+3-i {
+			t.Fatalf("up motion %d moved top from %d to %d", i, start+3, got)
+		}
+	}
 }
 
 func TestMouseClickKeepsFocusedURLInInsertMode(t *testing.T) {

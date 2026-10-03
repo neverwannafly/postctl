@@ -1261,3 +1261,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: regression tests failed before their fixes; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; module files unchanged; 0 goldens changed.
 - Blockers / questions: none.
 - Next: commit for correctness re-review; do not push.
+
+### 2026-10-03 22:51 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: re-review found duplicate drag logic in `vimfield.Mouse` and insert-mode loss when clicking an already-open table cell.
+- Files: `docs/ledger.md`.
+- Decisions: pane fields will delegate gestures to the tested `vimtext.Mouse` implementation; regressions will be tested through wrappers and panes before fixes.
+- Tests: pending.
+- Blockers / questions: none.
+- Next: add failing wrapper/pane tests, fix both paths, run gates and commit.
+
+### 2026-10-03 22:55 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: removed the duplicate `vimfield` gesture implementation by delegating to `vimtext.Mouse`; preserved insert mode when an already-open request or WebSocket table cell is clicked.
+- Files: `internal/tui/{vimfield,request,response,wspane}` and `docs/ledger.md`.
+- Decisions: one shared gesture implementation owns edge scrolling, selection and click counting for pane fields.
+- Tests: regressions failed before fixes; wrapper, request script, response body and request/WebSocket table tests pass; request View remains pure mid-drag; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; 0 goldens changed.
+- Blockers / questions: none.
+- Next: commit for correctness re-review; do not push.

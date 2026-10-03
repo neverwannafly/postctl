@@ -60,6 +60,30 @@ func TestMouseKeepsInsertModeAndScrollsPastEdge(t *testing.T) {
 	}
 }
 
+func TestMouseEdgeDragScrollsExactlyOneLinePerMotion(t *testing.T) {
+	f := New(theme(), vimtext.Options{})
+	f.Set(strings.Repeat("x\n", 30) + "x")
+	f.Fit(8, 4)
+	f.SetCursor(12, 0)
+	var mouse Mouse
+	if !mouse.Press(f, 0, 1, time.Unix(1, 0)) {
+		t.Fatal("press was not handled")
+	}
+	start := f.Top()
+	for i := 1; i <= 3; i++ {
+		mouse.Motion(0, 4)
+		if got := f.Top(); got != start+i {
+			t.Fatalf("down motion %d moved top from %d to %d", i, start, got)
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		mouse.Motion(0, -1)
+		if got := f.Top(); got != start+3-i {
+			t.Fatalf("up motion %d moved top from %d to %d", i, start+3, got)
+		}
+	}
+}
+
 func theme() ui.Theme { return ui.NewTheme(true, true, false) }
 
 func text(s string) tea.KeyPressMsg {

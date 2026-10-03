@@ -122,3 +122,30 @@ func TestResponseBodyMousePlacesReadOnlyCursor(t *testing.T) {
 		t.Fatalf("response click = cursor %d,%d mode %v, want %d,%d normal", row, col, v.f.Mode(), wantRow, wantCol)
 	}
 }
+
+func TestResponseBodyEdgeDragScrollsExactlyOneLine(t *testing.T) {
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	v3Pump(t, p, tui.SendResultMsg{Result: v3Result(id, vimDoc, "", nil)})
+	v := p.readyVim()
+	if v == nil {
+		t.Fatal("response body vim field was not ready")
+	}
+	v.f.Replace(strings.Repeat("x\n", 80) + "x")
+	v.f.Fit(v.w, v.h)
+	v.f.SetCursor(30, 0)
+	x, y := 4, responseChromeRows+1
+	p.HandleMouse(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}, x, y)
+	start := v.f.Top()
+	for i := 1; i <= 3; i++ {
+		p.HandleMouse(tea.MouseMotionMsg{X: x, Y: p.h + 2, Button: tea.MouseLeft}, x, p.h+2)
+		if got := v.f.Top(); got != start+i {
+			t.Fatalf("down motion %d moved top from %d to %d", i, start, got)
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		p.HandleMouse(tea.MouseMotionMsg{X: x, Y: responseChromeRows - 1, Button: tea.MouseLeft}, x, responseChromeRows-1)
+		if got := v.f.Top(); got != start+3-i {
+			t.Fatalf("up motion %d moved top from %d to %d", i, start+3, got)
+		}
+	}
+}

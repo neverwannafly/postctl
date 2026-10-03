@@ -255,6 +255,22 @@ func TestMousePlacesCursorInURLAndComposer(t *testing.T) {
 	}
 }
 
+func TestMouseKeepsWebSocketKVCellInsertMode(t *testing.T) {
+	h := newHarness(t)
+	h.gotoTab(tabParams)
+	x, y := 7, chrome+1
+	h.p.HandleMouse(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}, x, y)
+	if h.p.params.in == nil {
+		t.Fatal("click did not open the parameter key cell")
+	}
+	h.p.params.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: x + 1, Y: y, Button: tea.MouseLeft}, x+1, y)
+	if h.p.params.in.Mode() != vimtext.Insert {
+		t.Fatalf("clicking the focused parameter cell changed mode to %v", h.p.params.in.Mode())
+	}
+}
+
 func TestMouseKeepsURLInsertAndMasksWebSocketSecretFormYank(t *testing.T) {
 	const sentinel = "mouse-hidden-websocket-sentinel"
 	h := newHarness(t)

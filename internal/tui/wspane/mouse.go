@@ -232,7 +232,7 @@ func (p *Pane) kvMouseField(k *kvView, x, y int) (*vimfield.Field, int, int) {
 	if row < 0 || top+row >= len(items) || x < 6 {
 		return nil, 0, 0
 	}
-	k.cur = top + row
+	target := top + row
 	keyW := 0
 	for _, it := range items {
 		keyW = max(keyW, ui.Width(it.Key))
@@ -249,12 +249,24 @@ func (p *Pane) kvMouseField(k *kvView, x, y int) (*vimfield.Field, int, int) {
 	}
 	valueX := 6 + keyW + ui.SpaceSM
 	if x < valueX {
+		col := 0
+		if items[target].path {
+			col = 1
+		}
+		if k.edit && k.in != nil && k.cur == target && k.col == col {
+			return k.in, x - 6, 0
+		}
+		k.cur = target
 		k.beginEdit(p, items, 0, "")
 		return k.in, x - 6, 0
 	}
 	if x >= valueX+valueW {
 		return nil, 0, 0
 	}
+	if k.edit && k.in != nil && k.cur == target && k.col == 1 {
+		return k.in, x - valueX, 0
+	}
+	k.cur = target
 	k.beginEdit(p, items, 1, "")
 	return k.in, x - valueX, 0
 }
