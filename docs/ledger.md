@@ -51,6 +51,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done, merged to main | ws/ux-v1-vimtext | 2026-10-03 20:08 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
+| UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
+| UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
+| UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
 
 ## Entries
 
@@ -924,3 +928,9 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: nvim `--clean` defaults are the reference (nostartofline, autoindent); literal search is the only allowlisted deviation.
 - Tests: orchestrator reran the differential: corpus 476, random 500, mismatches 0, allowed 1; `task agents:check` green on main after merge.
 - Next: phase 2 adoption (V2a request + WebSocket panes, V2b screens and overlays, V3 response pane).
+
+### 2026-10-03 20:15 IST · UX0 · Orchestrator (Opus) · PROGRESS
+- Branch/worktree: main.
+- Did: phase 1 merged except H1 (Q, V0, V1 on main). Wrote phase 2 briefs `UX-V2a-request-vim`, `UX-V2b-screens-vim`, `UX-M1-mouse`, `UX-T-terminal`; created their worktrees.
+- Decisions: key forwarding from text fields in normal mode uses new `ForwardKeyMsg`/`ForwardSeqMsg` (owned by V2a); "always" keys work in panes and non-modal overlays only; H1 final fix round reassigned to GPT-5.6 Sol.
+- Next: V3 brief once H1 merges; M2 and QA after phase 2.

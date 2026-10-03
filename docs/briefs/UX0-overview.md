@@ -14,15 +14,15 @@ The user found the TUI slow to drive: pane keys were invisible, switching reques
 | 1 | V1 | `UX-V1-vimtext.md` | `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext` | GPT-5.6 Sol (medium) | — |
 | 1 | Q | `UX-Q-switcher.md` | `ws/ux-q-switcher` · `~/work/postctl-wt/ux-q-switcher` | Gemini 3.8 Flash (high) | — |
 | 1 | H1 | `UX-H1-history.md` | `ws/ux-h1-history` · `~/work/postctl-wt/ux-h1-history` | Composer 2.5 (fast) | — |
-| 2 | V2a | request pane + WebSocket pane adopt `vimtext`, highlighting, `{{var}}` and `pm.*` completion | `ws/ux-v2a-request` | Composer 2.5 | V0, V1 |
-| 2 | V2b | env editor, overlays, palette, filters, switcher input, list screens (history, runner, cookies) | `ws/ux-v2b-screens` | Composer 2.5 | V0, V1, Q |
+| 2 | V2a | `UX-V2a-request-vim.md` | `ws/ux-v2a-request` | Sonnet 5.5 (high) | V0, V1 |
+| 2 | V2b | `UX-V2b-screens-vim.md` | `ws/ux-v2b-screens` | Composer 2.5 | V0, V1, Q |
 | 2 | V3 | response pane: read-only `vimtext`, masked yank, History tab, diff vs previous, jq (`gojq`) | `ws/ux-v3-response` | Composer 2.5 | V0, V1, H1 |
-| 2 | M1 | mouse: hit regions, click focus, tree, tabs, wheel, `--no-mouse` | `ws/ux-m1-mouse` | Gemini 3.8 Flash | V0 |
-| 2 | T | tmux edge handoff, terminal detection, `docs/terminal.md` | `ws/ux-t-terminal` | Composer 2.5 | V0 |
+| 2 | M1 | `UX-M1-mouse.md` | `ws/ux-m1-mouse` | Gemini 3.8 Flash (high) | V0 |
+| 2 | T | `UX-T-terminal.md` | `ws/ux-t-terminal` | Composer 2.5 | V0 |
 | 3 | M2 | mouse inside editors (click cursor, drag → visual) | `ws/ux-m2-editor-mouse` | Composer 2.5 | V2a, V2b, M1 |
 | 3 | QA | leak sweep (yank, clipboard, diff, completion, restore), smoke script, golden review, docs | `qa/ux` | Sonnet 5.5 | all |
 
-Phase 2 and 3 briefs are written after phase 1 merges, against the real APIs.
+Phase 2 briefs V2a, V2b, M1, T written 2026-10-03 after V0, V1, Q merged; V3 waits for H1 (it reuses `internal/tui/diffview`). Reviews: two reviewer subagents per workstream; the H1 final round moved from Composer to GPT-5.6 Sol after two failed algorithm rounds.
 
 ## File ownership (phase 1)
 
