@@ -57,7 +57,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 | UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Started | ws/ux-m2-editor-mouse | 2026-10-03 22:10 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Started | qa/ux | 2026-10-03 22:10 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Done, not merged | qa/ux | 2026-10-03 22:50 IST |
 
 ## Entries
 
@@ -1225,3 +1225,47 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Behaviour changes (documented in docs/keys.md): on the Body tab, `/` is vim search, `?` is backward search (`Space ?` still opens help), `w` is a word motion; search matches visible text only and does not open folds.
 - Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS; `go mod tidy` no diff.
 - Next: phase 3 (UX-M2 mouse in editors, UX-QA).
+
+### 2026-10-03 22:06 IST · UX-QA · Sonnet 5.5 (high) · STARTED
+- Branch/worktree: `qa/ux` · `/Users/shubham/work/postctl-wt/qa-ux`
+- Did: read the brief, AGENTS files, UX ledger entries and the leak sweep. Plan: audit every UX output path against `internal/qa`, add missing cases and prove each by stubbing the masking in a `git clone` scratch copy; make the request pane drop the completer on secret fields; extend `scripts/tui_smoke.py`; review goldens at 80x24; fix docs.
+- Files: none yet.
+- Decisions: stay out of `vimtext`, `vimfield`, `screenfield` and `mouse.go` (UX-M2); findings there go to this ledger.
+- Tests: baseline run pending.
+- Blockers / questions: none.
+- Next: leak audit.
+
+### 2026-10-03 22:50 IST · UX-QA · Sonnet 5.5 (high) · DONE
+- Branch/worktree: `qa/ux` · `/Users/shubham/work/postctl-wt/qa-ux` (10 commits, one fix per commit, not pushed).
+- Did: audited every UX output path; added a shell-level sweep (`internal/qa/ux_rig_test.go`, `ux_shell_flow_test.go`: `TestSecretDoesNotLeakThroughUXFlows`, 140x40 and 80x24) that presses real keys over a workspace with a unique-first secret in every scope, literal credentials in auth rows, and a server that echoes known secrets into a header and a cookie. Frames (raw and ANSI-stripped), clipboard writes and `$EDITOR` files are searched for each secret and its first 12 characters. Stubs ran in a `git clone` scratch copy (deleted).
+- Leak paths (path -> test -> stub proven by `go test ./internal/qa` failing, passing on real code):
+  - request field yank (secret rows) -> `TestSecretDoesNotLeakThroughUXFlows` -> proven
+  - WebSocket field yank -> same -> proven
+  - env editor secret cell yank -> same -> proven
+  - closed secret row display (literal with braces) -> same plus `TestClosedSecretRowMasksLiteralsThatContainBraces` (request, wspane) -> proven
+  - `$EDITOR` on a hidden secret (refusal, temp file) -> same -> proven
+  - History screen list, detail and filter (URL query) -> same plus the existing sweep -> proven
+  - response diff headers -> same plus the existing sweep -> proven
+  - response History tab, jq output and errors, response body yank -> existing `TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI` -> proven (jq source and body yank stubs)
+  - switcher path (query and host stripped) -> existing sweep -> proven; my flow does not fail on it
+  - completion menus -> existing `TestSecretDoesNotLeakThroughCompletionMenus` -> proven
+  - which-key, toasts, footer notes, runner summary and failure text, help -> frames of the new sweep (no masking of their own; they carry key names and counts)
+  - NOT proven: masked curl (`maskVars`). A masked copy never hydrates secret values, so the stub changed nothing; the mask is defence in depth. Not claimed.
+- Fixes (each started with a failing test):
+  1. `request`: a secret field offered `{{variable}}` completion; it now offers none, like the WebSocket pane (`TestSecretFieldsOfferNoVariableCompletion`).
+  2. `request`, `wspane`: a closed secret row showed any literal containing `{{`; only a pure `{{reference}}` is shown (`vimfield.PureRef`).
+  3. `response`: Ctrl-S and Ctrl-Enter in the body buffer were forwarded and dropped, so no send (`TestShellCtrlSSendsFromTheResponseBody`).
+  4. `request`, `wspane`: after `$EDITOR` changed nothing (or failed) the URL bar was dead (`TestEditorThatChangesNothingReturnsToTheURLField`).
+  5. `tui`: `Space h` never told the history screen it opened, so it listed nothing until an unrelated message arrived (`TestOpeningHistoryTellsTheScreenItOpened`).
+  6. `tui`: a hosted screen's vim mode showed twice in the footer (`TestScreenModeAppearsOnceInTheFooter`).
+- Smoke: `scripts/tui_smoke.py` now walks start, Ctrl-S, which-key, `Space Space` switcher and filter, open, `g u` + `i` (INSERT), Esc (NORMAL), Ctrl-S, `g r`, `Space H`, `Space x`, `Space j` and a filter, Ctrl-h, Ctrl-l, `q` exits; 17 PASS/FAIL lines, about 20 s.
+- Goldens: reviewed 80x24 dark, `NO_COLOR` and ASCII for the request pane states; no change needed. The doubled mode badge was only in the shell footer over hosted screens (fix 6).
+- Docs: `README.md` leader row (`Space H`, `Space x`, `Space j`), `docs/onboarding.md` vim keys paragraph, `docs/keys.md` (`[`/`]` now says "press again to keep stepping"), comments in `leader.go` and `vimkeys_test.go`. No stale "no vim bindings" or `textin`/`textarea` text remains outside history and briefs.
+- Layering: `engine` has no TUI or Charm dependency; `model` and `ui` import nothing internal; `store`, `vars`, `httpx`, `history` import only `model`; `go mod tidy` no diff.
+- Deferred (for the orchestrator):
+  - Mouse-selected text leak coverage: needs `mouse.go` and `vimtext` (UX-M2 owns them). Add a case once M2 merges.
+  - Request-pane notices ("Copied as curl, secrets masked", yank notes) are invisible at 80x24 while the response pane is focused, because only the focused pane draws. Needs a design call (route to a shell toast); the clipboard write is proven instead.
+  - After `[` or `]`, any other key is swallowed with "No binding for ]x" (per the V0 brief and `TestUnknownKeyAfterAPrefixSaysSo`), so `] j` loses the `j`. Probably unfriendly; changing it needs the brief owner.
+- Tests: `task agents:check` green (build, `go test -race ./...`, golangci-lint 0 issues); `task tui:smoke` 17 PASS, 0 FAIL; `go run ./cmd/postctl --help` ok; `go mod tidy` no diff.
+- Blockers / questions: none.
+- Next: orchestrator merges `qa/ux`.
