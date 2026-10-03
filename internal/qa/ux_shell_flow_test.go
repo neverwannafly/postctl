@@ -249,6 +249,21 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.snap("editor refused")
 	r.keys("esc", "esc")
 
+	r.begin("curl on literal auth")
+	r.open("literal")
+	clips = len(r.clips)
+	r.keys("space", "y")
+	r.wait(200 * time.Millisecond)
+	r.mustClip(clips, "masked curl of the literal-auth request")
+	r.begin("curl revealed")
+	clips = len(r.clips)
+	r.keys("space", "Y")
+	r.wait(200 * time.Millisecond)
+	r.mustClip(clips, "revealed curl of the literal-auth request")
+	if !strings.Contains(r.clips[len(r.clips)-1].text, r.fx.sec.password) {
+		t.Fatal("the revealed curl lacks the credential, so the masked one proves nothing")
+	}
+
 	r.begin("websocket auth rows")
 	r.open("socket")
 	r.keys("g", "a")
@@ -300,6 +315,9 @@ func checkUXRig(t *testing.T, r *uxRig, sec uxSecrets) {
 		search("frame", f.name, f.text)
 	}
 	for _, c := range r.clips {
+		if c.name == "curl revealed" {
+			continue // Space Y copies the credential on purpose
+		}
 		search("clipboard", c.name, c.text)
 	}
 	for _, e := range r.editors {
