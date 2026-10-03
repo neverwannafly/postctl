@@ -51,7 +51,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done, merged to main | ws/ux-v1-vimtext | 2026-10-03 20:08 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
-| UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | M1 merged in, wheel fixed for vim fields; ready to merge (gate green, not pushed) | ws/ux-v2a-request | 2026-10-03 21:26 IST |
+| UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Done, merged | ws/ux-v2a-request | 2026-10-03 21:29 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
@@ -1177,3 +1177,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Process note: while I worked, another session committed a trial merge on this branch and then reset it (`restore after accidental review-copy merge`); I redid the merge from a3ba9ae.
 - Blockers / questions: none.
 - Next: orchestrator review and merge.
+
+### 2026-10-03 21:29 IST · UX-V2a · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-v2a-request` (c234998) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged vim editing for every request and WebSocket pane field, `ForwardKeyMsg`/`ForwardSeqMsg`, the mode-aware typing gate, `{{var}}` and `pm.*` completion (`internal/tui/complete`), JSON/JS highlighting, `vimtext.SetMask`/`ScrollLines`/`Top`, the wheel over vim fields; `textin` deleted.
+- Reviews: two rounds plus an M1 integration round. Fixed: WebSocket prompts and `$EDITOR`, undo steps across blur, autosave flush on send/connect, completion leak frames that could not fail (sentinel cut by `shorten`), mask unless a pure `{{ref}}`, the M1 wheel calling removed editor methods (did not compile against main), no WebSocket wheel guard. Declined: hiding non-secret values in completion (plan U6 masks secrets only); a local completion layer (the TUI has none).
+- Incident: a reviewer's `cp -R` copy kept the worktree's `.git` file, so its trial merge committed to `ws/ux-v2a-request` and its "repair" reset the branch while the implementer was merging. The implementer redid the merge; the orchestrator verified the branch contains main and has no markers. Rule from now on: review experiments use `git clone`, never `cp -R` of a worktree.
+- Follow-up (QA): the request pane leaves the completer on secret fields (the WebSocket pane disables it).
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS; `go mod tidy` no diff.
+- Next: UX-V3 item 4 (read-only vimtext response body) can start.
