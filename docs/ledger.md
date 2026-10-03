@@ -55,7 +55,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
-| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done (item 4 + review fixes on branch, ready to merge) | ws/ux-v3-response | 2026-10-03 21:59 IST |
+| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 
 ## Entries
 
@@ -1215,3 +1215,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `jsonFormats` counter (test hook, atomic): superseded build formats 0 times and the current one once; Update for a 4 MiB JSON body formats and indexes nothing; fold search (open, closed, after `zo`); folds survive `u` and reset on a new response. `task agents:check` and `task tui:smoke` green.
 - Blockers / questions: none.
 - Next: merge `ws/ux-v3-response` into main.
+
+### 2026-10-03 22:05 IST · UX-V3 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-v3-response` (fbec4c6) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged item 4: the response Body tab is a read-only vimtext buffer (motions, search, visual, yank masked unless revealed with `u`), JSON folds on `za`/`zo`/`zc`/`zR`/`zM`, forwarded shell keys, wheel via `ScrollLines`, fallback viewer for bodies of 5 MiB or more, binary and jq with a "vim keys limited" note, async formatting for bodies over 64 KiB with stale-build checks.
+- Reviews: security approved first time (yank and reveal stubs both fail the sweep). Correctness: two rounds. Restored JSON folding (it had been dropped), moved medium-body formatting and indexing out of `Update`, fixed fallback footers, added shell routing tests for `gH` and Ctrl-h/j/k/l.
+- Behaviour changes (documented in docs/keys.md): on the Body tab, `/` is vim search, `?` is backward search (`Space ?` still opens help), `w` is a word motion; search matches visible text only and does not open folds.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS; `go mod tidy` no diff.
+- Next: phase 3 (UX-M2 mouse in editors, UX-QA).
