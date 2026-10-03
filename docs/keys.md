@@ -263,24 +263,20 @@ Inspecting response payload, headers, timings, test results, and searching.
 | `]` | Next tab | Cycle forward: Body → Headers → Cookies → Tests → Console → Timeline → History |
 | `[` | Previous tab | Cycle backward through response tabs |
 | `gr` | Body tab | Focus the response pane on its Body tab |
-| `↑, k` | Scroll up | Scroll response viewer up one line |
-| `↓, j` | Scroll down | Scroll response viewer down one line |
-| `PgUp, Ctrl-u` | Page up | Scroll response up by half screen |
-| `PgDn, Ctrl-d` | Page down | Scroll response down by half screen |
-| `Home, gg` | Top | Scroll to the top of the response |
-| `End, G` | Bottom | Scroll to the end of the response |
-| `w` | Toggle wrap | Toggle soft line wrapping on long response lines |
-| `r` | Pretty / raw | Toggle formatted JSON with syntax colors vs raw response text |
-| `y` | Copy body | Copy entire response body to system clipboard |
-| `/` | Search response | Open search bar to find text across response |
-| `n` | Next match | Jump to next occurrence of search term |
-| `N` | Previous match | Jump to previous occurrence of search term |
-| `.` | Path filter | Filter JSON response using gjson path syntax (e.g. users.#.id) |
-| `Enter` | Toggle folding | Expand or collapse JSON object or array at cursor |
-| `h, ←` | Fold JSON node | Collapse JSON block at cursor |
-| `l, →` | Unfold JSON node | Expand JSON block at cursor |
+| `h j k l, w b e, 0 $, gg G, Ctrl-d/u/f/b` | Move (Body tab) | The Body tab is a read-only vim buffer with line numbers and syntax colors: motions work as in any vim field. Editing keys (i a o x d c p and the like) do nothing |
+| `/, ?, n, N` | Search (Body tab) | Search the body forward or backward; n and N jump between matches |
+| `v, V` | Select (Body tab) | Select by character or by line; y copies the selection, Esc cancels |
+| `y, yy` | Copy (Body tab) | Copy the selection, the line or a motion. Credential values and known secrets are masked unless revealed with u. The screen shows the body as the server sent it |
+| `za, zo, zc, zR, zM` | Fold JSON (Body tab) | On a pretty-printed JSON body: toggle, open or close the object or array under the cursor, or open or close all. A closed node is one line such as {…} 12 keys or […] 3 items. Copies take the text on screen, so a closed node yields its summary. Folds reset with a new response, path filter or r |
+| `r` | Pretty / raw | Toggle formatted JSON vs the raw response text |
+| `.` | Path filter | On a JSON body: filter by a gjson path (e.g. users.#.id); Enter applies, Esc closes |
+| `Esc (Body tab)` | Leave the body | In normal mode, return to the Request pane; in visual mode, cancel the selection |
+| `Space, g…, Tab, Ctrl-h/j/k/l, :, q` | Shell keys (Body tab) | Keys the buffer does not own work as everywhere: the leader, section jumps, pane movement, the command line |
+| `j, k, ↑, ↓, PgUp, PgDn, Ctrl-u, Ctrl-d, Home, End, G` | Scroll (large body, jq output, other tabs) | Bodies of 5 MiB or more, binary bodies, the jq view and the other tabs use the plain viewer; the footer says why (Large body, Binary body or jq output: vim keys limited) |
+| `w` | Toggle wrap (plain viewer) | Toggle soft line wrapping in a large body (not offered for the hex dump or jq output) |
+| `y (plain viewer)` | Copy body | Copy the whole body, or the jq output while a filter is applied, masked unless revealed |
 | `f` | Filter tests | On Tests tab: toggle showing failed assertions only |
-| `u` | Reveal secrets | Reveal redacted secrets in timeline and header traces |
+| `u` | Reveal secrets | Reveal redacted secrets in timeline and header traces, and in copies from the Body tab, until you leave the tab |
 | `j, k (History tab)` | Move | Move through the past sends of this request |
 | `Enter (History tab)` | Open entry | Open the entry in the history screen detail |
 | `d (History tab)` | Diff with current | Diff the entry with the response on screen |

@@ -1,18 +1,18 @@
 200 OK  67 ms  188 B  Tests 2/3                                                 
 Body  Headers(1)  Cookies  Tests(3)  Console(2)  Timeline                       
 ━━━━────────────────────────────────────────────────────────────────────────────
-   1 {                                                                          
-   2   "data": {                                                                
-   3     "items": [                                                             
-   4       {                                                                    
-   5         "id": "ch_1",                                                      
-   6         "amount": 1200                                                     
-   7       }                                                                    
-   8     ],                                                                     
-   9     "total": 1                                                             
-  10   },                                                                       
-  11   "ok": true                                                               
-  12 }                                                                          
+ 1 {                                                                            
+ 2   "data": {                                                                  
+ 3     "items": [                                                               
+ 4       {                                                                      
+ 5         "id": "ch_1",                                                        
+ 6         "amount": 1200                                                       
+ 7       }                                                                      
+ 8     ],                                                                       
+ 9     "total": 1                                                               
+10   },                                                                         
+11   "ok": true                                                                 
+12 }                                                                            
                                                                                 
                                                                                 
                                                                                 

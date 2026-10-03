@@ -23,6 +23,9 @@ type histState struct {
 	items   []history.Entry
 	cur     int
 	top     int
+	// now is the clock the relative times are drawn against. Update stamps it
+	// (View never reads the clock).
+	now time.Time
 }
 
 // histLoadedMsg carries one History tab load. Loads are numbered and tied to a
@@ -185,7 +188,7 @@ func (p *Pane) viewHistory(w, h int) string {
 	case len(p.hist.items) == 0:
 		return t.EmptyState("No sends of this request yet.", "", "Ctrl-S sends it.", w)
 	}
-	now := p.deps.now()
+	now := p.hist.now
 	curID := p.currentHistoryID()
 	rd := history.NewRedactor(nil)
 	if st := p.current(); st != nil {

@@ -310,3 +310,6 @@ func PureRef(text string) bool {
 	inner := t[2 : len(t)-2]
 	return strings.TrimSpace(inner) != "" && !strings.Contains(inner, "{{") && !strings.Contains(inner, "}}")
 }
+
+// SetCursor moves the cursor to a clamped zero-based row and column.
+func (f *Field) SetCursor(row, col int) { f.m.SetCursor(row, col) }

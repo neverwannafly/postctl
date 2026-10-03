@@ -242,7 +242,7 @@ Tabs: `Params  Auth  Headers  Body  Pre-request  Tests  Settings`. The active ta
 
 ### Response viewer
 
-Tabs: `Body  Headers  Cookies  Tests  Console  Timeline`. Body offers pretty / raw / text with syntax tokens, `/` to search, and a path filter. While a request is running the pane shows real steps, not a spinner alone:
+Tabs: `Body  Headers  Cookies  Tests  Console  Timeline`. Body is a read-only vim buffer (line numbers, syntax tokens, pretty / raw, motions, `/` search, `v` select, `y` copy masked unless revealed with `u`, a path filter on `.`, JSON folds on `za` `zo` `zc` `zR` `zM` shown as `{…} 12 keys`); bodies of 5 MiB or more, binary bodies and the jq view use the plain viewer and the footer says why ("Large body", "Binary body" or "jq output: vim keys limited"). A JSON body above 64 KiB shows "Formatting…" while it is prepared. While a request is running the pane shows real steps, not a spinner alone:
 
 ```text
 … Running pre-request script

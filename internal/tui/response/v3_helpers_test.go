@@ -131,7 +131,7 @@ func v3Run(t *testing.T, p *Pane, cmd tea.Cmd) []tea.Msg {
 		case nil:
 		case tea.BatchMsg:
 			queue = append(queue, m...)
-		case tui.ToastMsg, tui.FocusPaneMsg, tui.OpenRequestHistoryMsg, tui.CancelSendMsg:
+		case tui.ToastMsg, tui.FocusPaneMsg, tui.OpenRequestHistoryMsg, tui.CancelSendMsg, tui.ForwardKeyMsg, tui.ForwardSeqMsg:
 			shell = append(shell, m)
 		default:
 			_, next := p.Update(m)
@@ -194,4 +194,21 @@ func v3RunAction(t *testing.T, p *Pane, id string) []tea.Msg {
 		t.Fatalf("action %s is disabled", id)
 	}
 	return v3Run(t, p, a.Run())
+}
+
+// vimBodyScene shows a small JSON response in the Body tab of a focused pane.
+func vimBodyScene(p *Pane) {
+	id := model.NewID()
+	p.ref = tui.RequestRef{Request: &model.Request{ID: id}}
+	p.applyResult(demoResult(id))
+	_ = p.Focus()
+}
+
+// vimKeys presses keys on the pane's live Body buffer, running the commands
+// they return.
+func vimKeys(t *testing.T, p *Pane, keys ...string) {
+	t.Helper()
+	for _, k := range keys {
+		v3Pump(t, p, keyOf(k))
+	}
 }

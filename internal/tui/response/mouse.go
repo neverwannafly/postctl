@@ -73,6 +73,15 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 			}
 			return nil
 		}
+		if p.vimLive() {
+			switch msg.Button {
+			case tea.MouseWheelUp:
+				p.vimWheel(-3)
+			case tea.MouseWheelDown:
+				p.vimWheel(3)
+			}
+			return nil
+		}
 		switch msg.Button {
 		case tea.MouseWheelUp:
 			for i := 0; i < 3; i++ {
