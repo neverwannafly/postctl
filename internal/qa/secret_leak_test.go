@@ -189,10 +189,29 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		curlDump.WriteString(masked)
 	}
 
+	querySecretReq := model.NewRequest("Query secret", http.MethodGet, server.URL+"/items?token="+sentinel)
+	ws.Collections[0].Items = append(ws.Collections[0].Items, querySecretReq)
+
 	frames := renderLeakSweepFrames(t, ws, env, coll, oauth, bearerOutcome, log)
 	for name, frame := range renderLeakSweepFrames(t, ws, env, coll, folderRequest, folderOutcome, log) {
 		frames["folder "+name] = frame
 	}
+
+	shell := tui.New(tui.Options{
+		Backend: sweepBackend{
+			Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
+			ws:      ws,
+		},
+		NoWatch: true,
+	})
+	if initCmd := shell.Init(); initCmd != nil {
+		if batch, ok := initCmd().(tea.BatchMsg); ok && len(batch) > 0 {
+			shell, _ = shell.Update(batch[0]())
+		}
+	}
+	shell, _ = shell.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
+	shell, _ = shell.Update(tui.OpenSwitcherMsg{})
+	frames["switcher"] = shell.View().Content
 	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
 	for _, secret := range []string{sentinel, folderSentinel} {
@@ -302,4 +321,13 @@ func assertAbsent(t *testing.T, sentinel, artifact string, raw []byte) {
 	if strings.Contains(string(raw), sentinel) {
 		t.Errorf("secret leaked to %s", artifact)
 	}
+}
+
+type sweepBackend struct {
+	tui.Backend
+	ws *model.Workspace
+}
+
+func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileError, error) {
+	return b.ws, nil, nil
 }

@@ -49,7 +49,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done on branch, gate green, not merged | ws/ux-v0-shell | 2026-10-03 19:05 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
-| UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
+| UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
 ## Entries
@@ -780,3 +780,45 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Design-review checklist: (1) active environment and the primary action stay in the header and footer; unchanged. (2) every waiting or error state keeps its text; unavailable leader keys say "not available here" or "not bound" and how to see the keys. (3) every flow works without mouse, colour or Unicode; which-key goldens in NO_COLOR and ASCII. (4) the mode label shows whenever a text field has focus (`INSERT` for now), and every new key is in which-key (only when usable) and `docs/keys.md`. (5) selection and `[N]` badges are text. (6) readable at 80x24 (popup is 2 columns, 3 from 96 wide, with an "…and N more keys" note) and reflows at 100 and 140. (7) which-key, footer and help hold static labels only; no values, tokens or URLs; no new data path, so the leak sweep needed only its tab-stepping fix. (8) tree width rules untouched. (9) the popup is one bordered box at the bottom, for grouping only.
 - Blockers / questions: none. Merge order per orchestrator (V1, Q, H1, V0): V0 touches `internal/tui/{app,keys,leader,layout,palette,help}.go`, so expect conflicts with Q in `palette.go` / `switcher` wiring; the leader ID `request.find` is what Q should register, `history.request` for H1.
 - Next: orchestrator merge; then rerun `task keys` and `go test ./internal/tui -update` after the merge.
+
+### 2026-10-03 18:28 IST · UX-Q · Gemini 3.8 Flash · STARTED
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Read brief UX-Q-switcher.md, plan §0 U1-U6, design-language.md, internal/tui/AGENTS.md, palette.go, app.go, tree.go, overlays.go. Began implementing the request-only quick switcher overlay.
+- Files: docs/ledger.md
+- Decisions: Keep app.go diff minimal (~6 lines, well under 25 lines) and do not touch onKey/globalKey. Exclude URL query strings and hosts from row views. Record MRU depth 50 in syncSelection(true).
+- Tests: Baseline tests in internal/tui pass.
+- Blockers / questions: None.
+- Next: Implement OpenSwitcherMsg in pane.go, palette action in palette.go, app.go MRU hook and switcher message handler, switcher.go overlay with fuzzy matching and pure View, and switcher_test.go with ranking, purity, sentinel, and golden tests.
+
+### 2026-10-03 18:40 IST · UX-Q · Gemini 3.8 Flash · DONE
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Implemented the request-only quick switcher overlay. Handled OpenSwitcherMsg, registered palette action request.find in Navigation group with empty Keys string, recorded opened requests into a depth-50 deduplicated MRU via syncSelection(true), stripped URL query strings and hosts from display, implemented fuzzy matching across name, method, folder and URL path with MRU tie-breaking, added character match highlighting with selection token and underline, and added tests (ranking table, selection/focus open behavior, MRU dedupe/depth, sentinel URL masking, pure View, empty workspace) plus 9 goldens across 3 sizes and 3 looks.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, internal/tui/pane.go, internal/tui/palette.go, internal/tui/app.go, internal/tui/testdata/golden/switcher-*.golden, docs/ledger.md.
+- Decisions: Kept app.go diff to 5 added lines without touching onKey or globalKey. View is pure and performs no state mutation or I/O.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green; go test ./internal/tui -update regenerated only the 9 new switcher goldens.
+- Blockers / questions: none.
+- Next: Ready for orchestrator review and merge into main.
+
+### 2026-10-03 19:00 IST · UX-Q · Gemini 3.8 Flash · DONE
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Addressed all two-reviewer findings. (1) cleanURLPath strips scheme and authority (including userinfo and port) for scheme and scheme-less URLs; drops leading {{var}} or host/port authority segment. (2) cleanURLPath template-aware scan treats ? and # inside {{...}} as literal path text rather than delimiters. (3) Stripped ANSI escape sequences and C0/C1 control characters from names, folder paths and URL paths before matching, measuring and rendering; added test with embedded ESC sequence. (4) Updated empty-state guidance to avoid unwired shortcut. (5) Integrated switcher overlay into secret leak sweep in secret_leak_test.go, verifying query tokens do not leak. (6) Unified fuzzy search by invoking palette rankBy against composite search labels while maintaining MRU order as tie-breaker. (7) Pruned workspace-deleted IDs from MRU on open and record. (8) Removed redundant setFocus call from openItem. (9) Added regression tests for tree cursor moves leaving MRU unchanged, lenient-load problem exclusion, deleted request pruning, scroll clipping, and single-line truncation at 80x24.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, internal/qa/secret_leak_test.go, docs/ledger.md.
+- Decisions: Preserved count semantics ('n of m'); retained pure View semantics with zero side-effects.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues. Secret leak sweep and golden tests all pass.
+- Blockers / questions: none.
+- Next: Ready for orchestrator merge into main.
+
+### 2026-10-03 19:05 IST · UX-Q · Gemini 3.8 Flash · PROGRESS
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Addressed three re-review items. (1) cleanURLPath drops the first segment as authority for any scheme-less URL not starting with '/', fixing single-label host leaks (`host/path` -> `/path`, `localhost/p` -> `/p`, `api/v1` -> `/v1`). (2) Method text is sanitized (ANSI/control stripped) before matching and rendering, tested with ESC sequence in method. (3) Requests with empty names after sanitizing render as `(unnamed request)`.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, docs/ledger.md.
+- Decisions: Scheme-less authority handling simplified to unconditionally drop the first segment when not starting with '/'. Empty sanitized names consistently display `(unnamed request)`.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues.
+- Blockers / questions: none.
+- Next: Ready for orchestrator merge into main.
+
+### 2026-10-03 19:06 IST · UX-Q · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-q-switcher merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: two review rounds (correctness, privacy/design) by reviewer subagents; accepted fixes for scheme-less host stripping, template-aware query split, control-character stripping, unwired key in the empty state, leak-sweep coverage, palette matcher reuse, MRU pruning. Declined: masking literal path segments (URL bar shows the same path; secrets belong in secret variables). Deferred: INSERT indicator in overlays (V0/V2b).
+- Tests: `task agents:check` green on main after merge; `postctl --help` starts.
+- Next: V0 binds `Space f`/`Space Space` to `request.find` and changes the empty-state hint to `Space a` on rebase.

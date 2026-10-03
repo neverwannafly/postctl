@@ -111,6 +111,7 @@ type app struct {
 	activeEnv      model.ID
 	notInitialized bool // the directory has no postctl.yaml yet
 	loadSeq        int
+	recent         []model.ID
 
 	focus     Slot
 	prevFocus Slot // where Esc returns to from the single-pane sidebar overlay
@@ -314,6 +315,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.onSaveMsg(msg)
 	case OpenScreenMsg:
 		return a, a.openScreen(msg.Screen)
+	case OpenSwitcherMsg:
+		return a, a.openSwitcher()
 	case SelectRequestMsg:
 		return a, a.selectRequest(msg.RequestID)
 	case SendSavedRequestMsg:
@@ -898,6 +901,9 @@ func (a *app) syncSelection(open bool) tea.Cmd {
 	a.lastSel = sig
 	if open {
 		a.recordJump(ref)
+	}
+	if open && ref.Request != nil {
+		a.recordRecent(ref.Request.ID)
 	}
 	a.layoutPanes()
 	cmds := []tea.Cmd{a.broadcast(SelectionMsg{Ref: ref, Open: open})}
