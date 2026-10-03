@@ -46,6 +46,11 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-ARCH architecture/onboarding | GPT-5.6 Sol | Done, merged to main | docs/arch | 2026-09-30 13:32 IST |
 | FIX-IMP import fixes (script loss, secret-by-name, empty-input warnings, `env set --secret` stdin) | Sonnet 5.5 | Done, merged to main | fix/import | 2026-09-30 13:40 IST |
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
+| UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
+| UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
+| UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
+| UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
 ## Entries
 
@@ -746,3 +751,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go build ./...`, `go test -race ./...`, `golangci-lint run` green; `task tui:smoke` PASS.
 - Blockers / questions: none.
 - Next: none.
+
+### 2026-10-03 18:20 IST · UX0 · Orchestrator (Opus) · STARTED
+- Branch/worktree: main (phase 0 docs), then worktrees under `~/work/postctl-wt/ux-*`.
+- Did: user review of TUI ergonomics; user approved replacing plan Q11 with vim keys and added mouse, request switcher, history restore/diff, per-request history, syntax highlighting, `{{var}}`/`pm.*` completion, jump list, jq filter. Recorded as plan §0 U1–U6 (Q11 marked superseded, Q5 key updated), rewrote the design-language interaction section with a binding Key map, updated `AGENTS.md`, `internal/tui/AGENTS.md`, `.cursor/rules/tui.mdc`. Wrote briefs `UX0-overview`, `UX-V0-shell-keys`, `UX-V1-vimtext`, `UX-Q-switcher`, `UX-H1-history`.
+- Files: `docs/plan.md`, `docs/design-language.md`, `AGENTS.md`, `internal/tui/AGENTS.md`, `.cursor/rules/tui.mdc`, `docs/briefs/UX*.md`, `docs/ledger.md`.
+- Decisions: vim only (no standard keymap setting); `Ctrl-S` sends in every mode; optimise for Ghostty and tmux with legacy fallbacks; history entries gain a redacted unresolved `template`; reviews are done by two reviewer subagents per workstream, the orchestrator triages their findings.
+- Tests: `go test ./internal/qa` (agent-doc references).
+- Blockers / questions: none.
+- Next: phase 1 (V0, V1, Q, H1) in parallel; merge order V1, Q, H1, V0; then phase 2 briefs.

@@ -313,9 +313,50 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 
 ## Interaction language
 
-- Standard keys, no vim bindings: Enter opens or submits, Escape goes back or cancels, arrows move through lists, `/` filters, `?` shows help, `q` quits where context permits. `Ctrl-Enter` or `Ctrl-S` sends, `Ctrl-P` opens the command palette, `E` opens environments.
+- Vim keys (plan §0 U1): every text field is a modal vim editor, panes and lists move with vim motions, actions sit behind the `Space` leader. Arrow keys, Enter and Escape keep working everywhere, so a newcomer is never stuck. The full map is in [Key map](#key-map).
+- The current mode is always visible: the footer starts with `NORMAL`, `INSERT` or `VISUAL` (text, never color alone) whenever a text field has focus.
 - Show only valid key hints for the current screen. A global key must not silently replace a focused text field's expected behavior.
-- Support keyboard-only operation. Mouse support can be additive and must not be required.
+- Discoverability: pressing the leader or a prefix (`Space`, `g`, `[`, `]`) shows a which-key popup listing the next keys after a short delay; pane titles show their jump number (`[1]`, `[2]`, `[3]`).
+- Support keyboard-only operation. Mouse support is on by default (plan U3) and never required.
+
+## Key map
+
+This is the binding spec; `docs/keys.md` is generated from code and must match it. Terminal notes: `Ctrl-i` equals `Tab` and `Ctrl-h` equals Backspace in legacy key encoding, so every such key has a fallback (plan U4).
+
+**Always (every mode, every pane):** `Ctrl-S` send · `Ctrl-Enter` send (enhanced keyboard only) · `Alt-1/2/3` jump to sidebar, request, response · `Ctrl-P` palette · `Esc` (see below).
+
+**Escape ladder:** insert or visual → normal; normal in a text field → leave the field (back to pane navigation); in a pane with an overlay → close it; otherwise cancel a running send or OAuth flow. `Ctrl-C` in insert or visual acts as `Esc`; elsewhere `Ctrl-C` twice within a second quits (the first press says so in the status line).
+
+**Text fields** (URL, cells, body, scripts, WebSocket composer, env values, prompts):
+- Normal: `h j k l` and arrows, `w b e W B E`, `0 ^ $`, `gg G`, `f t F T ; ,`, `%`, counts (`3w`, `2dd`); operators `d c y` with motions and text objects (`iw aw i" a" i' a' i( a( i{ a{ i[ a[`), `dd cc yy`, `D C`, `x X`, `r`, `p P`, `J`, `~`; `u` undo, `Ctrl-r` redo (per field); `.` repeat; `/ ? n N *` search; `i a I A o O` enter insert; `v V` visual.
+- Insert: typing, `Ctrl-w` delete word, `Ctrl-u` delete to line start, `Tab` indents in multi-line fields, `{{` opens variable completion, `Ctrl-n`/`Ctrl-p` move in a completion list, `Enter` or `Tab` accepts.
+- Visual: motions extend, `d c y x > <` act, `o` swaps the anchor.
+- Yank and delete also copy to the system clipboard (OSC 52). Single-line fields treat `j k` and line operators as no-ops or whole-line.
+- URL bar: `Enter` sends in normal and insert. Overlay inputs (palette, switcher, filter, prompts) open in insert; `Esc` → normal where `j k` move through results; `Esc` or `q` in normal closes.
+
+**Panes and lists (outside text fields):** `j k` and arrows move, `h l` collapse and expand in the tree (left and right elsewhere), `gg G` top and bottom, `Ctrl-d Ctrl-u` half page, `/` filter or search, `n N` next and previous match, `Enter` open or activate (in a text-field row: edit, starting in normal), `i` edit the field under the cursor in insert, `[ ]` previous and next section tab, `Tab Shift-Tab` cycle panes, `1 2 3` jump to a pane, `Ctrl-h/j/k/l` move to the neighbouring pane (handing off to tmux at the edge; `Backspace` acts as `Ctrl-h` where the terminal cannot tell them apart), `Ctrl-o Ctrl-i` back and forward through opened requests (`Space [` and `Space ]` as fallbacks), `u Ctrl-r` undo and redo request edits, `?` help, `:` palette (`:q`, `:w`, `:wq` are accepted), `q` quit.
+
+**Section jumps (`g` prefix):** `gu` URL · `gp` Params · `ga` Auth · `gh` Headers · `gb` Body · `gs` Pre-request script · `gt` Tests · `gS` Settings · `gm` WebSocket messages · `gr` response Body · `gH` response History. `gg` stays "top".
+
+**Leader (`Space`, normal mode outside insert):**
+
+| Key | Action | Key | Action |
+| --- | --- | --- | --- |
+| `Space Space`, `Space f` | Find request (quick switcher) | `Space p` | Command palette |
+| `Space e` | Switch environment | `Space E` | Edit environments |
+| `Space h` | History screen | `Space H` | History of this request (response tab) |
+| `Space a` | New request or folder | `Space r` | Rename |
+| `Space d` | Delete (confirm, defaults to Cancel) | `Space D` | Duplicate |
+| `Space m` | Move to folder | `Space R` | Run collection or folder |
+| `Space y` | Copy as curl (masked) | `Space Y` | Copy as curl (revealed) |
+| `Space o` | Open field in `$EDITOR` | `Space v` | Reveal or hide secrets |
+| `Space i` | Insert script snippet | `Space c` | Cookies |
+| `Space b` | Toggle sidebar | `Space l` | Reload workspace |
+| `Space x` | Diff response with previous | `Space j` | jq filter on the response |
+| `Space s` | Send | `Space q` | Quit |
+| `Space [`, `Space ]` | Jump back, forward | `Space ?` | All keys |
+
+Tree actions (`a r d D m R`) act on the tree selection when the sidebar has focus, otherwise on the open request. `Alt-Up`/`Alt-Down` still reorder in the tree.
 - Preserve selection and scroll position across sends, resizes, and reloads.
 - Do not bind destructive actions to a single easy-to-hit key without confirmation.
 - Sending, scripting, disk access, and Keychain access never block the event loop; they run as commands that return typed messages, and a running request can be cancelled with Escape.
@@ -335,6 +376,7 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 - Can a first-time user identify the active environment and the primary action within a few seconds?
 - Does every waiting or error state explain what it is waiting for and what the user can do?
 - Can the flow be completed without a mouse, color, or Unicode glyph support?
+- Is the vim mode visible whenever a text field has focus, and does every new key appear in the which-key popup and `docs/keys.md`?
 - Is selection visible without color? Are method names and status codes explicit text?
 - Does the screen remain readable at 80 by 24 and reflow across the 100 and 140 column breakpoints?
 - Are secrets absent from every visible state, log, and diagnostic message?

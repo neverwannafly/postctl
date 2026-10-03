@@ -10,13 +10,13 @@
 | Q2 | Location | Both: global default workspace `~/.config/postctl/`, plus project-local workspaces discovered by walking up from cwd to a `postctl.yaml`. |
 | Q3 | Import sources | Exported Collection v2.1/v2.0 JSON files **and** (per Q15) extraction from the local Postman desktop install. Environments/globals come along from the local install. No Postman API, no curl/OpenAPI import in v1. Re-import: overwrite by stable ID with `--dry-run` diff (merge not required). |
 | Q4 | Scripts | Tier T1 + T2 (§7). T3 legacy globals: best-effort only if cheap; `pm.visualizer`/`pm.vault` no-op with warning. |
-| Q5 | Editing | Inline editor **and** `e` → `$EDITOR` round-trip. |
+| Q5 | Editing | Inline editor **and** an `$EDITOR` round-trip (key `Space o` since U1; was `e`/`Ctrl-O`). |
 | Q6 | Platform | macOS only (arm64 + amd64). Keep OS-specific code behind interfaces anyway. |
 | Q7 | Secrets | Variables can be marked secret; values stored in macOS Keychain, files hold only a reference. |
 | Q8 | v1 scope | CLI runner (json/junit), TUI collection runner, history, cookie jar, OAuth2, **WebSocket + gRPC**, copy-as-curl/codegen, command palette. **Out:** export to Postman, GraphQL-specific UI (GraphQL bodies imported/sent as JSON). |
 | Q9 | Layout | Responsive: 3 panes wide, stacked/tabbed medium, single pane + overlays at 80 cols. |
 | Q10 | Prod guard | Environments flagged `production` show a warning badge only; no send confirmation. |
-| Q11 | Keys | Standard/arrow keys like prod-console-tui (no vim bindings). `Ctrl-Enter`/`Ctrl-S` send, `Ctrl-P` palette. |
+| Q11 | Keys | **Superseded by U1 (2026-10-03).** Was: standard/arrow keys, no vim bindings. `Ctrl-Enter`/`Ctrl-S` send and `Ctrl-P` palette still hold. |
 | Q12 | Distribution | Local builds only (`go install ./cmd/postctl`); module path `github.com/shubham/postctl` (placeholder, cheap to change). No GoReleaser yet. |
 | Q13 | Git | `git init`; one branch + worktree per workstream; orchestrator merges. |
 | Q14 | Models | §10 mapping accepted ("Luna 6" unavailable). |
@@ -38,6 +38,12 @@
 | C2 | TUI send contract | Orchestrator committed `internal/tui/send.go` (`Sender`, `SendRequest`, `SendResult`, send messages) so WS6a, WS6b and WS4 build in parallel. WS6 is split: **WS6a** request editor + env editor + cookies + send wiring (Sonnet 5.5), **WS6b** response viewer (Composer 2.5). |
 | R4 | Local Postman data | WS1b may read the IndexedDB locally, read-only, from a temp copy. Never print variable values, tokens, headers values, or bodies in logs, ledger, or chat; only counts, key names, and structure. |
 | D11 | Secret-looking variables | Extends D2. The importer marks environment, globals, collection and folder variables `secret` when the key name looks like a credential (word-based rule in `internal/importer/postman/secretnames.go`, documented in `cli.md`), because Postman types many tokens `default` and a script's `pm.environment.set` would otherwise persist them in plaintext (R3). Empty variables only get the type; a value they have follows D2 (Keychain). `--no-mark-secrets` opts out; `--keep-literal-secrets` also keeps valued variables plain. After an import, empty inputs that requests or scripts read and nothing sets are reported by key name. `postctl env set <env> <key> --secret` may omit the value: it prompts without echo on a TTY, else reads one stdin line. |
+| U1 | Keys (2026-10-03) | **Vim only.** Every text field is a modal vim editor (normal, insert, visual); panes and lists navigate with vim motions; actions sit behind the `Space` leader with a which-key popup. No "standard" keymap setting. The full map is in [`design-language.md`](design-language.md#key-map). Kept: `Ctrl-S` always sends in every mode, `Ctrl-Enter` sends where supported, `Alt-1/2/3` and `1/2/3` jump to panes, arrow keys still move. |
+| U2 | Pane movement | `Ctrl-h/j/k/l` moves to the neighbouring pane in normal mode; at postctl's edge it hands off to tmux (`tmux select-pane`) when `$TMUX` is set (vim-tmux-navigator style). |
+| U3 | Mouse | Mouse on by default (click to focus panes, tree items and tabs, wheel scroll, click to place the cursor and drag to select in editors). `--no-mouse` / `POSTCTL_NO_MOUSE=1` turns it off. Keyboard-only remains complete. |
+| U4 | Terminals | Optimise for Ghostty and tmux (kitty keyboard protocol, OSC 52 clipboard, extended keys). Other terminals degrade, never break: every key that needs enhanced reporting has a fallback that works in legacy encoding. In tmux, postctl warns once (status line, not modal) when `extended-keys`, `escape-time`, `mouse` or `set-clipboard` are unsuitable, and `docs/terminal.md` gives the config. |
+| U5 | History | History entries also store the **unresolved** request template (redacted) so an entry can be restored into the editor without writing resolved values or mask glyphs to disk. Restore covers method, URL, params, headers and body; a field that was masked keeps the current value and the restore says so. Responses can be diffed (two history entries, or the current response against the previous one for that request). The response pane gets a per-request History tab. |
+| U6 | Editor extras | Syntax highlighting (chroma) in body and script editors, `{{var}}` completion in every request field (values of secret variables masked), `pm.*` completion in scripts, a request quick switcher (requests only, recent first), a jump list over opened requests (`Ctrl-o`/`Ctrl-i`), and a jq filter on JSON responses (`gojq`). |
 
 ### Q15 findings — local Postman install
 
@@ -213,7 +219,7 @@ Compatibility test corpus: a fixture folder of real-world Postman scripts (and �
 ## 8. TUI feature set (v1 target — trimmed by Q8)
 
 - Sidebar: collection tree with fold/unfold, method badges, fuzzy filter, create/rename/duplicate/move/delete (delete confirms, defaults to Cancel).
-- Request editor tabs: Params, Auth, Headers, Body, Pre-request, Tests, Settings. Inline key-value tables with enable/disable toggle. Body/script edit: inline textarea **and** `e` → `$EDITOR` round-trip.
+- Request editor tabs: Params, Auth, Headers, Body, Pre-request, Tests, Settings. Inline key-value tables with enable/disable toggle. Body/script edit: inline vim editor (U1) **and** `Space o` → `$EDITOR` round-trip.
 - Response viewer tabs: Body (pretty/raw/preview-as-text, syntax-highlighted, collapsible JSON, `/` search, path filter), Headers, Cookies, Tests (pass/fail with messages), Console, Timeline (DNS/connect/TLS/TTFB/download).
 - Environments: switcher (`E`), editor, secret values masked (`••••`) with reveal-on-hold, "production" flag that turns the header badge warning-colored (badge only, no send confirmation — §0 Q10).
 - Multiple open request tabs; unsaved marker; autosave.
