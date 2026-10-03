@@ -6,31 +6,47 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/shubham/postctl/internal/model"
 )
 
 func TestTemplateSensitiveFieldRule(t *testing.T) {
 	const secret = "literal-secret-value-abc"
 	r := NewRedactor([]string{secret})
 	cases := []struct {
-		name string
-		key  string
-		in   string
-		want string
+		name     string
+		key      string
+		in       string
+		want     string
+		wantMask bool
 	}{
-		{"pure ref", "Authorization", "{{accessToken}}", "{{accessToken}}"},
-		{"bearer ref", "Authorization", "Bearer {{accessToken}}", "Bearer {{accessToken}}"},
-		{"literal token", "Authorization", "Bearer abc123", Mask},
-		{"mixed", "X-Api-Key", "prefix-{{key}}-suffix", Mask},
-		{"known secret", "X-Public", secret, Mask},
-		{"harmless", "X-Trace", "abc", "abc"},
+		{"pure ref", "Authorization", "{{accessToken}}", "{{accessToken}}", false},
+		{"bearer ref", "Authorization", "Bearer {{accessToken}}", "Bearer {{accessToken}}", false},
+		{"literal token", "Authorization", "Bearer abc123", Mask, true},
+		{"mixed", "X-Api-Key", "prefix-{{key}}-suffix", Mask, true},
+		{"known secret", "X-Public", secret, Mask, true},
+		{"harmless", "X-Trace", "abc", "abc", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := templateFieldValue(r, tc.key, tc.in)
-			if got != tc.want {
-				t.Fatalf("got %q want %q", got, tc.want)
+			got, masked := templateFieldValue(r, tc.key, tc.in)
+			if got != tc.want || masked != tc.wantMask {
+				t.Fatalf("got %q masked=%v want %q masked=%v", got, masked, tc.want, tc.wantMask)
 			}
 		})
+	}
+}
+
+func TestTemplateQueryPureRefMatchesURL(t *testing.T) {
+	r := NewRedactor(nil)
+	req := model.NewRequest("Q", "GET", "{{baseUrl}}/x?api_key={{token}}")
+	req.URL.Query = []model.KV{{Key: "api_key", Value: "{{token}}"}}
+	tmpl := TemplateFromRequest(req, r)
+	if strings.Contains(tmpl.URL, Mask) {
+		t.Fatalf("url should keep ref, got %q", tmpl.URL)
+	}
+	if len(tmpl.Query) != 1 || tmpl.Query[0].Masked {
+		t.Fatalf("query param should not be masked: %+v", tmpl.Query)
 	}
 }
 
@@ -60,4 +76,10 @@ func TestEntryWithoutTemplateStillParses(t *testing.T) {
 		t.Fatal("marshal should omit empty template")
 	}
 	_ = log
+}
+
+func TestFieldMaskedLegacyGlyph(t *testing.T) {
+	if !FieldMasked(false, Mask) {
+		t.Fatal("glyph-only legacy templates should be treated as masked")
+	}
 }

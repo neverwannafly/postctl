@@ -39,8 +39,9 @@ type Model struct {
 // New builds a diff view from two redacted body texts and optional header
 // texts (when headersMode is toggled on).
 func New(th ui.Theme, left, right SideSummary, leftText, rightText string) *Model {
-	leftText, trL := Cap(prettyJSON(leftText), DefaultMaxLines)
-	rightText, trR := Cap(prettyJSON(rightText), DefaultMaxLines)
+	leftText, rightText = prettyJSONPair(leftText, rightText)
+	leftText, trL := Cap(leftText, DefaultMaxLines)
+	rightText, trR := Cap(rightText, DefaultMaxLines)
 	lines := Diff(leftText, rightText)
 	m := &Model{
 		th:        th,
@@ -61,12 +62,28 @@ func NewHeaders(th ui.Theme, left, right SideSummary, leftHdrs, rightHdrs []stri
 	return New(th, left, right, strings.Join(leftHdrs, "\n"), strings.Join(rightHdrs, "\n"))
 }
 
+func prettyJSONPair(left, right string) (string, string) {
+	if !jsonLike(left) || !jsonLike(right) {
+		return left, right
+	}
+	return prettyJSON(left), prettyJSON(right)
+}
+
+func jsonLike(s string) bool {
+	trim := strings.TrimSpace(s)
+	if trim == "" {
+		return false
+	}
+	if !strings.HasPrefix(trim, "{") && !strings.HasPrefix(trim, "[") {
+		return false
+	}
+	var v any
+	return json.Unmarshal([]byte(trim), &v) == nil
+}
+
 func prettyJSON(s string) string {
 	trim := strings.TrimSpace(s)
 	if trim == "" {
-		return s
-	}
-	if !strings.HasPrefix(trim, "{") && !strings.HasPrefix(trim, "[") {
 		return s
 	}
 	var v any

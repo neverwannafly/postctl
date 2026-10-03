@@ -1,7 +1,9 @@
 package diffview
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/ui"
@@ -15,13 +17,31 @@ func TestDiffAlgorithm(t *testing.T) {
 	}{
 		{"empty", "", "", nil},
 		{"identical", "a\nb", "a\nb", []LineKind{LineSame, LineSame}},
-		{"insert", "a", "a\nb", []LineKind{LineSame, LineAdd}},
-		{"delete", "a\nb", "a", []LineKind{LineSame, LineRemove}},
-		{"replace", "a", "b", []LineKind{LineRemove, LineAdd}},
+		{"insert", "a", "a\nb", []LineKind{LineHunkHeader, LineSame, LineAdd}},
+		{"delete", "a\nb", "a", []LineKind{LineHunkHeader, LineSame, LineRemove}},
+		{"replace", "a", "b", nil},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			lines := Diff(tc.a, tc.b)
+			if tc.name == "replace" {
+				if len(lines) != 3 || lines[0].Kind != LineHunkHeader {
+					t.Fatalf("replace: %v", lines)
+				}
+				var add, remove int
+				for _, ln := range lines[1:] {
+					switch ln.Kind {
+					case LineAdd:
+						add++
+					case LineRemove:
+						remove++
+					}
+				}
+				if add != 1 || remove != 1 {
+					t.Fatalf("replace kinds: %v", lines)
+				}
+				return
+			}
 			if tc.want == nil {
 				if len(lines) != 0 {
 					t.Fatalf("lines = %v", lines)
@@ -37,6 +57,55 @@ func TestDiffAlgorithm(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDiffLargeInputsBounded(t *testing.T) {
+	const n = 3000
+	var a, b strings.Builder
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			a.WriteByte('\n')
+			b.WriteByte('\n')
+		}
+		a.WriteString("line")
+		if i == n/2 {
+			b.WriteString("LINE")
+		} else {
+			b.WriteString("line")
+		}
+	}
+	start := time.Now()
+	if allocs := testing.AllocsPerRun(3, func() {
+		_ = Diff(a.String(), b.String())
+	}); allocs > 500_000 {
+		t.Fatalf("allocs = %v, want well below O(n*m)", allocs)
+	}
+	if elapsed := time.Since(start); elapsed > 30*time.Second {
+		t.Fatalf("diff took %v", elapsed)
+	}
+}
+
+func BenchmarkDiff20kLines(b *testing.B) {
+	const n = 20000
+	var a, sb strings.Builder
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			a.WriteByte('\n')
+			sb.WriteByte('\n')
+		}
+		a.WriteString("line")
+		if i == n/2 {
+			sb.WriteString("LINE")
+		} else {
+			sb.WriteString("line")
+		}
+	}
+	left, right := a.String(), sb.String()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = Diff(left, right)
 	}
 }
 

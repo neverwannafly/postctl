@@ -380,7 +380,8 @@ func (l *Log) add(offset int64, length int, e Entry) {
 		t.BodyURLEncoded = nil
 		t.BodyFormData = nil
 		t.BodyGraphQLVariables = ""
-		t.BodyTruncated = false
+		t.BodyRawTruncated = false
+		t.BodyRawEncoding = ""
 		s.Template = &t
 	}
 	l.byID[e.ID] = len(l.index)

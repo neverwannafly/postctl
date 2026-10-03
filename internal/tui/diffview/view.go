@@ -56,6 +56,8 @@ func (m *Model) summaryLine(t ui.Theme) string {
 
 func renderLine(t ui.Theme, ln Line) string {
 	switch ln.Kind {
+	case LineHunkHeader:
+		return t.Render(ui.AccentPrimary, ln.Text)
 	case LineAdd:
 		return t.Render(ui.StatusSuccess, "+ "+ln.Text)
 	case LineRemove:

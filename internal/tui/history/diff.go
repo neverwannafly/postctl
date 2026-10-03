@@ -116,9 +116,9 @@ func (m *Model) diffKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 
 func (m *Model) viewDiff() string {
 	if m.diffBodyMode {
-		return m.screenHeader("History diff") + m.diff.View()
+		return m.screenHeader("History diff") + "\n" + m.diff.View()
 	}
-	return m.screenHeader("History diff (headers)") + m.diffHeaders.View()
+	return m.screenHeader("History diff (headers)") + "\n" + m.diffHeaders.View()
 }
 
 func (m *Model) markLabel(e history.Entry) string {

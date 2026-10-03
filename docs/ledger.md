@@ -50,9 +50,27 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
-| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 19:05 IST |
+| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 20:15 IST |
 
 ## Entries
+
+### 2026-10-03 20:15 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: Addressed reviewer findings 1–12: structural template `masked` flags and URL/query parity; restore full replacement with mask-glyph refusal; pending patch + `tea.Sequence`; body/binary/truncation flags; Hirschberg diff + `@@` hunks; WebSocket restore disabled; literal-sentinel leak sweep + restore persist check; multipart basename; JSON pretty when both sides parse; diff layout golden fix.
+- Files: `internal/history/{template.go,*_test.go}`, `internal/tui/{history/*,diffview/*,request/restore.go,bind.go}`, `internal/qa/secret_leak_test.go`, goldens, `docs/ledger.md`
+- Decisions: Restore-as-new uses empty URL when template URL is masked; history JSONL may still contain mask glyphs in templates (excluded from workspace glyph sweep).
+- Tests: `task agents:check` green. Masking proof: stubbed `templateFieldValue` to return raw values → `TestLiteralSecretNotStoredInTemplateJSON` fails; full sweep passes with masking restored.
+- Blockers / questions: none
+- Next: none
+
+### 2026-10-03 19:05 IST · UX-H1 · Composer 2.5 (fast) · DONE
+- Branch/worktree: ws/ux-h1-history
+- Did: History entries now store a redacted unresolved `template` for restore. Engine records it from the pre-resolve request; sensitive fields keep pure `{{var}}` refs only. TUI History: `m` mark, `d` diff responses (reusable `internal/tui/diffview`), `r` restore with confirm (or create `<name> (restored)` when the request is gone) via `ApplyRequestPatchMsg` and request-pane undo/autosave. Docs, keys, goldens, leak sweep extended (template on disk, restore frame, diff frame).
+- Files: `internal/history/template.go`, `internal/engine/{record.go,session.go,types.go,record_test.go}`, `internal/tui/{pane.go,history/*,diffview/*,request/restore.go}`, `internal/qa/secret_leak_test.go`, `docs/{engine,model}.md`, `README.md`, `docs/keys.md`, goldens under `internal/tui/history/testdata` and `internal/tui/diffview/testdata`
+- Decisions: `Outcome.Unresolved` holds the template source (never logged). Masked/truncated template fields stay on restore; status lists key names only. Diff uses redacted history bodies only.
+- Tests: `task agents:check` green (build, race, lint 0). Leak sweep: temporarily disabled `templateFieldValue` masking (`return Mask` → `return value`); sentinel still absent because templates store `{{var}}` refs — literal masking covered by `TestTemplateSensitiveFieldRule` and `TestHistoryHoldsNoSecrets`.
+- Blockers / questions: none
+- Next: none
 
 ### 2026-10-03 18:35 IST · UX-H1 · Composer 2.5 (fast) · STARTED
 - Branch/worktree: ws/ux-h1-history

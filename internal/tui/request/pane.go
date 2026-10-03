@@ -186,8 +186,9 @@ type Pane struct {
 
 	confirm *importOffer
 
-	hist  map[model.ID]*history
-	saves map[model.ID]*saveState
+	hist    map[model.ID]*history
+	saves   map[model.ID]*saveState
+	pending map[model.ID]tui.ApplyRequestPatchMsg
 
 	send sendState
 

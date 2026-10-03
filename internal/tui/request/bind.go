@@ -36,6 +36,14 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 		p.zone = zBar
 		p.urlE = true
 	}
+	if p.req != nil {
+		if patch, ok := p.takePendingPatch(p.req.ID); ok {
+			if cmd == nil {
+				return p.applyHistoryTemplateNow(patch)
+			}
+			return tea.Batch(cmd, p.applyHistoryTemplateNow(patch))
+		}
+	}
 	return cmd
 }
 

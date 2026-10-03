@@ -2,6 +2,7 @@
 package diffview
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -13,11 +14,13 @@ const (
 	LineSame LineKind = iota
 	LineAdd
 	LineRemove
+	// LineHunkHeader is a unified diff hunk header (@@ ... @@).
+	LineHunkHeader
 )
 
 // Line is one row of a unified diff.
 type Line struct {
-	// Kind is same, add or remove.
+	// Kind is same, add, remove or hunk header.
 	Kind LineKind
 	// Text is the line content without a diff prefix.
 	Text string
@@ -34,8 +37,9 @@ type Hunk struct {
 // DefaultMaxLines is the per-side line cap before truncation.
 const DefaultMaxLines = 20000
 
-// Diff computes a line-based diff between a and b using a Myers-style
-// shortest-edit script on rune slices split by newline boundaries.
+const contextLines = 3
+
+// Diff computes a line-based unified diff between a and b.
 func Diff(a, b string) []Line {
 	aLines := splitLines(a)
 	bLines := splitLines(b)
@@ -62,65 +66,97 @@ const (
 	opAdd
 )
 
-func shortestScript(a, b []string) []editOp {
-	n, m := len(a), len(b)
-	// DP table for LCS backtracking; cap dimensions by line count (already capped upstream).
-	dp := make([][]int, n+1)
-	for i := range dp {
-		dp[i] = make([]int, m+1)
-	}
-	for i := n - 1; i >= 0; i-- {
-		for j := m - 1; j >= 0; j-- {
-			if a[i] == b[j] {
-				dp[i][j] = dp[i+1][j+1] + 1
-			} else if dp[i+1][j] >= dp[i][j+1] {
-				dp[i][j] = dp[i+1][j]
-			} else {
-				dp[i][j] = dp[i][j+1]
-			}
-		}
-	}
-	var script []editOp
-	i, j := 0, 0
-	for i < n && j < m {
-		if a[i] == b[j] {
-			script = append(script, opKeep)
-			i++
-			j++
-		} else if dp[i+1][j] >= dp[i][j+1] {
-			script = append(script, opDel)
-			i++
-		} else {
-			script = append(script, opAdd)
-			j++
-		}
-	}
-	for i < n {
-		script = append(script, opDel)
-		i++
-	}
-	for j < m {
-		script = append(script, opAdd)
-		j++
-	}
-	return script
-}
-
 func buildUnified(a, b []string, script []editOp) []Line {
-	var out []Line
+	type row struct {
+		kind LineKind
+		text string
+	}
+	var raw []row
 	ai, bi := 0, 0
 	for _, op := range script {
 		switch op {
 		case opKeep:
-			out = append(out, Line{Kind: LineSame, Text: a[ai]})
+			raw = append(raw, row{LineSame, a[ai]})
 			ai++
 			bi++
 		case opDel:
-			out = append(out, Line{Kind: LineRemove, Text: a[ai]})
+			raw = append(raw, row{LineRemove, a[ai]})
 			ai++
 		case opAdd:
-			out = append(out, Line{Kind: LineAdd, Text: b[bi]})
+			raw = append(raw, row{LineAdd, b[bi]})
 			bi++
+		}
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	// Collect change indices.
+	var changes []int
+	for i, r := range raw {
+		if r.kind != LineSame {
+			changes = append(changes, i)
+		}
+	}
+	if len(changes) == 0 {
+		out := make([]Line, len(raw))
+		for i, r := range raw {
+			out[i] = Line{Kind: r.kind, Text: r.text}
+		}
+		return out
+	}
+	// Merge change regions with context.
+	type region struct{ lo, hi int }
+	var regions []region
+	cl := max(0, changes[0]-contextLines)
+	ch := min(len(raw)-1, changes[0]+contextLines)
+	for _, c := range changes[1:] {
+		lo := max(0, c-contextLines)
+		hi := min(len(raw)-1, c+contextLines)
+		if lo <= ch+1 {
+			ch = hi
+		} else {
+			regions = append(regions, region{cl, ch})
+			cl, ch = lo, hi
+		}
+	}
+	regions = append(regions, region{cl, ch})
+
+	var out []Line
+	oldLine, newLine := 1, 1
+	for ri, reg := range regions {
+		if ri > 0 && reg.lo > regions[ri-1].hi+1 {
+			// Skip gap: advance line counters for skipped same lines.
+			for i := regions[ri-1].hi + 1; i < reg.lo; i++ {
+				oldLine++
+				newLine++
+			}
+		}
+		oldStart, newStart := oldLine, newLine
+		oldCount, newCount := 0, 0
+		for i := reg.lo; i <= reg.hi; i++ {
+			switch raw[i].kind {
+			case LineSame:
+				oldCount++
+				newCount++
+			case LineRemove:
+				oldCount++
+			case LineAdd:
+				newCount++
+			}
+		}
+		hdr := fmt.Sprintf("@@ -%d,%d +%d,%d @@", oldStart, oldCount, newStart, newCount)
+		out = append(out, Line{Kind: LineHunkHeader, Text: hdr})
+		for i := reg.lo; i <= reg.hi; i++ {
+			out = append(out, Line{Kind: raw[i].kind, Text: raw[i].text})
+			switch raw[i].kind {
+			case LineSame:
+				oldLine++
+				newLine++
+			case LineRemove:
+				oldLine++
+			case LineAdd:
+				newLine++
+			}
 		}
 	}
 	return out
@@ -131,14 +167,10 @@ func Hunks(lines []Line) []Hunk {
 	var hunks []Hunk
 	start := -1
 	for i, ln := range lines {
-		if ln.Kind == LineSame {
+		if ln.Kind == LineHunkHeader {
 			if start >= 0 {
 				hunks = append(hunks, Hunk{Start: start, End: i})
-				start = -1
 			}
-			continue
-		}
-		if start < 0 {
 			start = i
 		}
 	}

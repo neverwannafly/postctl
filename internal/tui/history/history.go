@@ -116,8 +116,10 @@ func (m *Model) KeyHints() []ui.Hint {
 			{Key: "y", Label: "Copy curl", Priority: 3},
 			{Key: "Esc", Label: "Back", Priority: 1},
 		}
-		if m.detail != nil && m.detail.Template == nil {
-			hints[1].Label = "Restore (unavailable)"
+		if m.detail != nil {
+			if hint := restoreDisabledReason(m.detail); hint != "" {
+				hints[1].Label = "Restore (unavailable)"
+			}
 		}
 		return hints
 	default:

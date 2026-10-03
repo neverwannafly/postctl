@@ -39,11 +39,15 @@ func TestHistoryTemplateFromUnresolvedRequest(t *testing.T) {
 		t.Fatalf("method = %q", entry.Template.Method)
 	}
 	for _, h := range entry.Template.Headers {
-		if strings.EqualFold(h.Key, "Authorization") && h.Value != "Bearer {{token}}" {
-			t.Fatalf("authorization template = %q", h.Value)
+		if strings.EqualFold(h.Key, "Authorization") {
+			if h.Value != "Bearer {{token}}" || h.Masked {
+				t.Fatalf("authorization template = %+v", h)
+			}
 		}
-		if strings.EqualFold(h.Key, "X-Api-Key") && h.Value != history.Mask {
-			t.Fatalf("api key should be masked, got %q", h.Value)
+		if strings.EqualFold(h.Key, "X-Api-Key") {
+			if h.Value != history.Mask || !h.Masked {
+				t.Fatalf("api key should be masked, got %+v", h)
+			}
 		}
 	}
 	if strings.Contains(entry.Template.BodyRaw, secret) {
@@ -66,8 +70,8 @@ func TestHistoryTemplateBearerLiteralMasked(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, h := range entry.Template.Headers {
-		if strings.EqualFold(h.Key, "Authorization") && h.Value != history.Mask {
-			t.Fatalf("got %q", h.Value)
+		if strings.EqualFold(h.Key, "Authorization") && (!h.Masked || h.Value != history.Mask) {
+			t.Fatalf("got %+v", h)
 		}
 	}
 }
