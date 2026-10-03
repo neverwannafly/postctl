@@ -271,6 +271,12 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	frames["history restore"] = restoreFrame
 	frames["history diff"] = diffFrame
 	frames["literal restore"] = renderRestoreLiteralFrame(t, ws, coll, bearer, literalEntry)
+	for name, frame := range renderResponseV3Frames(t, eng, log, env, coll, []v3Case{
+		{req: bearer, secret: sentinel},
+		{req: folderRequest, secret: folderSentinel},
+	}) {
+		frames[name] = frame
+	}
 	coll.Items = coll.Items[:len(coll.Items)-1]
 	if err := persistRestoredRequest(t, st, ws, coll, bearer, literalEntry.Template); err != nil {
 		t.Fatal(err)
@@ -578,4 +584,165 @@ type sweepBackend struct {
 
 func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileError, error) {
 	return b.ws, nil, nil
+}
+
+// v3Case is one request whose response pane frames the V3 sweep captures, and
+// the secret its engine redactor knows.
+type v3Case struct {
+	req    *model.Request
+	secret string
+}
+
+// renderResponseV3Frames captures the response pane's History tab, diff with
+// previous (body and headers) and jq views, and the text a yank puts on the
+// clipboard, for real engine outcomes. Every one is searched for the
+// sentinels by the caller.
+func renderResponseV3Frames(
+	t *testing.T,
+	eng *engine.Engine,
+	log *history.Log,
+	env *model.Environment,
+	coll *model.Collection,
+	cases []v3Case,
+) map[string]string {
+	t.Helper()
+	theme := ui.NewTheme(true, true, false)
+	frames := map[string]string{}
+	for _, c := range cases {
+		// Two sends, so the second has a previous history entry to diff with.
+		var out *engine.Outcome
+		for range 2 {
+			var err error
+			out, err = eng.Send(context.Background(), engine.SendInput{
+				Collection: coll, Request: c.req, Environment: env,
+			}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		if out.HistoryID == "" || out.Response == nil || !bytes.Contains(out.Response.Body, []byte(c.secret)) {
+			t.Fatalf("%s: the outcome needs a history entry and a body that echoes the secret", c.req.Name)
+		}
+		var clips []string
+		pane := response.NewWithDeps(tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}, response.Deps{
+			Log:       func() (tui.HistoryReader, error) { return log, nil },
+			Clipboard: func(s string) tea.Cmd { clips = append(clips, s); return nil },
+		})
+		pane.SetSize(140, 40)
+		driveResponsePane(t, pane, tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: c.req}})
+		driveResponsePane(t, pane, tui.SendResultMsg{Result: tuiengine.OutcomeToResult(out)})
+		_ = pane.Focus()
+		prefix := "v3 " + c.req.Name + " "
+
+		// History tab, with a server reason phrase that echoes the secret.
+		echoLog, err := history.Open(filepath.Join(t.TempDir(), "history"), history.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := echoLog.Append(history.Entry{
+			RequestID: c.req.ID, RequestName: c.req.Name, Status: 200, StatusText: "Echo " + c.secret,
+			Request: history.RequestSnapshot{Method: "GET", URL: "https://example.test/echo"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range []*history.Log{log, echoLog} {
+			hp := response.NewWithDeps(tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}, response.Deps{
+				Log: func() (tui.HistoryReader, error) { return l, nil },
+			})
+			hp.SetSize(140, 40)
+			driveResponsePane(t, hp, tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: c.req}})
+			driveResponsePane(t, hp, tui.SendResultMsg{Result: tuiengine.OutcomeToResult(out)})
+			driveResponsePane(t, hp, tui.FocusSectionMsg{Section: tui.SectionRespHistory})
+			frame := hp.View()
+			if !strings.Contains(frame, "ago") && !strings.Contains(frame, "just now") {
+				t.Fatalf("%s: the History tab lists no sends:\n%s", c.req.Name, frame)
+			}
+			if l == log {
+				frames[prefix+"history tab"] = frame
+			} else {
+				frames[prefix+"history tab echo"] = frame
+			}
+		}
+
+		// Diff with previous: body, then headers.
+		runResponseAction(t, pane, "response.diff")
+		frames[prefix+"diff body"] = pane.View()
+		driveResponsePane(t, pane, tea.KeyPressMsg{Code: 'h', Text: "h"})
+		frames[prefix+"diff headers"] = pane.View()
+		if !strings.Contains(frames[prefix+"diff body"], "Previous") || !strings.Contains(frames[prefix+"diff headers"], "headers") {
+			t.Fatalf("%s: the diff did not open", c.req.Name)
+		}
+		driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape})
+
+		// jq: the whole document, then the fields that carry the secret.
+		for i, filter := range []string{".", ".jwt, .queryEcho, .folderHeader, .requestPath"} {
+			runResponseAction(t, pane, "response.jq")
+			for _, r := range filter {
+				driveResponsePane(t, pane, tea.KeyPressMsg{Code: r, Text: string(r)})
+			}
+			driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEnter})
+			name := prefix + "jq " + string(rune('a'+i))
+			frames[name] = pane.View()
+			if !strings.Contains(frames[name], "Body (jq)") {
+				t.Fatalf("%s: jq filter %q did not apply:\n%s", c.req.Name, filter, frames[name])
+			}
+			clips = nil
+			driveResponsePane(t, pane, tea.KeyPressMsg{Code: 'y', Text: "y"})
+			if len(clips) != 1 || clips[0] == "" {
+				t.Fatalf("%s: yank of the jq view copied %d times", c.req.Name, len(clips))
+			}
+			frames[name+" yank"] = clips[0]
+			driveResponsePane(t, pane, tea.KeyPressMsg{Code: tea.KeyEscape}) // clear the filter
+		}
+	}
+	return frames
+}
+
+// runResponseAction runs a pane action the way the shell's leader key would.
+func runResponseAction(t *testing.T, p tui.Pane, id string) {
+	t.Helper()
+	src, ok := p.(tui.ActionSource)
+	if !ok {
+		t.Fatal("response pane has no actions")
+	}
+	for _, a := range src.Actions() {
+		if a.ID == id {
+			if a.Enabled != nil && !a.Enabled() {
+				t.Fatalf("action %s is disabled", id)
+			}
+			runPaneCmd(t, p, a.Run())
+			return
+		}
+	}
+	t.Fatalf("action %s is not registered", id)
+}
+
+// driveResponsePane delivers msg and runs the commands it leads to.
+func driveResponsePane(t *testing.T, p tui.Pane, msg tea.Msg) {
+	t.Helper()
+	_, cmd := p.Update(msg)
+	runPaneCmd(t, p, cmd)
+}
+
+func runPaneCmd(t *testing.T, p tui.Pane, cmd tea.Cmd) {
+	t.Helper()
+	queue := []tea.Cmd{cmd}
+	for steps := 0; len(queue) > 0; steps++ {
+		if steps > 500 {
+			t.Fatal("pane commands did not settle")
+		}
+		c := queue[0]
+		queue = queue[1:]
+		if c == nil {
+			continue
+		}
+		switch m := c().(type) {
+		case nil, tui.ToastMsg, tui.FocusPaneMsg, tui.OpenRequestHistoryMsg:
+		case tea.BatchMsg:
+			queue = append(queue, m...)
+		default:
+			_, next := p.Update(m)
+			queue = append(queue, next)
+		}
+	}
 }
