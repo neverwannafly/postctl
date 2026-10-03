@@ -57,6 +57,9 @@ type Options struct {
 	// in that direction (plan U2). The terminal-handoff workstream sets it to
 	// hand the move to tmux. Nil does nothing.
 	OnEdge func(dir Direction) tea.Cmd
+	// StartupCmd runs once during Init (for example a tmux settings check).
+	// Nil skips it.
+	StartupCmd tea.Cmd
 	// NoWatch disables file watching (tests).
 	NoWatch bool
 	// Light assumes a light terminal background until the terminal answers;
@@ -204,6 +207,9 @@ func newApp(opts Options) *app {
 // Init starts loading the workspace and asks the terminal for its background.
 func (a *app) Init() tea.Cmd {
 	cmds := []tea.Cmd{a.loadCmd(nil), tea.RequestBackgroundColor}
+	if a.opts.StartupCmd != nil {
+		cmds = append(cmds, a.opts.StartupCmd)
+	}
 	if !a.accessible {
 		cmds = append(cmds, tea.Tick(loadingDelay, func(time.Time) tea.Msg { return showLoadingMsg{} }))
 	}
@@ -214,6 +220,8 @@ func (a *app) Init() tea.Cmd {
 
 type (
 	showLoadingMsg struct{}
+	// StartupNoopMsg is returned when an optional Init command has nothing to report.
+	StartupNoopMsg struct{}
 	toastExpireMsg int
 	loadedMsg      struct {
 		seq      int
@@ -267,6 +275,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.onPaste(msg)
 	case tea.MouseMsg:
 		return a, a.onMouse(msg)
+	case StartupNoopMsg:
+		return a, nil
 	case showLoadingMsg:
 		if a.phase == phaseLoading {
 			a.showLoading = true
@@ -325,8 +335,12 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.openScreen(msg.Screen)
 	case OpenSwitcherMsg:
 		return a, a.openSwitcher()
+	case OpenRequestHistoryMsg:
+		return a, a.openRequestHistory(msg)
 	case SelectRequestMsg:
 		return a, a.selectRequest(msg.RequestID)
+	case CreateRequestFromHistoryMsg:
+		return a, a.createRequestFromHistory(msg)
 	case SendSavedRequestMsg:
 		return a, a.sendSavedRequest(msg.RequestID)
 	case foldPersistMsg:

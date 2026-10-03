@@ -191,6 +191,8 @@ See [`docs/scripting.md`](docs/scripting.md) for the complete API contract.
 
 ## Accessibility and Terminal Modes
 
+For Ghostty, tmux, **Ctrl-Enter**, pane handoff with **Ctrl-h/j/k/l**, and clipboard behaviour, see [`docs/terminal.md`](docs/terminal.md).
+
 `postctl` adheres to the Clear Signal design language and adapts to all terminal configurations:
 
 - `--accessible` (or `POSTCTL_ACCESSIBLE=1`): Emits a single-column, linear layout without alternate screen buffers, animations, or cursor resets. Suitable for screen readers.

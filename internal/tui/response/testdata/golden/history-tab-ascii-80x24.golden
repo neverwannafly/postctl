@@ -1,0 +1,21 @@
+200 OK  67 ms  188 B  Tests 2/3                                                 
+Body  Headers(1)  Cookies  Tests(3)  Console(2)  Timeline  History(3)           
+-----------------------------------------------------------==========-----------
+  GET   200 OK  120 ms  2.0 KB  12s ago  this response                          
+> GET   404 Not Found  120 ms  2.0 KB  7m ago                                   
+  GET   x No response  31 ms  1d ago                                            
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                

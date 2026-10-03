@@ -21,9 +21,14 @@ import (
 	"github.com/shubham/postctl/internal/ui"
 )
 
-// New builds the Response pane for [tui.Options.NewResponsePane].
-func New(env tui.PaneEnv) tui.Pane {
+// New builds the Response pane for [tui.Options.NewResponsePane], without a
+// history log (no History tab, no diff). [Factory] builds one with Deps.
+func New(env tui.PaneEnv) tui.Pane { return NewWithDeps(env, Deps{}) }
+
+// NewWithDeps builds the Response pane with the effects in d.
+func NewWithDeps(env tui.PaneEnv, d Deps) tui.Pane {
 	p := &Pane{
+		deps:     d,
 		th:       env.Theme,
 		byID:     map[model.ID]*storedResult{},
 		tab:      tabBody,
@@ -43,8 +48,31 @@ const (
 	tabTests
 	tabConsole
 	tabTimeline
-	tabCount
+	// tabHistory lists past sends of the request; it exists only when the
+	// pane has a history log.
+	tabHistory
 )
+
+// baseTabs are the tabs every response pane has, in order.
+var baseTabs = []tab{tabBody, tabHeaders, tabCookies, tabTests, tabConsole, tabTimeline}
+
+// tabList returns the tabs this pane offers, in display order.
+func (p *Pane) tabList() []tab {
+	if p.historyEnabled() {
+		return append(append([]tab(nil), baseTabs...), tabHistory)
+	}
+	return baseTabs
+}
+
+// tabIndex is the position of the active tab in [Pane.tabList].
+func (p *Pane) tabIndex() int {
+	for i, tb := range p.tabList() {
+		if tb == p.tab {
+			return i
+		}
+	}
+	return 0
+}
 
 type bodyMode int
 
@@ -60,6 +88,12 @@ type storedResult struct {
 
 // Pane implements the response viewer.
 type Pane struct {
+	deps                 Deps
+	hist                 histState
+	histGen              int
+	diff                 diffState
+	diffGen              int
+	jq                   jqState
 	th                   ui.Theme
 	w, h                 int
 	focused              bool
@@ -101,6 +135,11 @@ func (p *Pane) Title() string { return "Response" }
 func (p *Pane) SetSize(w, h int) {
 	p.w, p.h = w, h
 	p.prepareCurrent()
+	p.sizeDiff()
+	if p.jq.input != nil {
+		p.jq.input.SetSize(max(1, w-4), 1)
+	}
+	p.clampHist()
 }
 
 // Focus implements [tui.Pane].
@@ -118,9 +157,13 @@ func (p *Pane) Blur() {
 	p.revealSecrets = false
 }
 
-// VimMode implements [tui.ModeReporter]. The search and path boxes are not
-// modal yet, so editing one reports INSERT.
+// VimMode implements [tui.ModeReporter]. The jq input is a vim editor and
+// reports its mode; the search and path boxes are not modal yet, so editing
+// one reports INSERT.
 func (p *Pane) VimMode() string {
+	if p.jq.open && p.jq.input != nil {
+		return p.jq.input.Mode().String()
+	}
 	if p.Editing() {
 		return "INSERT"
 	}
@@ -129,10 +172,15 @@ func (p *Pane) VimMode() string {
 
 // Sections implements [tui.SectionLister]: g jumps can reach the Body tab; [
 // and ] step through every tab.
-func (p *Pane) Sections() []string { return []string{tui.SectionRespBody} }
+func (p *Pane) Sections() []string {
+	if p.historyEnabled() {
+		return []string{tui.SectionRespBody, tui.SectionRespHistory}
+	}
+	return []string{tui.SectionRespBody}
+}
 
 // Editing implements [tui.Editor].
-func (p *Pane) Editing() bool { return p.searchActive || p.pathActive }
+func (p *Pane) Editing() bool { return p.searchActive || p.pathActive || p.jq.open }
 
 func (p *Pane) registerActions(reg *tui.Registry) {
 	reg.Add(
@@ -155,8 +203,33 @@ func (p *Pane) hasBody() bool {
 	return r != nil && r.result.Response != nil && len(r.result.Response.Body) > 0
 }
 
+func (p *Pane) hasRequest() bool { return p.ref.Request != nil }
+
 // Actions implements [tui.ActionSource].
 func (p *Pane) Actions() []tui.Action {
+	acts := p.baseActions()
+	acts = append(acts, tui.Action{ID: "response.jq", Title: "jq filter on the response", Group: "Response", Keys: "Space j",
+		Enabled: p.hasRequest, Run: p.cmdOpenJQ})
+	if p.historyEnabled() {
+		acts = append(acts,
+			tui.Action{ID: "history.request", Title: "History of this request", Group: "Response", Keys: "Space H",
+				Enabled: p.hasRequest, Run: p.cmdShowHistory},
+			tui.Action{ID: "response.diff", Title: "Diff response with previous", Group: "Response", Keys: "Space x",
+				Enabled: p.hasRequest, Run: p.cmdDiffPrevious},
+		)
+	}
+	return acts
+}
+
+// cmdShowHistory is Space H: show the History tab of the open request.
+func (p *Pane) cmdShowHistory() tea.Cmd {
+	p.closeDiff()
+	p.tab = tabHistory
+	p.revealSecrets = false
+	return tea.Batch(focusResponse(), p.ensureHistory())
+}
+
+func (p *Pane) baseActions() []tui.Action {
 	return []tui.Action{
 		{ID: "response.copyBody", Title: "Copy response body", Group: "Response", Keys: "y",
 			Enabled: p.hasBody, Run: p.cmdCopyBody},
@@ -177,9 +250,13 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tui.SelectionMsg:
+		prev := p.requestID()
 		p.ref = msg.Ref
 		p.revealSecrets = false
 		p.syncViewFromSelection()
+		if p.requestID() != prev {
+			cmds = append(cmds, p.resetForRequest())
+		}
 		if demoEnabled() && msg.Ref.Request != nil && !p.demoInjected {
 			p.demoInjected = true
 			p.applyResult(demoResult(msg.Ref.Request.ID))
@@ -190,16 +267,39 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	case tui.ThemeChangedMsg:
 		p.th = msg.Theme
 		p.spin = p.th.NewSpinner()
+		if p.jq.open && p.jq.input != nil {
+			p.newJQInput(p.jq.input.Value())
+		}
 	case tui.FocusSectionMsg:
-		if msg.Section == tui.SectionRespBody {
+		switch {
+		case msg.Section == tui.SectionRespBody:
+			p.closeDiff()
 			p.tab = tabBody
 			p.revealSecrets = false
+		case msg.Section == tui.SectionRespHistory && p.historyEnabled():
+			p.closeDiff()
+			p.tab = tabHistory
+			p.revealSecrets = false
+			cmds = append(cmds, p.ensureHistory())
 		}
 	case tui.SectionStepMsg:
 		if !p.Editing() && msg.Delta != 0 {
-			p.tab = tab((int(p.tab) + msg.Delta + int(tabCount)) % int(tabCount))
+			list := p.tabList()
+			p.tab = list[(p.tabIndex()+msg.Delta+len(list))%len(list)]
 			p.revealSecrets = false // reveal lasts for one tab visit
+			p.closeDiff()
+			if p.tab == tabHistory {
+				cmds = append(cmds, p.ensureHistory())
+			}
 		}
+	case copyReadyMsg:
+		cmds = append(cmds, p.writeClipboard(msg.text), toast(ui.ToastSuccess, msg.label))
+	case histLoadedMsg:
+		p.onHistoryLoaded(msg)
+	case diffReadyMsg:
+		cmds = append(cmds, p.onDiffReady(msg))
+	case jqDoneMsg:
+		p.onJQDone(msg)
 	case tui.SendStartedMsg:
 		p.sendingID = msg.RequestID
 		p.sendStep = "Starting"
@@ -215,6 +315,11 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		p.revealSecrets = false
 		p.applyResult(msg.Result)
 		p.sendingID = ""
+		if msg.Result.RequestID == p.requestID() {
+			p.closeDiff()
+			p.jq.dirty = true
+			cmds = append(cmds, p.refreshHistory())
+		}
 	case spinner.TickMsg:
 		if p.sendingID != "" && p.focused {
 			var cmd tea.Cmd
@@ -226,6 +331,14 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 			cmds = append(cmds, tickElapsed())
 		}
 	default:
+		if p.jq.open && p.jq.input != nil {
+			switch msg.(type) {
+			case tea.KeyPressMsg, tea.PasteMsg:
+				cmds = append(cmds, p.jqUpdate(msg))
+				cmds = append(cmds, p.jqSync())
+				return p, tea.Batch(cmds...)
+			}
+		}
 		if p.searchActive {
 			var cmd tea.Cmd
 			p.search, cmd = p.search.Update(msg)
@@ -265,7 +378,21 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 			}
 		}
 	}
+	// The jq output must always match the response and reveal state on screen.
+	cmds = append(cmds, p.jqSync())
 	return p, tea.Batch(cmds...)
+}
+
+// resetForRequest drops per-request state when another request is selected.
+func (p *Pane) resetForRequest() tea.Cmd {
+	p.histGen++
+	p.hist = histState{}
+	p.closeDiff()
+	p.jqClear()
+	if p.tab == tabHistory {
+		return p.ensureHistory()
+	}
+	return nil
 }
 
 type elapsedTickMsg struct{}
@@ -276,10 +403,21 @@ func tickElapsed() tea.Cmd {
 
 func (p *Pane) onKey(msg tea.KeyPressMsg) tea.Cmd {
 	s := msg.String()
+	if p.diff.open {
+		return p.diffKey(s, msg)
+	}
+	if p.tab == tabHistory && p.sendingID == "" {
+		if cmd, ok := p.historyKey(s); ok {
+			return cmd
+		}
+	}
 	switch s {
 	case "esc":
 		if p.sendingID != "" && p.ref.Request != nil {
 			return func() tea.Msg { return tui.CancelSendMsg{RequestID: p.ref.Request.ID} }
+		}
+		if p.tab == tabBody && p.jq.filter != "" {
+			p.jqClear() // Esc backs out of the jq filter
 		}
 		return nil
 	case "ctrl+s":
@@ -337,6 +475,25 @@ func (p *Pane) KeyHints() []ui.Hint {
 	if p.sendingID != "" {
 		return []ui.Hint{{Key: "Esc", Label: "Cancel", Priority: 0}}
 	}
+	if p.jq.open {
+		return []ui.Hint{{Key: "Enter", Label: "Apply", Priority: 0}, {Key: "Esc", Label: "Normal, then clear", Priority: 1}}
+	}
+	if p.diff.open {
+		return []ui.Hint{
+			{Key: "n/N", Label: "Hunk", Priority: 2},
+			{Key: "h", Label: "Headers/body", Priority: 2},
+			{Key: "j/k", Label: "Scroll", Priority: 3},
+			{Key: "Esc", Label: "Back", Priority: 0},
+		}
+	}
+	if p.tab == tabHistory {
+		return []ui.Hint{
+			{Key: "j/k", Label: "Move", Priority: 2},
+			{Key: "Enter", Label: "Open", Priority: 0},
+			{Key: "d", Label: "Diff with current", Priority: 1},
+			{Key: "[ ]", Label: "Tab", Priority: 3},
+		}
+	}
 	if p.transportErr() {
 		return []ui.Hint{{Key: "Ctrl-S", Label: "Retry", Priority: 0}, {Key: "?", Label: "Help", Priority: 5}}
 	}
@@ -347,6 +504,9 @@ func (p *Pane) KeyHints() []ui.Hint {
 	}
 	if p.tab == tabBody {
 		h = append(h, ui.Hint{Key: "w", Label: "Wrap", Priority: 6})
+		if p.jq.filter != "" {
+			h = append(h, ui.Hint{Key: "Esc", Label: "Clear jq", Priority: 1})
+		}
 	}
 	return h
 }
@@ -367,23 +527,45 @@ func (p *Pane) render() string {
 	if p.sendingID != "" && p.ref.Request != nil && p.ref.Request.ID == p.sendingID {
 		return p.viewSending(w)
 	}
+	if p.diff.open {
+		return p.viewDiff(w)
+	}
 	st := p.current()
-	if st == nil {
-		return t.EmptyState("No response yet", "Responses appear here after a request is sent.", "Press Ctrl-Enter to send.", w)
-	}
-	if st.result.Skipped {
-		return t.EmptyState("Request skipped", "The pre-request script called pm.execution.skipRequest().", "", w)
-	}
-	if st.result.Err != nil && st.result.Response == nil {
-		return p.viewTransportErr(t, st.result, w)
+	onHistory := p.tab == tabHistory && p.historyEnabled()
+	if !onHistory {
+		if st == nil {
+			next := "Press Ctrl-Enter to send."
+			if p.historyEnabled() {
+				next = "Press Ctrl-Enter to send, or Space H to see past sends."
+			}
+			return t.EmptyState("No response yet", "Responses appear here after a request is sent.", next, w)
+		}
+		if st.result.Skipped {
+			return t.EmptyState("Request skipped", "The pre-request script called pm.execution.skipRequest().", "", w)
+		}
+		if st.result.Err != nil && st.result.Response == nil {
+			return p.viewTransportErr(t, st.result, w)
+		}
 	}
 	var b strings.Builder
-	b.WriteString(p.summaryLine(st.result, w))
+	switch {
+	case st == nil:
+		b.WriteString(t.Truncate(t.Render(ui.TextSecondary, "No response yet in this session. Ctrl-S sends this request."), w))
+	case st.result.Skipped:
+		b.WriteString(t.Truncate(t.Render(ui.TextSecondary, "Request skipped by its pre-request script."), w))
+	default:
+		b.WriteString(p.summaryLine(st.result, w))
+	}
 	b.WriteByte('\n')
 	b.WriteString(p.tabsBar(w))
 	b.WriteByte('\n')
-	b.WriteString(p.tabContent(st.result, w))
-	if st.result.ScriptError != "" {
+	switch {
+	case onHistory:
+		b.WriteString(p.viewHistory(w, p.contentHeight()))
+	case st != nil:
+		b.WriteString(p.tabContent(st.result, w))
+	}
+	if st != nil && st.result.ScriptError != "" {
 		b.WriteByte('\n')
 		text := maskResultText(p, st.result, st.result.ScriptError)
 		b.WriteString(t.Render(ui.StatusDanger, t.Glyphs.Warn+" Script: "+t.Truncate(text, w)))
@@ -457,7 +639,7 @@ func testCounts(tests []tui.TestOutcome) (passed, total int) {
 func (p *Pane) tabsBar(w int) string {
 	t := p.th
 	tabs := p.buildTabs()
-	bar := t.Tabs(w, tabs, int(p.tab), p.focused)
+	bar := t.Tabs(w, tabs, p.tabIndex(), p.focused)
 	if ui.Width(bar) > 0 && strings.Count(bar, "\n") >= 1 {
 		first := strings.SplitN(bar, "\n", 2)[0]
 		if ui.Width(first)+10 < w {
@@ -465,14 +647,18 @@ func (p *Pane) tabsBar(w int) string {
 		}
 	}
 	// Collapsed selector at narrow widths.
-	label := tabs[int(p.tab)].Label
-	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  ] next", int(p.tab)+1, tabCount, label))
+	label := tabs[p.tabIndex()].Label
+	return t.Render(ui.TextSecondary, fmt.Sprintf("[%d/%d] %s  ] next", p.tabIndex()+1, len(tabs), label))
 }
 
 func (p *Pane) buildTabs() []ui.Tab {
 	st := p.current()
 	var tabs []ui.Tab
-	tabs = append(tabs, ui.Tab{Label: "Body"})
+	body := ui.Tab{Label: "Body"}
+	if p.jq.filter != "" {
+		body.Label = "Body (jq)"
+	}
+	tabs = append(tabs, body)
 	if st != nil && st.result.Response != nil {
 		n := len(st.result.Response.Headers)
 		tabs = append(tabs, ui.Tab{Label: "Headers", Count: n})
@@ -499,6 +685,13 @@ func (p *Pane) buildTabs() []ui.Tab {
 	}
 	tabs = append(tabs, tb)
 	tabs = append(tabs, ui.Tab{Label: "Timeline"})
+	if p.historyEnabled() {
+		hist := ui.Tab{Label: "History"}
+		if p.hist.loaded && !p.hist.err {
+			hist.Count = len(p.hist.items)
+		}
+		tabs = append(tabs, hist)
+	}
 	return tabs
 }
 
@@ -522,6 +715,9 @@ func (p *Pane) tabContent(r tui.SendResult, w int) string {
 	h := p.contentHeight()
 	switch p.tab {
 	case tabBody:
+		if p.jqBarVisible() {
+			return p.viewJQ(r, w, h)
+		}
 		return p.viewBody(r, w, h)
 	case tabHeaders:
 		return p.viewHeaders(r, w, h)
@@ -542,6 +738,9 @@ func (p *Pane) tabContent(r tui.SendResult, w int) string {
 func (p *Pane) contentHeight() int {
 	h := p.h - 3 // summary + tabs
 	if p.searchActive || p.pathActive {
+		h--
+	}
+	if p.jqBarVisible() {
 		h--
 	}
 	return max(1, h)
@@ -890,6 +1089,9 @@ func (p *Pane) cacheKey() string {
 func (p *Pane) clampScroll() { p.clampScrollTotal(p.scrollTotal()) }
 
 func (p *Pane) scrollTotal() int {
+	if p.jqShowing() {
+		return len(p.jq.lines)
+	}
 	if p.jsonDoc != nil && p.bodyMode == modePretty {
 		return p.jsonDoc.visibleLineCount()
 	}
@@ -974,14 +1176,38 @@ func (p *Pane) foldCursor(collapse bool) {
 	p.jsonDoc.foldAt(src-1, collapse)
 }
 
+// copyReadyMsg carries text a command prepared for the clipboard.
+type copyReadyMsg struct {
+	text  string
+	label string
+}
+
+// cmdCopyBody copies what the Body tab shows: the jq output while a filter is
+// applied, otherwise the body. Both are masked unless the pane is revealed;
+// masking runs in the command, off the Update goroutine.
 func (p *Pane) cmdCopyBody() tea.Cmd {
+	st := p.current()
+	if st == nil || st.result.Response == nil {
+		return toast(ui.ToastWarning, "Nothing to copy")
+	}
+	if p.jqShowing() {
+		text := p.jqText()
+		return func() tea.Msg { return copyReadyMsg{text: text, label: "jq output copied"} }
+	}
+	res, reveal := st.result, p.revealSecrets
 	return func() tea.Msg {
-		st := p.current()
-		if st == nil || st.result.Response == nil {
-			return tui.ToastMsg{Kind: ui.ToastWarning, Text: "Nothing to copy"}
-		}
-		_ = clipboard.WriteAll(string(st.result.Response.Body))
-		return tui.ToastMsg{Kind: ui.ToastSuccess, Text: "Response body copied"}
+		return copyReadyMsg{text: string(pagerBody(res, reveal)), label: "Response body copied"}
+	}
+}
+
+// writeClipboard puts text on the clipboard.
+func (p *Pane) writeClipboard(text string) tea.Cmd {
+	if p.deps.Clipboard != nil {
+		return p.deps.Clipboard(text)
+	}
+	return func() tea.Msg {
+		_ = clipboard.WriteAll(text)
+		return nil
 	}
 }
 

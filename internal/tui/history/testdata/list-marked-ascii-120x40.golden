@@ -1,0 +1,5 @@
+postctl  demo — History                                                                                        env  none
+------------------------------------------------------------------------------------------------------------------------2026-10-03
+* GET   First  200  https://api.test/a  10 ms
+> GET   Second  404  https://api.test/b  20 ms
+Filter  all
