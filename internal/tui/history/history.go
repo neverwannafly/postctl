@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
@@ -25,6 +26,15 @@ type Deps struct {
 	Log func() (tui.HistoryReader, error)
 	// Curl builds a redacted curl command for an entry.
 	Curl func(ctx context.Context, e *history.Entry) (string, error)
+	// Now supplies the clock for mouse click counting; nil means time.Now.
+	Now func() time.Time
+}
+
+func (d Deps) now() time.Time {
+	if d.Now != nil {
+		return d.Now()
+	}
+	return time.Now()
 }
 
 // Factory returns a screen factory wired with d.
@@ -43,6 +53,11 @@ const (
 )
 
 type statusFilter int
+
+const (
+	historyHeaderRows = 2
+	filterLabel       = "Filter  "
+)
 
 const (
 	filterAll statusFilter = iota
@@ -249,6 +264,15 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		return m, m.reload()
 	}
 	return m, nil
+}
+
+// HandleMouse implements tui.ScreenMouseHandler for the history filter.
+func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
+	if !m.filtering || m.filter == nil {
+		return nil
+	}
+	m.filter.mouseUpdate(msg, x-ui.Width(filterLabel), y-historyHeaderRows, m.deps.now())
+	return nil
 }
 
 // start loads the list and, when the screen was opened on an entry, that
@@ -499,7 +523,7 @@ func (m *Model) viewList() string {
 	}
 	body := m.screenHeader(title)
 	if m.filtering {
-		body += t.Render(ui.AccentPrimary, "Filter  "+m.filter.view()) + "\n"
+		body += t.Render(ui.AccentPrimary, filterLabel+m.filter.view()) + "\n"
 	}
 	if len(m.items) == 0 {
 		body += t.EmptyState("No history yet", "Send a request with Ctrl-S; entries appear here.", "Ctrl-S Send", m.w)

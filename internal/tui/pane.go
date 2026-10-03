@@ -143,6 +143,12 @@ type MouseHandler interface {
 	HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd
 }
 
+// ScreenMouseHandler is implemented by full-body screens with mouse-aware
+// fields. Coordinates are relative to the screen body.
+type ScreenMouseHandler interface {
+	HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd
+}
+
 // ActionSource lets a pane contribute command-palette actions. The shell asks
 // on every palette open, so the list may change with pane state. Actions can
 // also be added with [Registry].

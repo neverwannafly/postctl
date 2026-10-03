@@ -8,6 +8,7 @@ package vimfield
 import (
 	"regexp"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -313,3 +314,35 @@ func PureRef(text string) bool {
 
 // SetCursor moves the cursor to a clamped zero-based row and column.
 func (f *Field) SetCursor(row, col int) { f.m.SetCursor(row, col) }
+
+// PosAt maps a cell in the field's frame to a buffer position.
+func (f *Field) PosAt(x, y int) (row, col int, ok bool) { return f.m.PosAt(x, y) }
+
+// Mouse tracks one field mouse gesture and click count. A tracker belongs to
+// one pane or screen and is updated only from Update/HandleMouse paths.
+type Mouse struct {
+	mouse vimtext.Mouse
+}
+
+// Active reports whether a press that began in a field is awaiting release.
+func (m *Mouse) Active() bool { return m.mouse.Active() }
+
+// Press begins a gesture at x,y in f. An existing insert-mode field stays in
+// insert mode; every other click focuses normal mode. Consecutive clicks on
+// the same grapheme within 400 ms select its Vim inner word, then its line.
+func (m *Mouse) Press(f *Field, x, y int, now time.Time) bool {
+	if f == nil {
+		return false
+	}
+	return m.mouse.Press(f.m, x, y, now)
+}
+
+// Motion extends a pressed single click as a charwise visual selection.
+// Motion beyond an edge scrolls one row, or one column for a single-line
+// field, before mapping the clamped edge cell.
+func (m *Mouse) Motion(x, y int) bool {
+	return m.mouse.Motion(x, y)
+}
+
+// Release ends the active gesture. A drag remains in visual mode.
+func (m *Mouse) Release() bool { return m.mouse.Release() }

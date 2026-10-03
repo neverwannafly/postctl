@@ -16,7 +16,7 @@ func (m *Model) rows() []model.Variable {
 	return nil
 }
 
-func (m *Model) rowsH() int { return max(1, m.h-3-4) }
+func (m *Model) rowsH() int { return max(1, m.h-envScreenHeaderRows-envTableChromeRows) }
 
 // ensureList returns the current list, creating globals on first use.
 func (m *Model) ensureList() *[]model.Variable {
@@ -219,7 +219,7 @@ func (m *Model) beginEdit(col int) {
 	}
 	f, _ := screenfield.New(m.th, val, ph, masked)
 	m.in = f
-	m.in.SetWidth(max(4, m.w-15))
+	m.in.SetWidth(max(4, m.w-envValueLabelWidth))
 	m.editBaseline = val
 	m.editSkipValue = col == 1 && v.IsSecret() && v.Value == "" && v.SecretRef != "" && !m.reveal
 }

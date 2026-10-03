@@ -56,8 +56,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
-| UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Started | ws/ux-m2-editor-mouse | 2026-10-03 22:10 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Done, not merged | qa/ux | 2026-10-03 22:50 IST |
+| UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Round 2 in progress (not merged) | qa/ux | 2026-10-03 23:00 IST |
 
 ## Entries
 
@@ -1269,3 +1269,64 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green (build, `go test -race ./...`, golangci-lint 0 issues); `task tui:smoke` 17 PASS, 0 FAIL; `go run ./cmd/postctl --help` ok; `go mod tidy` no diff.
 - Blockers / questions: none.
 - Next: orchestrator merges `qa/ux`.
+
+### 2026-10-03 22:05 IST · UX-M2 · GPT-5.6 Sol (medium) · STARTED
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: read the brief, repository and TUI agent guides, binding decisions, design and terminal guidance, architecture documents, and relevant flow documentation.
+- Files: `docs/ledger.md`.
+- Decisions: additive vimtext hit-mapping API; mouse editor behavior follows the M1 press and clock rules.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: add failing hit-mapping and editor mouse behavior tests, then implement the focused field paths.
+
+### 2026-10-03 22:24 IST · UX-M2 · GPT-5.6 Sol (medium) · DONE
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: added cell-to-buffer hit mapping, reusable click counting and drag selection; wired request, WebSocket, response, overlay and full-screen fields; routed releases beyond pane bounds; derived tab hit rows from layout constants; documented application and native terminal mouse behavior.
+- Files: `internal/tui/{vimtext,vimfield,screenfield,request,response,wspane,envedit,runner,history}` and root mouse/overlay/screen hooks; `README.md`; `docs/design-language.md`; `docs/ledger.md`.
+- Decisions: clicks preserve an existing insert session but open inactive cells in normal mode; hidden selections remain masked; motion and release route only to the field whose press began the drag; no key hints changed.
+- Tests: hit mapping covers gutters, scroll, wide clusters, tabs, masks, placeholders and end-of-line clamping; behavior covers click modes, drag/release, click counts, edge scrolling, focused-field wheels, pane breakpoints, ASCII, disabled mouse, table cells and the read-only response body. Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; 0 goldens changed.
+- Blockers / questions: none.
+- Next: ready for orchestrator review and merge.
+
+### 2026-10-03 22:35 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: security review passed; correctness review identified insert-mode preservation, uncovered form fields, edge-drag scrolling, pointer hit boundaries, overlay release state, large-line mapping cost, duplicated layout geometry and purity coverage.
+- Files: `docs/ledger.md`.
+- Decisions: add a failing regression test for each finding before its fix; keep all editor API changes additive.
+- Tests: pending.
+- Blockers / questions: none.
+- Next: fix review findings, run the Neovim differential and full gates, then commit.
+
+### 2026-10-03 22:47 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: fixed all correctness findings from review: preserved insert mode in already-focused fields; added request and WebSocket table/form hit mapping with fixed-mask yanks for hidden credentials; made edge drag scroll exactly one line; bounded wheel ownership to the field under the pointer; cleared pane and root drag state through overlays; cached large-line hit clusters and widths; shared mouse/view layout constants; added press and mid-drag purity coverage.
+- Files: `internal/tui/{vimtext,request,wspane,envedit,history,runner,response}` plus root mouse/overlay tests and `docs/ledger.md`.
+- Decisions: credential-bearing header values use the same fixed-mask redaction contract as secret form rows; the hit cache validates each entry against current line text, so edits and undo cannot reuse stale clusters.
+- Tests: regression tests failed before their fixes; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; module files unchanged; 0 goldens changed.
+- Blockers / questions: none.
+- Next: commit for correctness re-review; do not push.
+
+### 2026-10-03 22:51 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: re-review found duplicate drag logic in `vimfield.Mouse` and insert-mode loss when clicking an already-open table cell.
+- Files: `docs/ledger.md`.
+- Decisions: pane fields will delegate gestures to the tested `vimtext.Mouse` implementation; regressions will be tested through wrappers and panes before fixes.
+- Tests: pending.
+- Blockers / questions: none.
+- Next: add failing wrapper/pane tests, fix both paths, run gates and commit.
+
+### 2026-10-03 22:55 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: removed the duplicate `vimfield` gesture implementation by delegating to `vimtext.Mouse`; preserved insert mode when an already-open request or WebSocket table cell is clicked.
+- Files: `internal/tui/{vimfield,request,response,wspane}` and `docs/ledger.md`.
+- Decisions: one shared gesture implementation owns edge scrolling, selection and click counting for pane fields.
+- Tests: regressions failed before fixes; wrapper, request script, response body and request/WebSocket table tests pass; request View remains pure mid-drag; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; 0 goldens changed.
+- Blockers / questions: none.
+- Next: commit for correctness re-review; do not push.
+
+### 2026-10-03 22:58 IST · UX-M2 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-m2-editor-mouse` (8e4e6ee) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged mouse inside every vimtext field: `vimtext.PosAt`, `vimtext.Mouse`, `ScrollColumns`; click places the cursor (normal mode, insert kept when clicking inside the field being edited), drag selects in visual with one-line edge scroll, double click `viw`, triple click `V`, wheel scrolls the field under the pointer; request and WebSocket form, secret and key/value cells; M1 follow-ups (shared layout constants, behaviour-level breakpoint and ASCII tests).
+- Reviews: security passed first time (drag, double and triple click plus yank on a hidden secret yield the fixed mask; stubbing the mask fails the tests). Correctness: three rounds. Fixed: a click in an insert-mode field dropped to normal, form and secret fields not mouse-wired, edge drag scrolling 3 lines per event (the pane wrapper had its own drag path; now delegates to vimtext), wheel outside the field, drag state left after a release over an overlay, per-event re-splitting of long lines.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+- Next: UX-QA adds the mouse-selection leak case.

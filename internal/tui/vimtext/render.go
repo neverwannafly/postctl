@@ -92,7 +92,7 @@ func (m *Model) renderLine(row, width int) string {
 	for i := from; i < len(cs); i++ {
 		source := cs[i]
 		cell := source
-		if mask != "" && source != "\t" {
+		if mask != "" {
 			cell = mask
 		} else if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
@@ -278,3 +278,72 @@ func (m *Model) ScrollLines(n int) {
 
 // Top is the zero-based index of the first visible line.
 func (m *Model) Top() int { return m.top }
+
+// ScrollColumns moves a single-line editor's horizontal window by grapheme
+// columns. The cursor is kept in the visible window and the buffer and mode
+// are unchanged.
+func (m *Model) ScrollColumns(n int) {
+	if n == 0 || len(m.lines) == 0 {
+		return
+	}
+	cs := clusters(m.lines[m.row])
+	room := max(1, m.width-m.gutterWidth())
+	maxLeft := max(0, len(cs)-room)
+	m.left = min(max(0, m.left+n), maxLeft)
+	if m.col < m.left {
+		m.col = m.left
+	}
+	if m.col >= m.left+room {
+		m.col = min(len(cs), m.left+room-1)
+	}
+}
+
+// PosAt maps a cell in the editor's own frame to a zero-based grapheme
+// position. Cells in the line-number gutter or outside the frame do not map.
+// Either cell of a wide grapheme maps to that grapheme. A position beyond the
+// displayed end of a line clamps to its last grapheme in normal mode and to
+// EOL in insert mode. An empty buffer, including its placeholder, maps to 0,0.
+func (m *Model) PosAt(x, y int) (row, col int, ok bool) {
+	if x < 0 || x >= m.width || y < 0 || y >= m.height {
+		return 0, 0, false
+	}
+	bodyHeight := m.height
+	if m.searching {
+		bodyHeight--
+	}
+	if y >= bodyHeight {
+		return 0, 0, false
+	}
+	gutter := m.gutterWidth()
+	if x < gutter {
+		return 0, 0, false
+	}
+	row = m.top + y
+	if row >= len(m.lines) {
+		return 0, 0, false
+	}
+	cs := m.hitClusters(row)
+	if len(cs) == 0 {
+		return row, 0, true
+	}
+	cell := x - gutter
+	used := 0
+	maskWidth := 0
+	if m.opts.Mask != "" {
+		maskWidth = max(1, uniseg.StringWidth(m.opts.Mask))
+	}
+	for i := min(m.left, len(cs)); i < len(cs); i++ {
+		width := m.hitCache[row].widths[i]
+		if maskWidth != 0 {
+			width = maskWidth
+		}
+		if cell < used+width {
+			return row, i, true
+		}
+		used += width
+	}
+	if m.mode == Insert {
+		return row, len(cs), true
+	}
+	return row, len(cs) - 1, true
+}

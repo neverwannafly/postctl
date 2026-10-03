@@ -63,11 +63,14 @@ type Pane struct {
 	sc    *scope // preview scope: secrets masked
 	scNum *scope // validation scope: secrets replaced by 0
 
-	zone zone
-	tab  tabID
-	sect section
-	url  *vimfield.Field
-	urlE bool // the URL field has input focus
+	zone   zone
+	tab    tabID
+	sect   section
+	url    *vimfield.Field
+	urlE   bool // the URL field has input focus
+	mouse  vimfield.Mouse
+	mouseX int
+	mouseY int
 
 	params, headers *kvView
 	auth            *authView
