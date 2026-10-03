@@ -52,7 +52,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
-| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | PROGRESS (review fixes) | ws/ux-v2b-screens | 2026-10-03 20:40 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
@@ -1079,3 +1079,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Leak `assertAbsent` checks raw and ANSI-stripped text; env-editor mask assert targets the `Value (secret)` line only. Runner setup `i`/`a`/`I`/`A` focus fields in insert; vimtext EOL scroll uses cell widths; screenfield yank test via `New`+`SetClipboard`.
 - Tests: `task agents:check`, `task tui:smoke`, nvim differential green. Stub `Options.Mask` off: all six env-editor frames fail (insert/normal/visual × 80/140). Full sweep with ANSI strip: no other frame regressions.
 - Next: orchestrator merge.
+
+### 2026-10-03 20:56 IST · UX-V2b · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-v2b-screens` (892acdd) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged vim editing for the palette, switcher, tree filter, name prompts, env editor cells, runner setup and export fields, and the history screen filter; shared `listmotion` (j/k, gg/G, Ctrl-d/u) and `screenfield`; additive `vimtext` `Options.Mask` (one glyph per cluster while a secret is being edited; yank and every other view use the fixed mask).
+- Reviews: five rounds. Fixed: an unhydrated secret erased on Enter, a render-time Redact that broke cursor mapping, a leak sweep that could not fail, View sizing calls, runner field routing, a committed conflict marker. The leak sweep now also searches ANSI-stripped frames repo-wide (cursor escapes could split a sentinel); no other frame regressed. Orchestrator re-proved it: with the screenfield mask disabled, `go test ./internal/qa` fails.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+- Next: UX-V2a must adopt `Options.Mask` and add `SetMask(string)` (empty reveals) instead of its own mask API.
