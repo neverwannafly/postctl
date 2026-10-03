@@ -645,11 +645,9 @@ func TestMouseClickSelectsTheRowDrawnUnderThePointer(t *testing.T) {
 		if y < 0 {
 			t.Fatalf("%dx%d: the second variable is not drawn", size.w, size.h)
 		}
-		x := size.w - 5
+		x := 7 // inside the key column
 		if size.w >= 100 {
-			x = listW + 3 + 7 // inside the key column
-		} else {
-			x = 7
+			x = listW + 3 + 7
 		}
 		h.scr.HandleMouse(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft}, x, y)
 		if h.scr.cur != want {

@@ -57,7 +57,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
 | UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
-| UX-QA final pass | Sonnet 5.5 (high) | Round 2 in progress (not merged) | qa/ux | 2026-10-03 23:00 IST |
+| UX-QA final pass | Sonnet 5.5 (high) | Done (round 2), not merged | qa/ux | 2026-10-03 23:30 IST |
 
 ## Entries
 
@@ -1330,3 +1330,19 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Reviews: security passed first time (drag, double and triple click plus yank on a hidden secret yield the fixed mask; stubbing the mask fails the tests). Correctness: three rounds. Fixed: a click in an insert-mode field dropped to normal, form and secret fields not mouse-wired, edge drag scrolling 3 lines per event (the pane wrapper had its own drag path; now delegates to vimtext), wheel outside the field, drag state left after a release over an overlay, per-event re-splitting of long lines.
 - Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
 - Next: UX-QA adds the mouse-selection leak case.
+
+### 2026-10-03 23:30 IST · UX-QA · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: `qa/ux` · `/Users/shubham/work/postctl-wt/qa-ux`. Merged `main` (UX-M2) first; only `docs/ledger.md` conflicted (kept both sides' entries, main's rows, mine).
+- Did (round 2, one commit per item):
+  1. Failure paths in `internal/qa` print a frame's size (`frameShape`), never its content (flow steps, History tab, jq).
+  2. OAuth 2.0 token sentinel (unique-first) stored as the token the engine sends; the server echoes it in a plain header. Stub proof: engine session ignoring OAuth token values in its redactor -> `TestSecretDoesNotLeakThroughUXFlows` fails (frame and `history.jsonl`).
+  3. The `$EDITOR` file sweep no longer depends on the refusal message: no Fatal there; a separate count check plus the file search. Stub proof: refusal removed in `request/form.go` -> fails with "$EDITOR file auth rows" leak; same for `wspane/editor.go` -> "websocket auth rows".
+  4. Masked and revealed curl of "Literal auth" (`Space y`, `Space Y`); the revealed one must hold the credential (so the masked one proves something) and is exempt. Stub proof: `authArgs` secret() returning the value -> clipboard leak "curl on literal auth".
+  5. Mouse drag-select over hidden secret fields (request Password row, WebSocket Token row, env editor secret cell) with real click, motion, release messages, then `y`; the drag covers more than 12 characters. Stub proofs: `request/vim.go` Redact, `wspane/vim.go` Redact and `screenfield/field.go` fixed mask each fail with "clipboard mouse selection" leaks.
+     Found while doing it: the env editor hit test was one line off (a click selected the row below the one drawn); fixed with a failing test first (`TestMouseClickSelectsTheRowDrawnUnderThePointer`), commit `envedit`.
+     Also found: "Copied" markers for the body and env-cell yanks matched a leftover toast; those steps now require the clipboard write itself.
+  6. Design call: `setNotice` in the request and WebSocket panes now also emits a shell `ToastMsg`, so notices show whichever pane is focused (`TestActionNoticesShowWhicheverPaneIsFocused`, 80x24, response focused). The pane keeps its status-row copy (removing it broke 25+ pane tests and goldens), so at wide sizes the text can show twice. `docs/design-language.md` Interaction language updated. `TestRestoreAutosavePersistence` kept only the last message of a batch; it now runs every message.
+  7. Design call: after `[` or `]` an unbound key ends the repeat and is handled normally (`TestKeyAfterABracketIsHandledNormally`; `TestUnknownKeyAfterAPrefixSaysSo` keeps `g` and `Space`). Updated `leader.go`, `docs/design-language.md` Key map, `docs/keys.md` (`task keys`), and a dated note in `docs/briefs/UX-V0-shell-keys.md`.
+- Tests: see the gate result below. Deferred items from the DONE entry: the hidden-notice item is resolved by 6, the `]` item by 7; mouse leak coverage by 5.
+- Blockers / questions: duplicate notice text at wide sizes (status row plus toast); drop the status-row copy later if wanted.
+- Next: orchestrator merges `qa/ux`.
