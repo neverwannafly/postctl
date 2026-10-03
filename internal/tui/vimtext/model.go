@@ -194,6 +194,14 @@ func New(th ui.Theme, opts Options) *Model {
 	return m
 }
 
+// SetClipboard replaces the clipboard hook (for tests and custom hosts).
+func (m *Model) SetClipboard(fn func(text string) tea.Cmd) {
+	if fn == nil {
+		fn = tea.SetClipboard
+	}
+	m.opts.Clipboard = fn
+}
+
 // SetSize sets the drawing area and updates scroll offsets.
 func (m *Model) SetSize(w, h int) {
 	m.width, m.height = max(1, w), max(1, h)

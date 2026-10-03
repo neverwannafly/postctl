@@ -1073,3 +1073,9 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Security re-check fixes — leak sweep hydrates secret via `thenEdit`/`hydrate` (no Ctrl-R), captures insert/normal/visual env-editor frames and history vim filter; Esc once stays in field. Fixed mask: per-glyph while editing, fixed four-glyph `Redact` for yank; narrow-width `ensureVisible`; edit-mode purity tests (envedit, runner, screenfield). History merge keeps vim filter + per-request filter.
 - Tests: `task agents:check`, `task tui:smoke`, nvim differential. Leak stub proofs (/tmp copy): unset `screenfield` `Options.Mask` fails env-editor insert 80+140; vimtext render mask disabled fails insert 80+140; identity `Redact` does not fail display frames (yank length covered by `TestYankMaskedSecretUsesFixedMask`).
 - Next: orchestrator merge.
+
+### 2026-10-03 21:15 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Leak `assertAbsent` checks raw and ANSI-stripped text; env-editor mask assert targets the `Value (secret)` line only. Runner setup `i`/`a`/`I`/`A` focus fields in insert; vimtext EOL scroll uses cell widths; screenfield yank test via `New`+`SetClipboard`.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential green. Stub `Options.Mask` off: all six env-editor frames fail (insert/normal/visual × 80/140). Full sweep with ANSI strip: no other frame regressions.
+- Next: orchestrator merge.

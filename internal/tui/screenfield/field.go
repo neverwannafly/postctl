@@ -63,6 +63,9 @@ func fixedMask(th ui.Theme) string {
 	return th.Glyphs.Mask
 }
 
+// SetClipboard replaces the clipboard hook (for tests).
+func (f *Field) SetClipboard(fn func(text string) tea.Cmd) { f.ed.SetClipboard(fn) }
+
 // Focus returns the field to insert mode.
 func (f *Field) Focus() tea.Cmd { return f.ed.Focus() }
 

@@ -221,6 +221,26 @@ func TestEnsureVisibleIncludesCursorCell(t *testing.T) {
 	}
 }
 
+func TestEnsureVisiblePastEOLUsesCellWidths(t *testing.T) {
+	th := ui.NewTheme(true, true, false)
+	m := New(th, Options{SingleLine: true, StartInsert: true})
+	m.SetValue("界a")
+	m.SetSize(3, 1)
+	m.SetCursor(0, 2)
+	if m.left == 0 {
+		t.Fatal("EOL scroll used grapheme count; cursor hidden at exact cell fit")
+	}
+	if !strings.Contains(m.View(), " ") {
+		t.Fatalf("expected visible insert cursor at EOL, got:\n%s", m.View())
+	}
+	m.mode = Normal
+	m.SetCursor(0, 2)
+	m.ensureVisible()
+	if m.left == 0 {
+		t.Fatal("normal mode EOL scroll should use cell widths")
+	}
+}
+
 func TestUndoRedoHistoryIsBounded(t *testing.T) {
 	m := New(ui.NewTheme(true, true, false), Options{})
 	for i := range historyLimit + 25 {

@@ -185,6 +185,39 @@ func TestNoSecretsInSetupView(t *testing.T) {
 	}
 }
 
+func TestSetupIAFocusesUnfocusedFieldInInsert(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  tea.KeyPressMsg
+	}{
+		{"i", tea.KeyPressMsg{Code: 'i', Text: "i"}},
+		{"a", tea.KeyPressMsg{Code: 'a', Text: "a"}},
+		{"I", tea.KeyPressMsg{Code: 'I', Text: "I", Mod: tea.ModShift}},
+		{"A", tea.KeyPressMsg{Code: 'A', Text: "A", Mod: tea.ModShift}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := New(testEnv(80, 24), Deps{})
+			m.SetSize(80, 24)
+			for range 2 {
+				next, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+				if next != nil {
+					m = next.(*Model)
+				}
+			}
+			if m.iterations == nil || m.iterations.Focused() {
+				t.Fatal("iterations field should be selected but not focused")
+			}
+			next, _ := m.Update(tc.key)
+			if next != nil {
+				m = next.(*Model)
+			}
+			if !m.iterations.Focused() || m.iterations.VimMode() != "INSERT" {
+				t.Fatalf("focused=%v mode=%q", m.iterations.Focused(), m.iterations.VimMode())
+			}
+		})
+	}
+}
+
 func TestViewIsPureInEditMode(t *testing.T) {
 	m := New(testEnv(80, 24), Deps{})
 	m.SetSize(80, 24)

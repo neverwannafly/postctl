@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -26,26 +25,16 @@ func TestYankMaskedSecretUsesFixedMask(t *testing.T) {
 	th := ui.NewTheme(true, true, false)
 	want := fixedMask(th)
 	var clips []string
-	ed := vimtext.New(th, vimtext.Options{
-		SingleLine:  true,
-		StartInsert: false,
-		Mask:        maskGlyph(th),
-		Redact: func(s string) string {
-			if s == "" {
-				return ""
-			}
-			return fixedMask(th)
-		},
-		Clipboard: func(s string) tea.Cmd {
-			clips = append(clips, s)
-			return nil
-		},
+	f, _ := New(th, strings.Repeat("s", 30), "", true)
+	f.SetWidth(40)
+	f.SetClipboard(func(s string) tea.Cmd {
+		clips = append(clips, s)
+		return nil
 	})
-	ed.SetValue(strings.Repeat("s", 30))
-	ed.SetSize(40, 1)
-	_ = ed.Focus()
-	_, _ = ed.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
-	_, _ = ed.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	_ = f.Focus()
+	_, _ = f.Update(tea.KeyPressMsg{Code: tea.KeyEscape})
+	_, _ = f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	_, _ = f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
 	if len(clips) != 1 || clips[0] != want {
 		t.Fatalf("yank copied %q, want fixed mask", clips[0])
 	}

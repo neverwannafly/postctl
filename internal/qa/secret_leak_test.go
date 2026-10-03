@@ -16,6 +16,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/shubham/postctl/internal/engine"
 	"github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
@@ -365,7 +366,7 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 			}
 			assertAbsent(t, secret, name+" frame", []byte(frame))
 			if strings.HasPrefix(name, "env editor secret") {
-				assertMaskGlyphPresent(t, maskGlyph, name+" frame", []byte(frame))
+				assertEnvSecretFieldMask(t, maskGlyph, name+" frame", frame)
 			}
 			if strings.HasSuffix(name, "response cookies") {
 				// The cookie column clips long values, so also look for the start.
@@ -556,16 +557,29 @@ func assertWorkspaceFilesClean(t *testing.T, root, sentinel string) {
 
 func assertAbsent(t *testing.T, sentinel, artifact string, raw []byte) {
 	t.Helper()
-	if strings.Contains(string(raw), sentinel) {
+	text := string(raw)
+	stripped := ansi.Strip(text)
+	if strings.Contains(text, sentinel) || strings.Contains(stripped, sentinel) {
 		t.Errorf("secret leaked to %s", artifact)
 	}
 }
 
-func assertMaskGlyphPresent(t *testing.T, glyph, artifact string, raw []byte) {
+func assertEnvSecretFieldMask(t *testing.T, glyph, artifact, frame string) {
 	t.Helper()
-	if glyph == "" || !strings.Contains(string(raw), glyph) {
-		t.Errorf("expected mask glyph in %s", artifact)
+	if glyph == "" {
+		t.Errorf("empty mask glyph for %s", artifact)
+		return
 	}
+	for _, line := range strings.Split(ansi.Strip(frame), "\n") {
+		if !strings.Contains(line, "Value (secret)") {
+			continue
+		}
+		if !strings.Contains(line, glyph) {
+			t.Errorf("expected mask glyph on the secret value field line in %s", artifact)
+		}
+		return
+	}
+	t.Errorf("no Value (secret) field line in %s", artifact)
 }
 
 func assertMaskGlyphsAbsent(t *testing.T, root string) {

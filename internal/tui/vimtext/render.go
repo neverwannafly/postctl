@@ -184,7 +184,14 @@ func (m *Model) ensureVisible() {
 		if total+cursorWidth <= room {
 			m.left = 0
 		} else {
-			m.left = max(0, len(cs)-(room-cursorWidth))
+			need := total + cursorWidth - room
+			left := 0
+			widthBefore := 0
+			for left < len(cs) && widthBefore < need {
+				widthBefore += clusterWidth(cs[left], m.opts.TabText)
+				left++
+			}
+			m.left = left
 		}
 	} else if total <= room {
 		m.left = 0

@@ -285,6 +285,14 @@ func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		}
 		return m, cmd
 	}
+	if f := m.activeField(); f != nil && !f.Focused() {
+		switch k.String() {
+		case "i", "a", "I", "A":
+			focus := f.FocusNormal()
+			_, _, cmd, _, _ := f.UpdateEx(k)
+			return m, tea.Batch(focus, cmd)
+		}
+	}
 	m.setupNav.Cursor = m.field
 	if r := listmotion.Key(k, listmotion.Config{Count: 7, Page: 7}, &m.setupNav); r.Handled {
 		if r.Moved {
