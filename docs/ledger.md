@@ -1011,3 +1011,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: reuse footer toast for the notice; `StartupCmd` + `StartupNoopMsg` in Options/Init; no real tmux in tests.
 - Tests: `task agents:check` green (build, race, lint 0).
 - Next: orchestrator merge; not pushed.
+
+### 2026-10-03 20:21 IST · UX-T · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-t-terminal` merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged `internal/termx` (tmux settings check with a one-time warning, Ctrl-h/j/k/l handoff at pane edges), `docs/terminal.md` (Ghostty and tmux setup, navigator bindings).
+- Reviews: invariants/security approved a5e9c3d; tmux/docs correctness approved b2d65ef after fixes (navigator snippet rewritten and parsed on a private tmux server, per-option query failures no longer hide warnings, `extended-keys-format` is tmux 3.5+, Ghostty lines). Declined: adding the tmux notice to the leak sweep (fixed text and option names only).
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` run.
+- Next: none for T.
