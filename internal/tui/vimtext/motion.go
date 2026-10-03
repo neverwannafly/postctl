@@ -31,17 +31,19 @@ func (m *Model) applyMotion(key string, count int) bool {
 		}
 	case "0", "home":
 		m.col = 0
+		m.preferred = 0
 	case "^":
 		m.firstNonBlank()
 	case "$", "end":
 		m.col = max(0, m.lineLen(m.row)-1)
+		m.preferred = -1
 	case "G":
 		if m.count > 0 {
 			m.row = min(m.count-1, len(m.lines)-1)
 		} else {
 			m.row = len(m.lines) - 1
 		}
-		m.col = min(m.col, max(0, m.lineLen(m.row)-1))
+		m.firstNonBlank()
 	case "%":
 		m.matchBracket()
 	default:
@@ -56,29 +58,29 @@ func (m *Model) matchBracket() {
 		open, close string
 	}
 	pairs := []bracket{{"(", ")"}, {"[", "]"}, {"{", "}"}}
-	cs := clusters(m.lines[m.row])
-	if len(cs) == 0 {
-		return
-	}
-	start := m.col
-	for start < len(cs) {
+	cells := m.bufferCells()
+	start := -1
+	for i, cell := range cells {
+		if cell.pos.row != m.row || cell.pos.col < m.col || cell.text == "\n" {
+			continue
+		}
 		found := false
 		for _, p := range pairs {
-			if cs[start] == p.open || cs[start] == p.close {
+			if cell.text == p.open || cell.text == p.close {
 				found = true
 			}
 		}
 		if found {
+			start = i
 			break
 		}
-		start++
 	}
-	if start >= len(cs) {
+	if start < 0 {
 		return
 	}
 	for _, p := range pairs {
 		dir, depth := 0, 0
-		switch cs[start] {
+		switch cells[start].text {
 		case p.open:
 			dir = 1
 		case p.close:
@@ -86,36 +88,56 @@ func (m *Model) matchBracket() {
 		default:
 			continue
 		}
-		for i := start; i >= 0 && i < len(cs); i += dir {
-			switch cs[i] {
+		for i := start; i >= 0 && i < len(cells); i += dir {
+			switch cells[i].text {
 			case p.open:
 				depth += dir
 			case p.close:
 				depth -= dir
 			}
 			if depth == 0 {
-				m.col = i
+				m.setMotionPosition(cells[i].pos.row, cells[i].pos.col)
 				return
 			}
 		}
 	}
 }
 
-func (m *Model) objectRange(inner bool, object byte) (position, position, bool) {
+type bufferCell struct {
+	text string
+	pos  position
+}
+
+func (m *Model) bufferCells() []bufferCell {
+	var out []bufferCell
+	for row, line := range m.lines {
+		for col, text := range clusters(line) {
+			out = append(out, bufferCell{text: text, pos: position{row, col}})
+		}
+		if row+1 < len(m.lines) {
+			out = append(out, bufferCell{text: "\n", pos: position{row, m.lineLen(row)}})
+		}
+	}
+	return out
+}
+
+func (m *Model) objectRange(inner bool, object byte, count int) (position, position, bool, bool) {
 	cs := clusters(m.lines[m.row])
 	if len(cs) == 0 {
-		return position{}, position{}, false
+		return position{}, position{}, false, false
 	}
 	if object == 'w' || object == 'W' {
 		big := object == 'W'
 		start := min(m.col, len(cs)-1)
 		if isSpaceCluster(cs[start]) {
-			for start < len(cs) && isSpaceCluster(cs[start]) {
-				start++
+			end := start
+			for start > 0 && isSpaceCluster(cs[start-1]) {
+				start--
 			}
-			if start == len(cs) {
-				return position{}, position{}, false
+			for end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
+				end++
 			}
+			return position{m.row, start}, position{m.row, end}, true, false
 		}
 		end := start
 		for start > 0 && sameWordClass(cs[start], cs[start-1], big) {
@@ -124,8 +146,19 @@ func (m *Model) objectRange(inner bool, object byte) (position, position, bool) 
 		for end+1 < len(cs) && sameWordClass(cs[end], cs[end+1], big) {
 			end++
 		}
+		for range max(1, count) - 1 {
+			next := end + 1
+			for next < len(cs) && isSpaceCluster(cs[next]) {
+				next++
+			}
+			if next >= len(cs) {
+				break
+			}
+			for end = next; end+1 < len(cs) && sameWordClass(cs[end], cs[end+1], big); end++ {
+			}
+		}
 		if !inner {
-			if end+1 < len(cs) {
+			if end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
 				for end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
 					end++
 				}
@@ -135,63 +168,147 @@ func (m *Model) objectRange(inner bool, object byte) (position, position, bool) 
 				}
 			}
 		}
-		return position{m.row, start}, position{m.row, end}, true
+		return position{m.row, start}, position{m.row, end}, true, false
 	}
 	open, close := "", ""
 	switch object {
 	case '"', '\'', '`':
 		open, close = string(object), string(object)
-	case '(', 'b':
+	case '(', ')', 'b':
 		open, close = "(", ")"
-	case '{', 'B':
+	case '{', '}', 'B':
 		open, close = "{", "}"
-	case '[':
+	case '[', ']':
 		open, close = "[", "]"
 	default:
-		return position{}, position{}, false
+		return position{}, position{}, false, false
 	}
-	left := -1
-	depth := 0
-	for i := min(m.col, len(cs)-1); i >= 0; i-- {
-		if open != close && cs[i] == close {
-			depth++
-		}
-		if cs[i] == open {
-			if depth == 0 {
-				left = i
+	if open == close {
+		left, right := -1, -1
+		for i := 0; i < len(cs); {
+			if cs[i] != open {
+				i++
+				continue
+			}
+			j := i + 1
+			for j < len(cs) && cs[j] != close {
+				j++
+			}
+			if j >= len(cs) {
 				break
 			}
-			depth--
-		}
-	}
-	if left < 0 {
-		return position{}, position{}, false
-	}
-	right := -1
-	depth = 0
-	for i := left + 1; i < len(cs); i++ {
-		if open != close && cs[i] == open {
-			depth++
-		}
-		if cs[i] == close {
-			if depth == 0 {
-				right = i
+			if m.col >= i && m.col <= j || i >= m.col {
+				left, right = i, j
 				break
 			}
-			depth--
+			i = j + 1
+		}
+		if left < 0 {
+			return position{}, position{}, false, false
+		}
+		if inner {
+			return position{m.row, left + 1}, position{m.row, right - 1}, true, right == left+1
+		}
+		end := right
+		for end+1 < len(cs) && isSpaceCluster(cs[end+1]) {
+			end++
+		}
+		if end == right {
+			for left > 0 && isSpaceCluster(cs[left-1]) {
+				left--
+			}
+		}
+		return position{m.row, left}, position{m.row, end}, true, false
+	}
+	cells := m.bufferCells()
+	cursor := -1
+	for i, cell := range cells {
+		if cell.pos == (position{m.row, m.col}) {
+			cursor = i
+			break
 		}
 	}
-	if right < 0 {
-		return position{}, position{}, false
+	if cursor < 0 {
+		return position{}, position{}, false, false
 	}
+	left, right := -1, -1
+	searchAt := cursor
+	for range max(1, count) {
+		depth := 0
+		left = -1
+	leftScan:
+		for i := searchAt; i >= 0; i-- {
+			switch cells[i].text {
+			case close:
+				depth++
+			case open:
+				if depth == 0 {
+					left = i
+					break leftScan
+				}
+				depth--
+				if depth == 0 {
+					left = i
+					break leftScan
+				}
+			}
+		}
+		if left < 0 {
+			return position{}, position{}, false, false
+		}
+		depth = 0
+		right = -1
+	rightScan:
+		for i := left + 1; i < len(cells); i++ {
+			switch cells[i].text {
+			case open:
+				depth++
+			case close:
+				if depth == 0 {
+					right = i
+					break rightScan
+				}
+				depth--
+			}
+		}
+		if right < 0 || cursor > right {
+			return position{}, position{}, false, false
+		}
+		searchAt = left - 1
+	}
+	a, b := cells[left].pos, cells[right].pos
 	if inner {
-		left++
-		right--
+		if a.row != b.row && b.row-a.row > 1 {
+			innerRow := a.row + 1
+			startCol := firstWordColumn(m.lines[innerRow])
+			endRow := b.row - 1
+			return position{innerRow, startCol}, position{endRow, m.lineLen(endRow)}, true, false
+		}
+		a = nextPosition(m, a)
+		b = prevPosition(m, b)
 	}
-	if right < left {
-		right = left - 1
+	empty := less(b, a)
+	return a, b, true, empty
+}
+
+func nextPosition(m *Model, p position) position {
+	if p.col < m.lineLen(p.row) {
+		return position{p.row, p.col + 1}
 	}
-	return position{m.row, left}, position{m.row, right}, true
+	if p.row+1 < len(m.lines) {
+		return position{p.row + 1, 0}
+	}
+	return p
+}
+
+func prevPosition(m *Model, p position) position {
+	if p.col > 0 {
+		return position{p.row, p.col - 1}
+	}
+	if p.row > 0 {
+		return position{p.row - 1, m.lineLen(p.row - 1)}
+	}
+	return p
 }
 
 func (m *Model) search(pattern string, dir int) bool {
@@ -199,28 +316,39 @@ func (m *Model) search(pattern string, dir int) bool {
 		return false
 	}
 	startRow, startCol := m.row, m.col
-	for step := 0; step < len(m.lines); step++ {
-		row := (startRow + dir*step + len(m.lines)*2) % len(m.lines)
-		line := m.lines[row]
-		if dir > 0 {
-			from := 0
-			if step == 0 {
-				from = byteAt(line, startCol+1)
+	for pass := 0; pass < 2; pass++ {
+		for step := 0; step < len(m.lines); step++ {
+			row := (startRow + dir*step + len(m.lines)*2) % len(m.lines)
+			if pass == 1 && row != startRow {
+				continue
 			}
-			if i := strings.Index(line[from:], pattern); i >= 0 {
-				m.row, m.col = row, graphemeAtByte(line, from+i)
-				m.ensureVisible()
-				return true
-			}
-		} else {
-			to := len(line)
-			if step == 0 {
-				to = byteAt(line, startCol)
-			}
-			if i := strings.LastIndex(line[:to], pattern); i >= 0 {
-				m.row, m.col = row, graphemeAtByte(line, i)
-				m.ensureVisible()
-				return true
+			line := m.lines[row]
+			if dir > 0 {
+				from, to := 0, len(line)
+				if step == 0 && pass == 0 {
+					from = byteAt(line, startCol+1)
+				}
+				if pass == 1 {
+					to = byteAt(line, startCol+1)
+				}
+				if i := strings.Index(line[from:to], pattern); i >= 0 {
+					m.setMotionPosition(row, graphemeAtByte(line, from+i))
+					m.ensureVisible()
+					return true
+				}
+			} else {
+				from, to := 0, len(line)
+				if step == 0 && pass == 0 {
+					to = byteAt(line, startCol)
+				}
+				if pass == 1 {
+					from = byteAt(line, startCol)
+				}
+				if i := strings.LastIndex(line[from:to], pattern); i >= 0 {
+					m.setMotionPosition(row, graphemeAtByte(line, from+i))
+					m.ensureVisible()
+					return true
+				}
 			}
 		}
 	}

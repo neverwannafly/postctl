@@ -42,8 +42,16 @@ func (m *Model) View() string {
 		rows = append(rows, m.th.Fit(m.th.Render(ui.AccentPrimary, prefix)+m.searchText, m.width))
 	}
 	if len(m.completions) > 0 && !m.searching {
-		start := min(len(rows), max(0, m.row-m.top+1))
-		for i := 0; i < min(4, len(m.completions)) && start+i < len(rows); i++ {
+		popupRows := min(4, len(m.completions), len(rows))
+		cursorRow := min(len(rows)-1, max(0, m.row-m.top))
+		start := cursorRow + 1
+		if start+popupRows > len(rows) {
+			start = max(0, cursorRow-popupRows)
+		}
+		cursorX := gutter + displayColumn(m.lines[m.row], m.col, m.opts.TabText) -
+			displayColumn(m.lines[m.row], m.left, m.opts.TabText)
+		cursorX = min(max(0, cursorX), max(0, m.width-8))
+		for i := 0; i < popupRows; i++ {
 			idx := (m.completeSel + i) % len(m.completions)
 			item := m.completions[idx]
 			marker := "  "
@@ -56,7 +64,7 @@ func (m *Model) View() string {
 			if item.Detail != "" {
 				text += "  " + item.Detail
 			}
-			rows[start+i] = m.th.Fit(style.Render(text), m.width)
+			rows[start+i] = strings.Repeat(" ", cursorX) + m.th.Fit(style.Render(text), m.width-cursorX)
 		}
 	}
 	return strings.Join(rows, "\n")
@@ -68,16 +76,18 @@ func (m *Model) renderLine(row, width int) string {
 	from := min(m.left, len(cs))
 	var b strings.Builder
 	used := 0
+	byteOff := byteAt(line, from)
 	for i := from; i < len(cs); i++ {
-		cell := cs[i]
-		if cell == "\t" {
+		source := cs[i]
+		cell := source
+		if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
 		}
 		cw := max(1, uniseg.StringWidth(cell))
 		if used+cw > width {
 			break
 		}
-		style := m.styleAt(row, i, byteAt(line, i))
+		style := m.styleAt(row, i, byteOff)
 		if m.selected(row, i) {
 			style = style.Reverse(true)
 			if bg := m.th.SelectedBG(); bg != nil {
@@ -89,6 +99,7 @@ func (m *Model) renderLine(row, width int) string {
 		}
 		b.WriteString(style.Render(cell))
 		used += cw
+		byteOff += len(source)
 	}
 	if m.focused && row == m.row && m.col >= len(cs) && used < width {
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
@@ -131,11 +142,12 @@ func (m *Model) ensureVisible() {
 	if m.searching {
 		visibleHeight = max(1, visibleHeight-1)
 	}
-	if m.row < m.top+2 {
-		m.top = max(0, m.row-2)
+	scrolloff := min(2, max(0, (visibleHeight-1)/2))
+	if m.row < m.top+scrolloff {
+		m.top = max(0, m.row-scrolloff)
 	}
-	if m.row >= m.top+visibleHeight-2 {
-		m.top = min(max(0, len(m.lines)-visibleHeight), m.row-visibleHeight+3)
+	if m.row >= m.top+visibleHeight-scrolloff {
+		m.top = min(max(0, len(m.lines)-visibleHeight), m.row-visibleHeight+scrolloff+1)
 	}
 	room := max(1, m.width-m.gutterWidth())
 	cs := clusters(m.lines[m.row])
@@ -145,15 +157,26 @@ func (m *Model) ensureVisible() {
 	}
 	width := 0
 	for i := m.left; i < col; i++ {
-		width += max(1, uniseg.StringWidth(cs[i]))
+		width += clusterWidth(cs[i], m.opts.TabText)
 	}
-	for width >= room && m.left < col {
-		width -= max(1, uniseg.StringWidth(cs[m.left]))
+	cursorWidth := 1
+	if col < len(cs) {
+		cursorWidth = clusterWidth(cs[col], m.opts.TabText)
+	}
+	for width+cursorWidth > room && m.left < col {
+		width -= clusterWidth(cs[m.left], m.opts.TabText)
 		m.left++
 	}
 	if m.left < 0 {
 		m.left = 0
 	}
+}
+
+func clusterWidth(cluster, tabText string) int {
+	if cluster == "\t" {
+		return max(1, len(tabText))
+	}
+	return max(1, uniseg.StringWidth(cluster))
 }
 
 func (m *Model) rehighlight() {

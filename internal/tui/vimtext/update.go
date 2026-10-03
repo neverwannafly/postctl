@@ -42,6 +42,7 @@ func (m *Model) updatePaste(p tea.PasteMsg) (tea.Cmd, Event) {
 	}
 	m.beginChange(p)
 	if m.insertText(p.Content) {
+		m.insertSession += p.Content
 		m.recordChange(p)
 		m.afterEdit()
 		return nil, Event{Kind: Changed}
@@ -65,13 +66,14 @@ func (m *Model) updateInsert(key tea.KeyPressMsg) (tea.Cmd, Event) {
 			m.recordChange(key)
 			m.afterEdit()
 			return nil, Event{Kind: Changed}
-		case "esc":
+		case "esc", "ctrl+c":
 			m.completions = nil
 			return nil, Event{}
 		}
 	}
 	switch k {
 	case "esc", "ctrl+c":
+		m.finishCountedInsert()
 		m.finishChange()
 		m.mode = Normal
 		if m.col > 0 {
@@ -117,6 +119,12 @@ func (m *Model) updateInsert(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 	case "ctrl+w":
 		m.beginChange(key)
+		if m.col == 0 && m.row > 0 && !m.opts.SingleLine {
+			m.deleteBackward()
+			m.recordChange(key)
+			m.afterEdit()
+			return nil, Event{Kind: Changed}
+		}
 		start := position{m.row, m.col}
 		m.wordBackward(false)
 		if less(position{m.row, m.col}, start) {
@@ -146,6 +154,7 @@ func (m *Model) updateInsert(key tea.KeyPressMsg) (tea.Cmd, Event) {
 func (m *Model) insertKey(key tea.KeyPressMsg, text string) (tea.Cmd, Event) {
 	m.beginChange(key)
 	if m.insertText(text) {
+		m.insertSession += text
 		m.recordChange(key)
 		m.afterEdit()
 		return nil, Event{Kind: Changed}
@@ -162,6 +171,30 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 		return nil, Event{Kind: Leave}
 	}
+	if m.gPending {
+		m.gPending = false
+		switch k {
+		case "g":
+			if m.count > 0 {
+				m.row = min(m.count-1, len(m.lines)-1)
+			} else {
+				m.row = 0
+			}
+			m.firstNonBlank()
+			m.clearPending()
+			m.ensureVisible()
+			return nil, Event{}
+		case "e", "E":
+			for range max(1, m.count) {
+				m.wordEndBackward(k == "E")
+			}
+			m.clearPending()
+			return nil, Event{}
+		default:
+			m.clearPending()
+			return nil, Event{Kind: Seq, Seq: "g" + keyText(key)}
+		}
+	}
 	if k == "ctrl+s" || k == "ctrl+enter" || k == "ctrl+p" || k == "ctrl+c" ||
 		k == "ctrl+h" || k == "ctrl+j" || k == "ctrl+k" || k == "ctrl+l" ||
 		k == "ctrl+o" || k == "ctrl+i" || k == "tab" || k == "shift+tab" ||
@@ -170,17 +203,25 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		return nil, Event{Kind: Unhandled, Key: key}
 	}
 	if m.replace {
+		count := max(1, m.operatorCnt)
 		m.replace = false
 		m.pending = ""
 		if m.opts.ReadOnly || key.Key().Text == "" {
 			return nil, Event{}
 		}
-		m.beginChange(key)
 		cs := clusters(m.lines[m.row])
 		if m.col < len(cs) {
-			cs[m.col] = key.Key().Text
+			before := m.snap()
+			end := min(len(cs), m.col+count)
+			for i := m.col; i < end; i++ {
+				cs[i] = key.Key().Text
+			}
 			m.lines[m.row] = joinClusters(cs)
-			m.finishChange()
+			m.col = end - 1
+			m.pushUndo(before)
+			m.redo = nil
+			m.lastChange = append(countedKeys(count, 'r'), key)
+			m.rehighlightRow(m.row)
 			return nil, Event{Kind: Changed}
 		}
 		return nil, Event{}
@@ -193,21 +234,23 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 			m.findChar(kind, key.Key().Text, count)
 			if op != 0 {
 				end := position{m.row, m.col}
-				text := m.rangeText(at, end, true)
+				inclusive := kind == 'f' || kind == 't'
+				text := m.rangeText(at, end, inclusive)
 				m.reg, m.regLine = text, false
 				if op == 'y' {
 					m.row, m.col = at.row, at.col
 					return m.clipboard(text), Event{}
 				}
-				m.deleteRange(at, end, true)
+				m.deleteRange(at, end, inclusive)
 				if op == 'c' {
 					m.mode = Insert
 					m.changeStart = &before
 					m.changeKeys = []tea.Msg{runeKey(op), runeKey(kind), key}
 				} else {
-					m.undo = append(m.undo, before)
+					m.pushUndo(before)
 					m.redo = nil
 					m.lastChange = []tea.Msg{runeKey(op), runeKey(kind), key}
+					m.clampNormalCursor()
 				}
 				m.rehighlight()
 				return m.clipboard(text), Event{Kind: Changed}
@@ -222,31 +265,6 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		m.count = m.count*10 + int(k[0]-'0')
 		m.pending += k
 		return nil, Event{}
-	}
-	if m.gPending {
-		m.gPending = false
-		switch k {
-		case "g":
-			if m.count > 0 {
-				m.row = min(m.count-1, len(m.lines)-1)
-			} else {
-				m.row = 0
-			}
-			m.col = 0
-			m.clearPending()
-			m.ensureVisible()
-			return nil, Event{}
-		case "e", "E":
-			for range max(1, m.count) {
-				m.wordBackward(k == "E")
-				m.wordForward(k == "E", true)
-			}
-			m.clearPending()
-			return nil, Event{}
-		default:
-			m.clearPending()
-			return nil, Event{Kind: Seq, Seq: "g" + keyText(key)}
-		}
 	}
 	if m.operator != 0 {
 		return m.finishOperator(key)
@@ -270,13 +288,7 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		m.findKind, m.pending = k[0], m.pending+k
 		return nil, Event{}
 	case ";", ",":
-		if m.lastFind != 0 {
-			kind := m.lastFind
-			if k == "," {
-				kind = reverseFind(kind)
-			}
-			m.findChar(kind, m.lastFindKey, count)
-		}
+		m.repeatFind(k == ",", count)
 	case "d", "c", "y":
 		if m.opts.ReadOnly && k != "y" {
 			m.clearPending()
@@ -295,22 +307,28 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		if m.opts.ReadOnly {
 			break
 		}
-		return m.simpleDelete(key, k)
+		m.count = 0
+		return m.simpleDelete(key, k, count)
 	case "r":
 		if !m.opts.ReadOnly {
-			m.replace, m.pending = true, "r"
+			m.replace, m.pending, m.operatorCnt = true, "r", count
+			m.count = 0
 		}
 		return nil, Event{}
 	case "p", "P":
 		if !m.opts.ReadOnly {
-			return m.pasteRegister(key, k == "P")
+			m.count = 0
+			return m.pasteRegister(key, k == "P", count)
 		}
 	case "J":
 		if !m.opts.ReadOnly && m.row+1 < len(m.lines) {
-			m.beginChange(key)
-			m.lines[m.row] = strings.TrimRight(m.lines[m.row], " \t") + " " + strings.TrimLeft(m.lines[m.row+1], " \t")
-			m.lines = append(m.lines[:m.row+1], m.lines[m.row+2:]...)
-			m.finishChange()
+			m.count = 0
+			before := m.snap()
+			joinCount := max(2, count)
+			m.joinLines(m.row, min(len(m.lines)-1, m.row+joinCount-1))
+			m.pushUndo(before)
+			m.redo = nil
+			m.lastChange = countedKeys(joinCount, 'J')
 			return nil, Event{Kind: Changed}
 		}
 	case "~":
@@ -356,7 +374,8 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		}
 	case "i", "a", "I", "A", "o", "O":
 		if !m.opts.ReadOnly {
-			return m.enterInsert(key, k)
+			m.count = 0
+			return m.enterInsert(key, k, count)
 		}
 	case "v":
 		m.mode, m.anchor = Visual, position{m.row, m.col}
@@ -373,8 +392,62 @@ func (m *Model) updateNormal(key tea.KeyPressMsg) (tea.Cmd, Event) {
 
 func (m *Model) finishOperator(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	k, op, count := key.String(), m.operator, max(1, m.operatorCnt)*max(1, m.count)
+	if m.operatorG {
+		if k != "g" {
+			m.clearPending()
+			return nil, Event{Kind: Seq, Seq: "g" + keyText(key)}
+		}
+		before := m.snap()
+		from := m.operatorAt.row
+		m.clearPending()
+		keys := append(countedKeys(count, op), runeKey('g'), key)
+		return m.applyLineOperator(op, from, 0, before, keys)
+	}
+	if k == "g" {
+		m.operatorG = true
+		m.pending += "g"
+		return nil, Event{}
+	}
 	if k == "f" || k == "t" || k == "F" || k == "T" {
 		m.findKind = k[0]
+		m.pending += k
+		return nil, Event{}
+	}
+	if k == ";" || k == "," {
+		before := m.snap()
+		start := m.operatorAt
+		m.repeatFind(k == ",", count)
+		end := position{m.row, m.col}
+		forward := less(start, end)
+		m.clearPending()
+		inclusive := forward
+		text := m.rangeText(start, end, inclusive)
+		m.reg, m.regLine = text, false
+		if op == 'y' {
+			m.SetCursor(min(start.row, end.row), min(start.col, end.col))
+			return m.clipboard(text), Event{}
+		}
+		m.deleteRange(start, end, inclusive)
+		if op == 'c' {
+			m.mode = Insert
+			m.changeStart = &before
+			m.changeKeys = append(countedKeys(count, op), key)
+		} else {
+			m.pushUndo(before)
+			m.redo = nil
+			m.lastChange = append(countedKeys(count, op), key)
+			m.clampNormalCursor()
+		}
+		m.rehighlight()
+		return m.clipboard(text), Event{Kind: Changed}
+	}
+	if k == "/" || k == "?" {
+		m.searching, m.searchText = true, ""
+		if k == "?" {
+			m.searchDir = -1
+		} else {
+			m.searchDir = 1
+		}
 		m.pending += k
 		return nil, Event{}
 	}
@@ -387,45 +460,60 @@ func (m *Model) finishOperator(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		before := m.snap()
 		m.clearPending()
 		end := min(m.row+count-1, len(m.lines)-1)
-		if op == '>' || op == '<' {
-			m.indentLines(m.row, end, op == '>')
-			m.undo = append(m.undo, before)
-			m.redo = nil
-			m.lastChange = []tea.Msg{runeKey(op), key}
-			m.rehighlight()
-			return nil, Event{Kind: Changed}
-		}
-		text := m.lineRange(m.row, end, op != 'y')
-		m.reg, m.regLine = text, true
-		cmd := m.clipboard(text)
-		if op == 'y' {
-			return cmd, Event{}
-		}
-		m.rehighlight()
-		if op == 'c' && !m.opts.ReadOnly {
-			m.mode = Insert
-			m.changeStart = &before
-			m.changeKeys = []tea.Msg{runeKey(op), key}
-		} else {
-			m.undo = append(m.undo, before)
-			m.redo = nil
-			m.lastChange = []tea.Msg{runeKey(op), key}
-		}
-		return cmd, Event{Kind: Changed}
+		return m.applyLineOperator(op, m.row, end, before, append(countedKeys(count, op), key))
 	}
 	start := position{m.row, m.col}
 	before := m.snap()
-	if !m.applyMotion(k, count) {
+	lastWordMoved := true
+	motionOK := true
+	if k == "w" || k == "W" {
+		for range count {
+			previous := position{m.row, m.col}
+			m.wordForward(k == "W", false)
+			lastWordMoved = position{m.row, m.col} != previous
+		}
+	} else {
+		motionOK = m.applyMotion(k, count)
+	}
+	if !motionOK {
 		m.clearPending()
 		return nil, Event{Kind: Unhandled, Key: key}
 	}
 	end := position{m.row, m.col}
-	inclusive := k == "e" || k == "E" || k == "$"
+	if op == '>' || op == '<' {
+		m.clearPending()
+		return m.applyLineOperator(op, start.row, end.row, before, append(countedKeys(count, op), key))
+	}
+	if k == "j" || k == "down" || k == "k" || k == "up" || k == "G" {
+		m.clearPending()
+		return m.applyLineOperator(op, start.row, end.row, before, append(countedKeys(count, op), key))
+	}
+	inclusive := k == "e" || k == "E" || k == "$" || k == "%"
+	if k == "w" || k == "W" {
+		if end.row > start.row {
+			end = position{start.row, m.lineLen(start.row)}
+		} else if !lastWordMoved {
+			inclusive = true
+		}
+		if op == 'c' && start.col < m.lineLen(start.row) && !isSpaceCluster(clusters(m.lines[start.row])[start.col]) {
+			m.row, m.col = start.row, start.col
+			cs := clusters(m.lines[m.row])
+			for m.col+1 < len(cs) && sameWordClass(cs[m.col], cs[m.col+1], k == "W") {
+				m.col++
+			}
+			for range count - 1 {
+				m.wordEndForward(k == "W")
+			}
+			end = position{m.row, m.col}
+			inclusive = true
+		}
+	}
 	m.clearPending()
 	if op == 'y' {
 		text := m.rangeText(start, end, inclusive)
 		m.reg, m.regLine = text, false
-		m.row, m.col = start.row, start.col
+		yankStart, _ := ordered(start, end)
+		m.SetCursor(yankStart.row, yankStart.col)
 		return m.clipboard(text), Event{}
 	}
 	text := m.deleteRange(start, end, inclusive)
@@ -433,11 +521,12 @@ func (m *Model) finishOperator(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	if op == 'c' {
 		m.mode = Insert
 		m.changeStart = &before
-		m.changeKeys = []tea.Msg{runeKey(op), key}
+		m.changeKeys = append(countedKeys(count, op), key)
 	} else {
-		m.undo = append(m.undo, before)
+		m.pushUndo(before)
 		m.redo = nil
-		m.lastChange = []tea.Msg{runeKey(op), key}
+		m.lastChange = append(countedKeys(count, op), key)
+		m.clampNormalCursor()
 	}
 	m.rehighlight()
 	return m.clipboard(text), Event{Kind: Changed}
@@ -446,39 +535,74 @@ func (m *Model) finishOperator(key tea.KeyPressMsg) (tea.Cmd, Event) {
 func (m *Model) finishTextObject(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	prefix := m.textObject
 	inner, op := prefix == 'i', m.operator
+	count := max(1, m.operatorCnt) * max(1, m.count)
 	object := byte(0)
 	if key.Key().Text != "" {
 		object = key.Key().Text[0]
 	} else if len(key.String()) == 1 {
 		object = key.String()[0]
 	}
-	a, b, ok := m.textObjectRange(inner, object)
+	a, b, ok, empty := m.textObjectRange(inner, object, count)
 	m.clearPending()
 	if !ok {
 		return nil, Event{}
 	}
-	text := m.rangeText(a, b, true)
+	multilineDeleteRow := -1
+	if inner && op == 'd' && a.row > 0 && a.row <= b.row {
+		multilineDeleteRow = a.row
+		a = position{a.row - 1, m.lineLen(a.row - 1)}
+	}
+	if op == '>' || op == '<' {
+		before := m.snap()
+		m.indentLines(min(a.row, b.row), max(a.row, b.row), op == '>')
+		m.pushUndo(before)
+		m.redo = nil
+		m.lastChange = append(countedKeys(count, op), runeKey(prefix), key)
+		m.SetCursor(a.row, firstWordColumn(m.lines[a.row]))
+		m.rehighlight()
+		return nil, Event{Kind: Changed}
+	}
+	text := ""
+	if !empty {
+		text = m.rangeText(a, b, true)
+	}
 	m.reg, m.regLine = text, false
 	if op == 'y' {
+		m.SetCursor(a.row, a.col)
 		return m.clipboard(text), Event{}
 	}
 	before := m.snap()
-	m.deleteRange(a, b, true)
+	if !empty {
+		m.deleteRange(a, b, true)
+	} else {
+		m.SetCursor(a.row, a.col)
+	}
 	if op == 'c' {
 		m.mode = Insert
 		m.changeStart = &before
-		m.changeKeys = []tea.Msg{runeKey(op), runeKey(prefix), key}
+		m.changeKeys = append(countedKeys(count, op), runeKey(prefix), key)
 	} else {
-		m.undo = append(m.undo, before)
+		if !empty {
+			m.pushUndo(before)
+		}
 		m.redo = nil
-		m.lastChange = []tea.Msg{runeKey(op), runeKey(prefix), key}
+		m.lastChange = append(countedKeys(count, op), runeKey(prefix), key)
+		if multilineDeleteRow >= 0 {
+			m.SetCursor(min(multilineDeleteRow, len(m.lines)-1), 0)
+			m.firstNonBlank()
+		}
+		m.clampNormalCursor()
 	}
 	m.rehighlight()
-	return m.clipboard(text), Event{Kind: Changed}
+	ev := Event{}
+	if !empty {
+		ev.Kind = Changed
+	}
+	return m.clipboard(text), ev
 }
 
-func (m *Model) textObjectRange(inner bool, object byte) (position, position, bool) {
-	return m.objectRange(inner, object)
+func (m *Model) textObjectRange(inner bool, object byte, count int) (position, position, bool, bool) {
+	return m.objectRange(inner, object, count)
 }
 
 func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
@@ -500,14 +624,13 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 			} else {
 				m.row = 0
 			}
-			m.col = 0
+			m.firstNonBlank()
 			m.clearPending()
 			m.ensureVisible()
 			return nil, Event{}
 		case "e", "E":
 			for range max(1, m.count) {
-				m.wordBackward(k == "E")
-				m.wordForward(k == "E", true)
+				m.wordEndBackward(k == "E")
 			}
 			m.clearPending()
 			return nil, Event{}
@@ -532,7 +655,26 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		m.anchor = cur
 		return nil, Event{}
 	}
-	if isDigitKey(k) {
+	if k == "v" {
+		if m.mode == Visual {
+			m.mode = Normal
+		} else {
+			m.mode = Visual
+		}
+		m.clearPending()
+		return nil, Event{}
+	}
+	if k == "V" {
+		if m.mode == VisualLine {
+			m.mode = Normal
+		} else {
+			m.mode = VisualLine
+			m.anchor.col = 0
+		}
+		m.clearPending()
+		return nil, Event{}
+	}
+	if isDigitKey(k) && (k != "0" || m.count > 0) {
 		m.count = m.count*10 + int(k[0]-'0')
 		return nil, Event{}
 	}
@@ -544,13 +686,7 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		m.findKind, m.pending = k[0], k
 		return nil, Event{}
 	case ";", ",":
-		if m.lastFind != 0 {
-			kind := m.lastFind
-			if k == "," {
-				kind = reverseFind(kind)
-			}
-			m.findChar(kind, m.lastFindKey, max(1, m.count))
-		}
+		m.repeatFind(k == ",", max(1, m.count))
 		m.count = 0
 		return nil, Event{}
 	case "/", "?":
@@ -581,6 +717,7 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		return nil, Event{}
 	}
 	if len(k) != 1 || !strings.ContainsRune("dxcy><~J", rune(k[0])) {
+		m.clearPending()
 		return nil, Event{Kind: Unhandled, Key: key}
 	}
 	if m.opts.ReadOnly && k != "y" {
@@ -591,7 +728,7 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	if k == ">" || k == "<" {
 		before := m.snap()
 		m.indentLines(min(a.row, b.row), max(a.row, b.row), k == ">")
-		m.undo = append(m.undo, before)
+		m.pushUndo(before)
 		m.redo = nil
 		m.mode = Normal
 		m.rehighlight()
@@ -600,7 +737,7 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	if k == "~" {
 		before := m.snap()
 		m.toggleRange(a, b, linewise)
-		m.undo = append(m.undo, before)
+		m.pushUndo(before)
 		m.redo = nil
 		m.mode = Normal
 		m.rehighlight()
@@ -609,7 +746,7 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	if k == "J" {
 		before := m.snap()
 		m.joinLines(min(a.row, b.row), max(a.row, b.row))
-		m.undo = append(m.undo, before)
+		m.pushUndo(before)
 		m.redo = nil
 		m.mode = Normal
 		m.rehighlight()
@@ -617,22 +754,37 @@ func (m *Model) updateVisual(key tea.KeyPressMsg) (tea.Cmd, Event) {
 	}
 	var text string
 	if linewise {
-		text = m.lineRange(a.row, b.row, k != "y")
+		before := m.snap()
+		m.mode = Normal
+		keys := visualRepeatKeys(true, a, b, k)
+		return m.applyLineOperator(k[0], a.row, b.row, before, keys)
 	} else {
 		text = m.rangeText(a, b, true)
 		if k != "y" {
 			before := m.snap()
 			m.deleteRange(a, b, true)
-			m.undo = append(m.undo, before)
-			m.redo = nil
+			if k == "c" {
+				m.mode = Insert
+				m.changeStart = &before
+				m.changeKeys = visualRepeatKeys(false, a, b, k)
+			} else {
+				m.pushUndo(before)
+				m.redo = nil
+				m.lastChange = visualRepeatKeys(false, a, b, k)
+				m.mode = Normal
+				m.clampNormalCursor()
+			}
 		}
 	}
 	if k == "y" || k == "d" || k == "x" || k == "c" {
 		m.reg, m.regLine = text, linewise
 	}
-	m.mode = Normal
-	if k == "c" && !m.opts.ReadOnly {
-		m.mode = Insert
+	if k == "y" {
+		start, _ := ordered(a, b)
+		m.SetCursor(start.row, start.col)
+		m.mode = Normal
+	} else if k != "c" {
+		m.mode = Normal
 	}
 	m.rehighlight()
 	if k == "y" || k == "d" || k == "x" || k == "c" {
@@ -653,7 +805,29 @@ func (m *Model) updateSearch(key tea.KeyPressMsg) (tea.Cmd, Event) {
 		m.searching = false
 		if m.searchText != "" {
 			m.lastSearch, m.lastDir = m.searchText, m.searchDir
-			m.search(m.lastSearch, m.lastDir)
+			op, start := m.operator, m.operatorAt
+			before := m.snap()
+			if m.search(m.lastSearch, m.lastDir) && op != 0 {
+				end := position{m.row, m.col}
+				m.clearPending()
+				text := m.rangeText(start, end, false)
+				m.reg, m.regLine = text, false
+				if op == 'y' {
+					m.SetCursor(min(start.row, end.row), min(start.col, end.col))
+					return m.clipboard(text), Event{}
+				}
+				m.deleteRange(start, end, false)
+				if op == 'c' {
+					m.mode = Insert
+					m.changeStart = &before
+				} else {
+					m.pushUndo(before)
+					m.redo = nil
+					m.clampNormalCursor()
+				}
+				m.rehighlight()
+				return m.clipboard(text), Event{Kind: Changed}
+			}
 		}
 	case "backspace":
 		if m.searchText != "" {
@@ -678,6 +852,26 @@ func keyText(k tea.KeyPressMsg) string {
 
 func runeKey(r byte) tea.KeyPressMsg {
 	return tea.KeyPressMsg(tea.Key{Code: rune(r), Text: string(r)})
+}
+
+func visualRepeatKeys(linewise bool, a, b position, action string) []tea.Msg {
+	start, end := ordered(a, b)
+	keys := []tea.Msg{runeKey('v')}
+	if linewise {
+		keys[0] = runeKey('V')
+	}
+	for range end.row - start.row {
+		keys = append(keys, runeKey('j'))
+	}
+	if !linewise {
+		for range end.col - start.col {
+			keys = append(keys, runeKey('l'))
+		}
+	}
+	if action != "" {
+		keys = append(keys, runeKey(action[0]))
+	}
+	return keys
 }
 
 func reverseFind(k byte) byte {

@@ -48,7 +48,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
-| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done | ws/ux-v1-vimtext | 2026-10-03 18:36 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done (review fixes) | ws/ux-v1-vimtext | 2026-10-03 19:00 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
@@ -778,3 +778,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `go test -race ./internal/tui/vimtext`, focused package lint, and `task agents:check` green. Benchmarks on Apple M3 Pro: `G`/`gg` 4.56 µs/op, 100 typed characters 1.14 ms total, edited-line highlight recompute 0.91 ms/op.
 - Blockers / questions: none.
 - Next: orchestrator review and phase-2 adoption.
+
+### 2026-10-03 18:45 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Began reviewer remediation for data-loss, Vim fidelity, routing, rendering, history, and purity findings. Verified the operator indentation defect and started by expanding the permanent keystroke corpus before implementation changes.
+- Files: `internal/tui/vimtext/`, `docs/ledger.md`
+- Decisions: Every reported behavior will have a Vim-compatible corpus case before its fix; nvim defaults are authoritative for edge semantics.
+- Tests: Baseline package tests are green before adding the rejecting cases.
+- Blockers / questions: none.
+- Next: add at least 120 regression cases, confirm they fail, then fix sections A through D.
+
+### 2026-10-03 19:00 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Fixed all reviewer findings in sections A–D: operator and empty-object data loss, linewise undo, word/search/pair/operator/count/dot semantics, single-line restrictions, completion placement and routing, scroll/cursor rendering, bounded history, deep-copy purity coverage, join/find/yank/visual details, and cursor placement. Added 184 permanent nvim-compatible regression cases, growing the corpus from 241 to 425.
+- Files: `internal/tui/vimtext/`, `docs/ledger.md`
+- Decisions: No findings were deferred. Multiline inner-pair edits preserve nvim's indentation and line structure; linewise single-line registers are charwise and contain no newline.
+- Tests: `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` green. Six goldens regenerated and reviewed. Apple M3 Pro benchmarks: `G`/`gg` 9.28 µs/op, 100 typed characters 2.91 ms total, edited-line highlight recompute 1.66 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.

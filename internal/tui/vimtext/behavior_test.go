@@ -1,6 +1,7 @@
 package vimtext
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -149,6 +150,89 @@ func TestCompletionNavigationAcceptAndEscapeLadder(t *testing.T) {
 	if m.Mode() != Normal {
 		t.Fatal("second Escape should leave insert")
 	}
+
+	m.SetValue("")
+	m.mode = Insert
+	for _, msg := range parseKeys(t, "pr") {
+		_, _ = m.Update(msg)
+	}
+	_, _ = m.Update(tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl}))
+	if m.Mode() != Insert || len(m.completions) != 0 {
+		t.Fatal("Ctrl-C should close completion before leaving insert")
+	}
+}
+
+func TestCompletionPopupMovesAboveAndAlignsToCursor(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{StartInsert: true, Completer: fakeCompleter{}})
+	m.SetValue("a\nb\nc\npr")
+	m.SetSize(20, 4)
+	m.SetCursor(3, 2)
+	_ = m.Focus()
+	m.refreshCompletion()
+	lines := strings.Split(m.View(), "\n")
+	if !strings.Contains(lines[1], "print") || strings.Contains(lines[3], "print") {
+		t.Fatal("bottom-row completion was not placed above the cursor")
+	}
+	if !strings.HasPrefix(lines[1], "  ") {
+		t.Fatal("completion popup was not aligned to the cursor column")
+	}
+}
+
+func TestPendingRoutingAndShortViewportStability(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{})
+	m.SetValue("a\nb\nc\nd")
+	_ = m.Focus()
+	_, _ = m.Update(runeKey('g'))
+	_, event := m.Update(runeKey(' '))
+	if event.Kind != Seq || event.Seq != "g " || m.Pending() != "" {
+		t.Fatalf("g+Space event=%#v pending=%q", event, m.Pending())
+	}
+	m.mode = Visual
+	_, _ = m.Update(runeKey('2'))
+	_, event = m.Update(runeKey('q'))
+	if event.Kind != Unhandled || m.Pending() != "" {
+		t.Fatalf("visual unhandled event=%#v pending=%q", event, m.Pending())
+	}
+	for height := 1; height <= 4; height++ {
+		m.SetSize(8, height)
+		m.SetCursor(3, 0)
+		top := m.top
+		for range 5 {
+			m.ensureVisible()
+			if m.top != top {
+				t.Fatalf("height %d scroll offset oscillated", height)
+			}
+		}
+	}
+}
+
+func TestEnsureVisibleIncludesCursorCell(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{})
+	m.SetValue("界a")
+	m.SetSize(2, 1)
+	m.SetCursor(0, 1)
+	if m.left != 1 {
+		t.Fatalf("wide cursor cell clipped: left=%d", m.left)
+	}
+	m.mode = Insert
+	m.SetCursor(0, 2)
+	if m.left == 0 {
+		t.Fatal("end-of-line cursor cell clipped")
+	}
+}
+
+func TestUndoRedoHistoryIsBounded(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{})
+	for i := range historyLimit + 25 {
+		m.pushUndo(snapshot{lines: []string{fmt.Sprint(i)}})
+		m.pushRedo(snapshot{lines: []string{fmt.Sprint(i)}})
+	}
+	if len(m.undo) != historyLimit || len(m.redo) != historyLimit {
+		t.Fatalf("history sizes undo=%d redo=%d", len(m.undo), len(m.redo))
+	}
+	if m.undo[0].lines[0] != "25" || m.redo[0].lines[0] != "25" {
+		t.Fatal("history did not drop the oldest snapshots")
+	}
 }
 
 func TestSingleLineSubmitAndRestrictions(t *testing.T) {
@@ -195,11 +279,44 @@ func TestViewIsPureInEveryMode(t *testing.T) {
 			m.mode = mode
 			m.anchor = position{7, 1}
 			m.opts.Clipboard, m.opts.Redact = nil, nil
-			before := *m
+			before := deepCopyModel(m)
 			first, second := m.View(), m.View()
 			if first != second || !reflect.DeepEqual(before, *m) {
 				t.Fatal("View mutated the model")
 			}
 		})
 	}
+}
+
+func deepCopyModel(m *Model) Model {
+	out := *m
+	out.lines = append([]string(nil), m.lines...)
+	out.completions = append([]Item(nil), m.completions...)
+	out.changeKeys = append([]tea.Msg(nil), m.changeKeys...)
+	out.lastChange = append([]tea.Msg(nil), m.lastChange...)
+	if m.highlights != nil {
+		out.highlights = make([][]Span, len(m.highlights))
+		for i := range m.highlights {
+			out.highlights[i] = append([]Span(nil), m.highlights[i]...)
+		}
+	}
+	copySnapshots := func(in []snapshot) []snapshot {
+		if in == nil {
+			return nil
+		}
+		result := make([]snapshot, len(in))
+		for i := range in {
+			result[i] = in[i]
+			result[i].lines = append([]string(nil), in[i].lines...)
+		}
+		return result
+	}
+	out.undo = copySnapshots(m.undo)
+	out.redo = copySnapshots(m.redo)
+	if m.changeStart != nil {
+		s := *m.changeStart
+		s.lines = append([]string(nil), m.changeStart.lines...)
+		out.changeStart = &s
+	}
+	return out
 }

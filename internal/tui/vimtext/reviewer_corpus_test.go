@@ -1,0 +1,182 @@
+package vimtext
+
+import (
+	"fmt"
+	"strings"
+)
+
+// reviewerRegressionCases pins every behavior reported by the two UX-V1
+// reviewers. The generated count matrices intentionally exercise distinct
+// counts as independent permanent corpus entries.
+func reviewerRegressionCases() []corpusCase {
+	cases := []corpusCase{
+		// A1: indentation operators never delete their motion/object range.
+		{name: "review A1 indent word", start: "foo bar", keys: ">w", want: "  foo bar", wantCol: 2},
+		{name: "review A1 indent down", start: "a\nb\nc", keys: ">j", want: "  a\n  b\nc", wantCol: 2},
+		{name: "review A1 outdent down", start: "  a\n  b\nc", keys: "<LT>j", want: "a\nb\nc"},
+		{name: "review A1 indent inner word", start: "foo bar", col: 1, keys: ">iw", want: "  foo bar", wantCol: 2},
+
+		// A2: empty inner objects are valid empty ranges.
+		{name: "review A2 delete empty parens", start: "f()", col: 1, keys: "di(", want: "f()", wantCol: 2},
+		{name: "review A2 change empty parens", start: "()", keys: "ci(X<Esc>", want: "(X)", wantCol: 1},
+		{name: "review A2 change empty quotes", start: `a "" b`, col: 3, keys: `ci"X<Esc>`, want: `a "X" b`, wantCol: 3},
+		{name: "review A2 delete empty brackets", start: "x[]", col: 1, keys: "di[", want: "x[]", wantCol: 2},
+		{name: "review A2 change empty braces", start: "{}", keys: "ci}X<Esc>", want: "{X}", wantCol: 1},
+
+		// A3/B1/B2/B3/B4: Vim word-motion boundaries.
+		{name: "review A3 w crosses line to start", start: "foo\nbar baz", keys: "w", want: "foo\nbar baz", wantRow: 1},
+		{name: "review A3 dw before newline", start: "a \nb", col: 1, keys: "dw", want: "a\nb"},
+		{name: "review A3 empty line stops w", start: "a\n\nb", keys: "w", want: "a\n\nb", wantRow: 1},
+		{name: "review A3 empty line stops b", start: "a\n\nb", row: 2, keys: "b", want: "a\n\nb", wantRow: 1},
+		{name: "review A3 w last word clamps", start: "foo bar", col: 4, keys: "w", want: "foo bar", wantCol: 6},
+		{name: "review B1 e advances from short word end", start: "a b c", keys: "e", want: "a b c", wantCol: 2},
+		{name: "review B1 e advances from word end", start: "foo bar", col: 2, keys: "e", want: "foo bar", wantCol: 6},
+		{name: "review B1 counted e advances", start: "a b c d", keys: "2e", want: "a b c d", wantCol: 4},
+		{name: "review B2 ge previous end", start: "foo bar", col: 5, keys: "ge", want: "foo bar", wantCol: 2},
+		{name: "review B2 counted ge", start: "one two three", col: 10, keys: "2ge", want: "one two three", wantCol: 2},
+		{name: "review B3 dw last word line", start: "foo bar\nbaz", col: 4, keys: "dw", want: "foo \nbaz", wantCol: 3},
+		{name: "review B3 dw first line", start: "foo\nbar", keys: "dw", want: "\nbar"},
+		{name: "review B3 cw nonblank", start: "foo bar", keys: "cwX<Esc>", want: "X bar"},
+		{name: "review B4 cw inside word", start: "foo bar", col: 2, keys: "cwX<Esc>", want: "foX bar", wantCol: 2},
+
+		// A4/B5/B6: linewise edits and cursor clamping.
+		{name: "review A4 visual line delete undo", start: "a\nb\nc", keys: "Vjdu", want: "a\nb\nc", wantRow: 1},
+		{name: "review A4 visual line x undo", start: "a\nb\nc", keys: "Vjxu", want: "a\nb\nc", wantRow: 1},
+		{name: "review A4 visual line change undo", start: "a\nb\nc", keys: "VjcX<Esc>u", want: "a\nb\nc", wantRow: 1},
+		{name: "review B5 cc preserves line", start: "a\nb\nc", row: 1, keys: "ccX<Esc>", want: "a\nX\nc", wantRow: 1},
+		{name: "review B5 S preserves line", start: "a\nb\nc", row: 1, keys: "SX<Esc>", want: "a\nX\nc", wantRow: 1},
+		{name: "review B5 visual line c preserves line", start: "a\nb\nc", row: 1, keys: "VcX<Esc>", want: "a\nX\nc", wantRow: 1},
+		{name: "review B6 d dollar clamp", start: "abc", col: 1, keys: "d$", want: "a"},
+		{name: "review B6 daw clamp", start: "x foo", col: 2, keys: "daw", want: "x"},
+		{name: "review B6 visual delete clamp", start: "abc\ndef", keys: "vjd", want: "ef"},
+
+		// B7: curswant and display columns.
+		{name: "review B7 dollar curswant", start: "abcdef\nab\nabcdefgh", keys: "$jj", want: "abcdef\nab\nabcdefgh", wantRow: 2, wantCol: 7},
+		{name: "review B7 zero resets curswant", start: "abcdef\nab\nabcdefgh", keys: "$j0j", want: "abcdef\nab\nabcdefgh", wantRow: 2},
+		{name: "review B7 caret resets curswant", start: "abcdef\n  a\n    z", keys: "$j^j", want: "abcdef\n  a\n    z", wantRow: 2, wantCol: 4},
+		{name: "review B7 display column wide", start: "世界abc\nabcdef", col: 2, keys: "j", want: "世界abc\nabcdef", wantRow: 1, wantCol: 4},
+
+		// B8/B9: counts and dot-repeat retain the original change.
+		{name: "review B8 counted X", start: "abcdef", col: 5, keys: "3X", want: "abf", wantCol: 2},
+		{name: "review B8 counted substitute", start: "abcdef", keys: "3sX<Esc>", want: "Xdef"},
+		{name: "review B8 counted replace", start: "abcdef", keys: "3rX", want: "XXXdef", wantCol: 2},
+		{name: "review B8 counted put", start: "abcd", keys: "x3p", want: "baaacd", wantCol: 3},
+		{name: "review B8 counted join", start: "a\nb\nc\nd", keys: "3J", want: "a b c\nd", wantCol: 3},
+		{name: "review B8 counted insert", start: "a", keys: "3iX<Esc>", want: "XXXa", wantCol: 2},
+		{name: "review B8 counted append", start: "a", keys: "3AX<Esc>", want: "aXXX", wantCol: 3},
+		{name: "review B8 counted open", start: "a", keys: "3oX<Esc>", want: "a\nX\nX\nX", wantRow: 3},
+		{name: "review B8 dot counted x", start: "abcdefgh", keys: "3x.", want: "gh"},
+		{name: "review B8 dot counted dd", start: "a\nb\nc\nd\ne", keys: "2dd.", want: "e"},
+		{name: "review B8 dot operator count", start: "a b c d e", keys: "d2w.", want: "e"},
+		{name: "review B8 counted around word", start: "one two three", keys: "d2aw", want: "three"},
+		{name: "review B8 counted inner parens", start: "((x))", col: 2, keys: "d2i(", want: "()", wantCol: 1},
+		{name: "review B9 dot replace", start: "abcd", keys: "rzl.", want: "zzcd", wantCol: 1},
+		{name: "review B9 dot visual delete", start: "abcdef", keys: "vldl.", want: "cf", wantCol: 1},
+		{name: "review B9 dot visual change", start: "abcdef", keys: "vlcX<Esc>l.", want: "XXef", wantCol: 1},
+
+		// B10: same-line search wrap.
+		{name: "review B10 forward own line wrap", start: "foo bar foo", col: 8, keys: "/foo<CR>", want: "foo bar foo"},
+		{name: "review B10 backward own line wrap", start: "foo bar foo", keys: "?foo<CR>", want: "foo bar foo", wantCol: 8},
+		{name: "review B10 star own line wrap", start: "foo bar foo", col: 8, keys: "*", want: "foo bar foo"},
+		{name: "review B10 n own line wrap", start: "foo bar foo", keys: "/foo<CR>n", want: "foo bar foo"},
+		{name: "review B10 N own line wrap", start: "foo bar foo", keys: "/foo<CR>N", want: "foo bar foo"},
+		{name: "review B10 single line search wrap", opts: Options{SingleLine: true}, start: "foo bar foo", col: 8, keys: "/foo<CR>", want: "foo bar foo"},
+
+		// B11/B12: text objects and matching pairs.
+		{name: "review B11 ciw whitespace", start: "a b", col: 1, keys: "ciwX<Esc>", want: "aXb", wantCol: 1},
+		{name: "review B11 quote containing cursor", start: `"a" "b"`, col: 2, keys: `ci"X<Esc>`, want: `"X" "b"`, wantCol: 1},
+		{name: "review B11 quote next pair", start: `say "hi" ok`, keys: `ci"X<Esc>`, want: `say "X" ok`, wantCol: 5},
+		{name: "review B11 around quote trailing space", start: `x "a" y`, col: 3, keys: `da"`, want: "x y", wantCol: 2},
+		{name: "review B11 around quote leading space", start: `x "a"`, col: 3, keys: `da"`, want: "x"},
+		{name: "review B11 around word leading fallback", start: "x foo.bar", col: 2, keys: "daw", want: "x.bar", wantCol: 1},
+		{name: "review B11 i close paren alias", start: "(abc)", col: 4, keys: "di)", want: "()", wantCol: 1},
+		{name: "review B11 a close paren alias", start: "(abc) x", col: 4, keys: "da)", want: " x"},
+		{name: "review B11 i close brace alias", start: "{abc}", col: 4, keys: "di}", want: "{}", wantCol: 1},
+		{name: "review B11 a close brace alias", start: "{abc} x", col: 4, keys: "da}", want: " x"},
+		{name: "review B11 i close bracket alias", start: "[abc]", col: 4, keys: "di]", want: "[]", wantCol: 1},
+		{name: "review B11 a close bracket alias", start: "[abc] x", col: 4, keys: "da]", want: " x"},
+		{name: "review B11 multiline braces", start: "{\n  a\n}", row: 1, col: 1, keys: "ci{X<Esc>", want: "{\n  X\n}", wantRow: 1, wantCol: 2},
+		{name: "review B11 multiline parens", start: "f(\n a\n)", row: 1, col: 1, keys: "di(", want: "f(\n)", wantRow: 1},
+		{name: "review B12 percent multiline", start: "{\n a\n}", keys: "%", want: "{\n a\n}", wantRow: 2},
+		{name: "review B12 percent searches line", start: "x (a)", keys: "%", want: "x (a)", wantCol: 4},
+
+		// B13/B14: operator motions and single-line behavior.
+		{name: "review B13 dj linewise", start: "a\nb\nc", keys: "dj", want: "c"},
+		{name: "review B13 dk linewise", start: "a\nb\nc", row: 1, keys: "dk", want: "c"},
+		{name: "review B13 dG linewise", start: "a\nb\nc", row: 1, keys: "dG", want: "a"},
+		{name: "review B13 dgg linewise", start: "a\nb\nc", row: 2, keys: "dgg", want: ""},
+		{name: "review B13 backward find inclusive target", start: "abcd", col: 3, keys: "dFb", want: "ad", wantCol: 1},
+		{name: "review B13 backward till exclusive cursor", start: "abcd", col: 3, keys: "dTb", want: "abd", wantCol: 2},
+		{name: "review B13 percent inclusive", start: "(abc)x", keys: "d%", want: "x"},
+		{name: "review B13 repeat find operator", start: "a,b,c", keys: "f,d;", want: "ac", wantCol: 1},
+		{name: "review B13 reverse find operator", start: "a,b,c", keys: "2f,d,", want: "a,c", wantCol: 1},
+		{name: "review B13 search operator", start: "one two three", keys: "d/two<CR>", want: "two three"},
+		{name: "review B14 single line open below no-op", opts: Options{SingleLine: true}, start: "abc", keys: "oX<Esc>", want: "abc"},
+		{name: "review B14 single line open above no-op", opts: Options{SingleLine: true}, start: "abc", keys: "OX<Esc>", want: "abc"},
+		{name: "review B14 single line line paste", opts: Options{SingleLine: true}, start: "abc", keys: "ddp", want: "abc", wantCol: 2},
+		{name: "review B14 single line change line", opts: Options{SingleLine: true}, start: "abc", keys: "ccX<Esc>", want: "X"},
+		{name: "review B14 single line yank put", opts: Options{SingleLine: true}, start: "abc", keys: "yyp", want: "aabcbc", wantCol: 3},
+
+		// D1-D8: smaller Vim semantics.
+		{name: "review D1 repeat till forward", start: "a,b,c,d", keys: "t,;", want: "a,b,c,d", wantCol: 2},
+		{name: "review D1 repeat till backward", start: "a,b,c,d", col: 6, keys: "T,;", want: "a,b,c,d", wantCol: 4},
+		{name: "review D2 join close paren", start: "call(\n)", keys: "J", want: "call()", wantCol: 5},
+		{name: "review D2 join empty next", start: "a\n\nb", keys: "J", want: "a\nb"},
+		{name: "review D2 join keeps first trailing", start: "a  \nb", keys: "J", want: "a  b", wantCol: 3},
+		{name: "review D2 indent skips empty", start: "a\n\nb", keys: "3>>", want: "  a\n\n  b", wantCol: 2},
+		{name: "review D3 yiw cursor start", start: "abc", col: 2, keys: "yiw", want: "abc"},
+		{name: "review D3 yi paren cursor start", start: "(abc)", col: 3, keys: "yi(", want: "(abc)", wantCol: 1},
+		{name: "review D3 visual line yank cursor start", start: "a\nb\nc", keys: "Vjy", want: "a\nb\nc"},
+		{name: "review D3 visual char yank cursor start", start: "abc", keys: "vey", want: "abc"},
+		{name: "review D3 yb cursor start", start: "one two", col: 6, keys: "yb", want: "one two", wantCol: 4},
+		{name: "review D4 visual zero motion", start: "abc", col: 2, keys: "v0", want: "abc", wantMode: Visual},
+		{name: "review D4 vv exits", start: "abc", keys: "vv", want: "abc"},
+		{name: "review D4 v switches visual line", start: "abc", keys: "Vv", want: "abc", wantMode: Visual},
+		{name: "review D4 V switches visual char", start: "abc", keys: "vV", want: "abc", wantMode: VisualLine},
+		{name: "review D5 visual change one undo", start: "abcd", keys: "vlcX<Esc>u", want: "abcd", wantCol: 1},
+		{name: "review D6 ctrl-w joins newline only", start: "one\ntwo", row: 1, keys: "i<C-w><Esc>", want: "onetwo", wantCol: 2},
+		{name: "review D7 dd first nonblank", start: "a\n  b", keys: "dd", want: "  b", wantCol: 2},
+		{name: "review D7 G first nonblank", start: "a\n  b", keys: "G", want: "a\n  b", wantRow: 1, wantCol: 2},
+		{name: "review D8 around quotes expectation", start: `"abc" x`, col: 2, keys: `da"`, want: "x"},
+	}
+
+	for n := 1; n <= 20; n++ {
+		start := strings.Repeat("x", 25)
+		cases = append(cases, corpusCase{
+			name:  "review count x matrix " + fmt.Sprint(n),
+			start: start, keys: fmt.Sprintf("%dx", n),
+			want: start[n:],
+		})
+	}
+	for n := 1; n <= 15; n++ {
+		start := strings.Repeat("a", 20)
+		cases = append(cases, corpusCase{
+			name:  "review count replace matrix " + fmt.Sprint(n),
+			start: start, keys: fmt.Sprintf("%drZ", n),
+			want: strings.Repeat("Z", n) + start[n:], wantCol: n - 1,
+		})
+	}
+	for n := 1; n <= 15; n++ {
+		cases = append(cases, corpusCase{
+			name:  "review count insert matrix " + fmt.Sprint(n),
+			start: "z", keys: fmt.Sprintf("%diX<Esc>", n),
+			want: strings.Repeat("X", n) + "z", wantCol: n - 1,
+		})
+	}
+	for n := 1; n <= 15; n++ {
+		cases = append(cases, corpusCase{
+			name:  "review count append matrix " + fmt.Sprint(n),
+			start: "z", keys: fmt.Sprintf("%daX<Esc>", n),
+			want: "z" + strings.Repeat("X", n), wantCol: n,
+		})
+	}
+	for n := 1; n <= 10; n++ {
+		start := strings.Repeat("a", 15)
+		cases = append(cases, corpusCase{
+			name:  "review count substitute matrix " + fmt.Sprint(n),
+			start: start, keys: fmt.Sprintf("%dsX<Esc>", n),
+			want: "X" + start[n:],
+		})
+	}
+	return cases
+}

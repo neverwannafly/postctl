@@ -1,6 +1,7 @@
 package vimtext
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -8,8 +9,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func (m *Model) enterInsert(key tea.KeyPressMsg, kind string) (tea.Cmd, Event) {
-	m.beginChange(key)
+func (m *Model) enterInsert(key tea.KeyPressMsg, kind string, count int) (tea.Cmd, Event) {
+	if m.opts.SingleLine && (kind == "o" || kind == "O") {
+		return nil, Event{}
+	}
+	before := m.snap()
+	m.changeStart = &before
+	m.changeKeys = countedKeys(count, kind[0])
+	m.insertCount, m.insertKind, m.insertSession = max(1, count), kind, ""
 	switch kind {
 	case "a":
 		m.col = min(m.col+1, m.lineLen(m.row))
@@ -39,7 +46,7 @@ func (m *Model) lineTail(key tea.KeyPressMsg, kind byte) (tea.Cmd, Event) {
 	cs := clusters(m.lines[m.row])
 	if len(cs) == 0 || m.col >= len(cs) {
 		if kind == 'C' {
-			return m.enterInsert(key, "A")
+			return m.enterInsert(key, "A", 1)
 		}
 		return nil, Event{}
 	}
@@ -57,69 +64,84 @@ func (m *Model) lineTail(key tea.KeyPressMsg, kind byte) (tea.Cmd, Event) {
 	return m.clipboard(text), Event{Kind: Changed}
 }
 
-func (m *Model) simpleDelete(key tea.KeyPressMsg, kind string) (tea.Cmd, Event) {
+func (m *Model) simpleDelete(key tea.KeyPressMsg, kind string, count int) (tea.Cmd, Event) {
 	if kind == "S" {
 		before := m.snap()
-		text := m.lineRange(m.row, m.row, true)
-		m.reg, m.regLine = text, true
-		m.mode = Insert
-		m.changeStart = &before
-		m.changeKeys = []tea.Msg{key}
-		return m.clipboard(text), Event{Kind: Changed}
+		return m.applyLineOperator('c', m.row, min(len(m.lines)-1, m.row+count-1), before, countedKeys(count, 'S'))
 	}
-	m.beginChange(key)
+	before := m.snap()
 	var text string
 	if kind == "X" {
 		if m.col == 0 {
-			m.changeStart = nil
 			return nil, Event{}
 		}
 		cs := clusters(m.lines[m.row])
-		text = cs[m.col-1]
-		m.col--
-		m.lines[m.row] = joinClusters(append(cs[:m.col], cs[m.col+1:]...))
+		from := max(0, m.col-count)
+		text = joinClusters(cs[from:m.col])
+		m.lines[m.row] = joinClusters(append(cs[:from], cs[m.col:]...))
+		m.col = from
 	} else {
 		cs := clusters(m.lines[m.row])
 		if m.col >= len(cs) {
-			m.changeStart = nil
 			return nil, Event{}
 		}
-		text = cs[m.col]
-		m.lines[m.row] = joinClusters(append(cs[:m.col], cs[m.col+1:]...))
-		m.col = min(m.col, max(0, len(cs)-2))
+		end := min(len(cs), m.col+count)
+		text = joinClusters(cs[m.col:end])
+		m.lines[m.row] = joinClusters(append(cs[:m.col], cs[end:]...))
+		m.col = min(m.col, max(0, m.lineLen(m.row)-1))
 	}
 	m.reg, m.regLine = text, false
 	if kind == "s" {
 		m.mode = Insert
+		m.changeStart = &before
+		m.changeKeys = countedKeys(count, 's')
+		m.insertCount, m.insertKind, m.insertSession = 1, "s", ""
 	} else {
-		m.finishChange()
+		m.pushUndo(before)
+		m.redo = nil
+		m.lastChange = countedKeys(count, kind[0])
+		m.rehighlightRow(m.row)
 	}
 	return m.clipboard(text), Event{Kind: Changed}
 }
 
-func (m *Model) pasteRegister(key tea.KeyPressMsg, before bool) (tea.Cmd, Event) {
+func (m *Model) pasteRegister(key tea.KeyPressMsg, before bool, count int) (tea.Cmd, Event) {
 	if m.reg == "" {
 		return nil, Event{}
 	}
 	m.beginChange(key)
-	if m.regLine {
-		text := strings.TrimSuffix(m.reg, "\n")
-		parts := strings.Split(text, "\n")
-		at := m.row + 1
-		if before {
-			at = m.row
+	for range max(1, count) {
+		if m.regLine && !m.opts.SingleLine {
+			text := strings.TrimSuffix(m.reg, "\n")
+			parts := strings.Split(text, "\n")
+			at := m.row + 1
+			if before {
+				at = m.row
+			}
+			m.lines = append(m.lines[:at], append(parts, m.lines[at:]...)...)
+			m.row, m.col = at, 0
+		} else {
+			text := strings.TrimSuffix(m.reg, "\n")
+			if !before && m.lineLen(m.row) > 0 {
+				m.col++
+			}
+			m.insertText(text)
+			m.col = max(0, m.col-1)
 		}
-		m.lines = append(m.lines[:at], append(parts, m.lines[at:]...)...)
-		m.row, m.col = at, 0
-	} else {
-		if !before && m.lineLen(m.row) > 0 {
-			m.col++
-		}
-		m.insertText(m.reg)
-		m.col = max(0, m.col-1)
 	}
 	m.finishChange()
+	m.lastChange = countedKeys(count, map[bool]byte{true: 'P', false: 'p'}[before])
 	return nil, Event{Kind: Changed}
+}
+
+func countedKeys(count int, key byte) []tea.Msg {
+	var out []tea.Msg
+	if count > 1 {
+		for _, r := range fmt.Sprint(count) {
+			out = append(out, tea.KeyPressMsg(tea.Key{Code: r, Text: string(r)}))
+		}
+	}
+	return append(out, runeKey(key))
 }
 
 func (m *Model) toggleCase(key tea.KeyPressMsg, count int) (tea.Cmd, Event) {
@@ -173,6 +195,31 @@ func (m *Model) repeatLast() (tea.Cmd, Event) {
 	return tea.Batch(cmds...), Event{}
 }
 
+func (m *Model) finishCountedInsert() {
+	count := max(1, m.insertCount)
+	if count <= 1 || m.insertSession == "" {
+		m.insertCount, m.insertKind, m.insertSession = 0, "", ""
+		return
+	}
+	switch m.insertKind {
+	case "o":
+		for range count - 1 {
+			m.lines = append(m.lines[:m.row+1], append([]string{m.insertSession}, m.lines[m.row+1:]...)...)
+			m.row++
+			m.col = len(clusters(m.insertSession))
+		}
+	case "O":
+		for range count - 1 {
+			m.lines = append(m.lines[:m.row], append([]string{m.insertSession}, m.lines[m.row:]...)...)
+			m.row++
+			m.col = len(clusters(m.insertSession))
+		}
+	default:
+		m.insertText(strings.Repeat(m.insertSession, count-1))
+	}
+	m.insertCount, m.insertKind, m.insertSession = 0, "", ""
+}
+
 func (m *Model) afterEdit() {
 	m.rehighlightRow(m.row)
 	m.refreshCompletion()
@@ -209,6 +256,9 @@ func (m *Model) acceptCompletion() {
 func (m *Model) indentLines(from, to int, right bool) {
 	for row := from; row <= to; row++ {
 		if right {
+			if m.lines[row] == "" {
+				continue
+			}
 			m.lines[row] = m.opts.TabText + m.lines[row]
 			continue
 		}
@@ -220,6 +270,55 @@ func (m *Model) indentLines(from, to int, right bool) {
 			remove = 1
 		}
 		m.lines[row] = m.lines[row][remove:]
+	}
+}
+
+func (m *Model) lineOperatorText(from, to int) string {
+	from, to = min(from, to), max(from, to)
+	text := strings.Join(m.lines[from:to+1], "\n")
+	if !m.opts.SingleLine {
+		text += "\n"
+	}
+	return text
+}
+
+func (m *Model) applyLineOperator(op byte, from, to int, before snapshot, keys []tea.Msg) (tea.Cmd, Event) {
+	from, to = min(from, to), max(from, to)
+	text := m.lineOperatorText(from, to)
+	m.reg, m.regLine = text, !m.opts.SingleLine
+	switch op {
+	case 'y':
+		m.SetCursor(from, firstWordColumn(m.lines[from]))
+		return m.clipboard(text), Event{}
+	case '>', '<':
+		m.indentLines(from, to, op == '>')
+		m.pushUndo(before)
+		m.redo = nil
+		m.lastChange = append([]tea.Msg(nil), keys...)
+		m.SetCursor(from, firstWordColumn(m.lines[from]))
+		m.rehighlight()
+		return nil, Event{Kind: Changed}
+	case 'c':
+		m.lines[from] = ""
+		m.lines = append(m.lines[:from+1], m.lines[to+1:]...)
+		m.SetCursor(from, 0)
+		m.mode = Insert
+		m.changeStart = &before
+		m.changeKeys = append([]tea.Msg(nil), keys...)
+		m.rehighlight()
+		return m.clipboard(text), Event{Kind: Changed}
+	default:
+		m.lines = append(m.lines[:from], m.lines[to+1:]...)
+		if len(m.lines) == 0 {
+			m.lines = []string{""}
+		}
+		m.SetCursor(min(from, len(m.lines)-1), 0)
+		m.firstNonBlank()
+		m.pushUndo(before)
+		m.redo = nil
+		m.lastChange = append([]tea.Msg(nil), keys...)
+		m.rehighlight()
+		return m.clipboard(text), Event{Kind: Changed}
 	}
 }
 
@@ -253,11 +352,18 @@ func (m *Model) joinLines(from, to int) {
 	if from >= to {
 		return
 	}
-	joined := strings.TrimRight(m.lines[from], " \t")
+	joined := m.lines[from]
+	joinCol := -1
 	for row := from + 1; row <= to; row++ {
-		joined += " " + strings.TrimLeft(m.lines[row], " \t")
+		next := strings.TrimLeft(m.lines[row], " \t")
+		separator := ""
+		if next != "" && !strings.HasPrefix(next, ")") && !strings.HasSuffix(joined, " ") && !strings.HasSuffix(joined, "\t") {
+			separator = " "
+		}
+		joinCol = len(clusters(joined))
+		joined += separator + next
 	}
 	m.lines[from] = joined
 	m.lines = append(m.lines[:from+1], m.lines[to+1:]...)
-	m.SetCursor(from, min(m.col, max(0, m.lineLen(from)-1)))
+	m.SetCursor(from, min(max(0, joinCol), max(0, m.lineLen(from)-1)))
 }

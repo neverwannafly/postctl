@@ -126,12 +126,14 @@ type Model struct {
 	operator    byte
 	operatorCnt int
 	operatorAt  position
+	operatorG   bool
 	gPending    bool
 	textObject  byte
 	replace     bool
 	findKind    byte
 	lastFind    byte
 	lastFindKey string
+	lastFindPos int
 
 	anchor  position
 	reg     string
@@ -140,10 +142,13 @@ type Model struct {
 	undo []snapshot
 	redo []snapshot
 
-	changeStart *snapshot
-	changeKeys  []tea.Msg
-	lastChange  []tea.Msg
-	replaying   bool
+	changeStart   *snapshot
+	changeKeys    []tea.Msg
+	lastChange    []tea.Msg
+	replaying     bool
+	insertCount   int
+	insertKind    string
+	insertSession string
 
 	searching  bool
 	searchDir  int
@@ -240,7 +245,7 @@ func (m *Model) Cursor() (row, col int) { return m.row, m.col }
 func (m *Model) SetCursor(row, col int) {
 	m.row = min(max(0, row), len(m.lines)-1)
 	m.col = min(max(0, col), m.lineLen(m.row))
-	m.preferred = m.col
+	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
 	m.ensureVisible()
 }
 
@@ -282,5 +287,5 @@ func collapseNewlines(s string) string {
 func (m *Model) clearPending() {
 	m.pending, m.operator, m.textObject = "", 0, 0
 	m.count, m.operatorCnt = 0, 0
-	m.gPending, m.replace, m.findKind = false, false, 0
+	m.gPending, m.operatorG, m.replace, m.findKind = false, false, false, 0
 }

@@ -32,7 +32,7 @@ func TestGoldenViews(t *testing.T) {
 	for _, look := range looks {
 		for _, size := range sizes {
 			t.Run(look.name+"/"+size.name, func(t *testing.T) {
-				got := renderGoldenStates(t, look.th, size.w, size.h)
+				got := trimGolden(renderGoldenStates(t, look.th, size.w, size.h))
 				path := filepath.Join("testdata", "golden", look.name+"_"+size.name+".golden")
 				if *updateGoldens {
 					if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -52,6 +52,14 @@ func TestGoldenViews(t *testing.T) {
 			})
 		}
 	}
+}
+
+func trimGolden(s string) string {
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	return strings.Join(lines, "\n")
 }
 
 func renderGoldenStates(t *testing.T, th ui.Theme, w, h int) string {

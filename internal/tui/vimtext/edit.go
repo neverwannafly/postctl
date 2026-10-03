@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/rivo/uniseg"
 )
 
 func (m *Model) beginChange(msg tea.Msg) {
@@ -31,7 +32,7 @@ func (m *Model) finishChange() {
 		return
 	}
 	if strings.Join(m.changeStart.lines, "\n") != m.Value() {
-		m.undo = append(m.undo, *m.changeStart)
+		m.pushUndo(*m.changeStart)
 		m.redo = nil
 		if !m.replaying {
 			m.lastChange = append([]tea.Msg(nil), m.changeKeys...)
@@ -46,7 +47,7 @@ func (m *Model) undoChange() bool {
 	if len(m.undo) == 0 {
 		return false
 	}
-	m.redo = append(m.redo, m.snap())
+	m.pushRedo(m.snap())
 	s := m.undo[len(m.undo)-1]
 	m.undo = m.undo[:len(m.undo)-1]
 	m.restore(s)
@@ -57,12 +58,25 @@ func (m *Model) redoChange() bool {
 	if len(m.redo) == 0 {
 		return false
 	}
-	m.undo = append(m.undo, m.snap())
+	m.pushUndo(m.snap())
 	s := m.redo[len(m.redo)-1]
 	m.redo = m.redo[:len(m.redo)-1]
 	m.restore(s)
 	return true
 }
+
+const historyLimit = 1000
+
+func appendBounded[T any](items []T, item T) []T {
+	if len(items) >= historyLimit {
+		copy(items, items[len(items)-historyLimit+1:])
+		items = items[:historyLimit-1]
+	}
+	return append(items, item)
+}
+
+func (m *Model) pushUndo(s snapshot) { m.undo = appendBounded(m.undo, s) }
+func (m *Model) pushRedo(s snapshot) { m.redo = appendBounded(m.redo, s) }
 
 func (m *Model) insertText(s string) bool {
 	if m.opts.SingleLine {
@@ -172,6 +186,14 @@ func (m *Model) deleteRange(a, b position, inclusive bool) string {
 	return text
 }
 
+func (m *Model) clampNormalCursor() {
+	if m.mode != Normal {
+		return
+	}
+	m.col = min(m.col, max(0, m.lineLen(m.row)-1))
+	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
+}
+
 func (m *Model) lineRange(a, b int, remove bool) string {
 	a, b = min(a, b), max(a, b)
 	text := strings.Join(m.lines[a:b+1], "\n") + "\n"
@@ -208,7 +230,7 @@ func sameWordClass(a, b string, big bool) bool {
 
 func (m *Model) moveHorizontal(delta int) {
 	m.col = min(max(0, m.col+delta), max(0, m.lineLen(m.row)-boolInt(m.mode == Insert)))
-	m.preferred = m.col
+	m.preferred = displayColumn(m.lines[m.row], m.col, m.opts.TabText)
 }
 
 func boolInt(v bool) int {
@@ -223,55 +245,140 @@ func (m *Model) moveVertical(delta int) {
 		return
 	}
 	m.row = min(max(0, m.row+delta), len(m.lines)-1)
-	m.col = min(m.preferred, max(0, m.lineLen(m.row)-boolInt(m.mode == Insert)))
+	switch m.preferred {
+	case -1:
+		m.col = max(0, m.lineLen(m.row)-boolInt(m.mode == Insert))
+	case -2:
+		m.col = firstWordColumn(m.lines[m.row])
+	default:
+		m.col = columnAtDisplay(m.lines[m.row], m.preferred, m.mode == Insert, m.opts.TabText)
+	}
 }
 
 func (m *Model) wordForward(big, end bool) {
+	if end {
+		m.wordEndForward(big)
+		return
+	}
 	row, col := m.row, m.col
-	for {
-		cs := clusters(m.lines[row])
-		if len(cs) == 0 || col >= len(cs) {
-			if row+1 >= len(m.lines) {
-				break
-			}
+	cs := clusters(m.lines[row])
+	if len(cs) == 0 {
+		if row+1 < len(m.lines) {
 			row++
-			col = 0
-			if end && len(clusters(m.lines[row])) > 0 {
-				break
-			}
-			continue
+			col = firstWordColumn(m.lines[row])
 		}
-		if end {
-			for col+1 < len(cs) && sameWordClass(cs[col], cs[col+1], big) {
-				col++
-			}
-			break
-		}
-		for col < len(cs) && !isSpaceCluster(cs[col]) {
-			class := cs[col]
+		m.setMotionPosition(row, col)
+		return
+	}
+	col = min(col, len(cs)-1)
+	if !isSpaceCluster(cs[col]) {
+		class := cs[col]
+		for col < len(cs) && !isSpaceCluster(cs[col]) && sameWordClass(class, cs[col], big) {
 			col++
-			if col < len(cs) && !sameWordClass(class, cs[col], big) {
-				break
-			}
-		}
-		for col < len(cs) && isSpaceCluster(cs[col]) {
-			col++
-		}
-		if col < len(cs) {
-			break
 		}
 	}
-	m.row, m.col, m.preferred = row, col, col
+	for col < len(cs) && isSpaceCluster(cs[col]) {
+		col++
+	}
+	if col < len(cs) {
+		m.setMotionPosition(row, col)
+		return
+	}
+	if row+1 >= len(m.lines) {
+		m.setMotionPosition(row, max(0, len(cs)-1))
+		return
+	}
+	row++
+	if m.lines[row] == "" {
+		m.setMotionPosition(row, 0)
+		return
+	}
+	m.setMotionPosition(row, firstWordColumn(m.lines[row]))
 }
 
 func (m *Model) wordBackward(big bool) {
 	row, col := m.row, m.col
+	if col == 0 {
+		if row == 0 {
+			return
+		}
+		row--
+		if m.lines[row] == "" {
+			m.setMotionPosition(row, 0)
+			return
+		}
+		col = len(clusters(m.lines[row]))
+	}
+	cs := clusters(m.lines[row])
+	for col > 0 && isSpaceCluster(cs[col-1]) {
+		col--
+	}
+	if col > 0 {
+		col--
+		for col > 0 && sameWordClass(cs[col], cs[col-1], big) {
+			col--
+		}
+	}
+	m.setMotionPosition(row, col)
+}
+
+func (m *Model) wordEndForward(big bool) {
+	row, col := m.row, m.col
+	cs := clusters(m.lines[row])
+	if len(cs) == 0 {
+		if row+1 < len(m.lines) {
+			row++
+			cs = clusters(m.lines[row])
+			col = 0
+		}
+	} else if col+1 >= len(cs) || !sameWordClass(cs[col], cs[col+1], big) {
+		col = min(col+1, len(cs))
+	}
+	for {
+		for col < len(cs) && isSpaceCluster(cs[col]) {
+			col++
+		}
+		if col < len(cs) {
+			for col+1 < len(cs) && sameWordClass(cs[col], cs[col+1], big) {
+				col++
+			}
+			m.setMotionPosition(row, col)
+			return
+		}
+		if row+1 >= len(m.lines) {
+			m.setMotionPosition(row, max(0, len(cs)-1))
+			return
+		}
+		row++
+		cs = clusters(m.lines[row])
+		col = 0
+		if len(cs) == 0 {
+			m.setMotionPosition(row, 0)
+			return
+		}
+	}
+}
+
+func (m *Model) wordEndBackward(big bool) {
+	row, col := m.row, m.col
+	if col > 0 {
+		cs := clusters(m.lines[row])
+		col--
+		for col > 0 && !isSpaceCluster(cs[col-1]) && sameWordClass(cs[col], cs[col-1], big) {
+			col--
+		}
+	}
 	for {
 		if col == 0 {
 			if row == 0 {
-				break
+				m.setMotionPosition(0, 0)
+				return
 			}
 			row--
+			if m.lines[row] == "" {
+				m.setMotionPosition(row, 0)
+				return
+			}
 			col = len(clusters(m.lines[row]))
 		}
 		cs := clusters(m.lines[row])
@@ -280,13 +387,61 @@ func (m *Model) wordBackward(big bool) {
 		}
 		if col > 0 {
 			col--
-			for col > 0 && sameWordClass(cs[col], cs[col-1], big) {
-				col--
+			for col+1 < len(cs) && sameWordClass(cs[col], cs[col+1], big) {
+				col++
 			}
-			break
+			m.setMotionPosition(row, col)
+			return
 		}
 	}
-	m.row, m.col, m.preferred = row, col, col
+}
+
+func firstWordColumn(line string) int {
+	cs := clusters(line)
+	for i, c := range cs {
+		if !isSpaceCluster(c) {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m *Model) setMotionPosition(row, col int) {
+	m.row, m.col = row, col
+	m.preferred = displayColumn(m.lines[row], col, m.opts.TabText)
+}
+
+func displayColumn(line string, col int, tabText string) int {
+	cs := clusters(line)
+	col = min(max(0, col), len(cs))
+	width := 0
+	for _, c := range cs[:col] {
+		if c == "\t" {
+			width += max(1, len(tabText))
+		} else {
+			width += max(1, uniseg.StringWidth(c))
+		}
+	}
+	return width
+}
+
+func columnAtDisplay(line string, want int, insert bool, tabText string) int {
+	cs := clusters(line)
+	width := 0
+	for i, c := range cs {
+		cw := max(1, uniseg.StringWidth(c))
+		if c == "\t" {
+			cw = max(1, len(tabText))
+		}
+		if width+cw > want {
+			return i
+		}
+		width += cw
+	}
+	if insert {
+		return len(cs)
+	}
+	return max(0, len(cs)-1)
 }
 
 func (m *Model) firstNonBlank() {
@@ -295,6 +450,7 @@ func (m *Model) firstNonBlank() {
 	for m.col < len(cs) && isSpaceCluster(cs[m.col]) {
 		m.col++
 	}
+	m.preferred = -2
 }
 
 func (m *Model) findChar(kind byte, target string, count int) {
@@ -334,5 +490,22 @@ func (m *Model) findChar(kind byte, target string, count int) {
 	}
 	m.col = min(max(0, idx), max(0, len(cs)-1))
 	m.preferred = m.col
-	m.lastFind, m.lastFindKey = kind, target
+	m.lastFind, m.lastFindKey, m.lastFindPos = kind, target, idx
+}
+
+func (m *Model) repeatFind(reverse bool, count int) {
+	if m.lastFind == 0 {
+		return
+	}
+	kind := m.lastFind
+	if reverse {
+		kind = reverseFind(kind)
+	}
+	switch kind {
+	case 't':
+		m.col = min(m.lineLen(m.row)-1, m.col+1)
+	case 'T':
+		m.col = max(0, m.col-1)
+	}
+	m.findChar(kind, m.lastFindKey, count)
 }
