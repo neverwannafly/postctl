@@ -935,6 +935,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: key forwarding from text fields in normal mode uses new `ForwardKeyMsg`/`ForwardSeqMsg` (owned by V2a); "always" keys work in panes and non-modal overlays only; H1 final fix round reassigned to GPT-5.6 Sol.
 - Next: V3 brief once H1 merges; M2 and QA after phase 2.
 
+### 2026-10-03 20:14 IST · UX-T · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-t-terminal
+- Did: review fixes — real vim-tmux-navigator tmux.conf (ps-based is_postctl, copy-mode-vi); CheckSettings continues on per-option errors; tmux 3.5+ note for extended-keys-format; Ghostty config lines; HandoffPane uses injected env.
+- Tests: `task agents:check` green; tmux snippet validated on `-L postctl-check` private socket.
+- Next: orchestrator re-review.
+
 ### 2026-10-03 20:11 IST · UX-T · Composer 2.5 (fast) · DONE
 - Branch/worktree: ws/ux-t-terminal · ~/work/postctl-wt/ux-t-terminal
 - Did: tmux pane handoff on layout edge via `Options.OnEdge` (`tmux select-pane -L|-D|-U|-R`, skips zoomed windows); one-shot tmux settings check in Init (300 ms, fake runner in tests); `docs/terminal.md` for Ghostty/tmux and fallbacks; links from README and keys.md.

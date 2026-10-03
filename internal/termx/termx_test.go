@@ -99,12 +99,18 @@ func TestCheckSettingsTimeout(t *testing.T) {
 	}
 }
 
-func TestCheckSettingsTmuxMissing(t *testing.T) {
-	r := &fakeRunner{err: map[string]error{
-		"tmux\000show\000-gv\000extended-keys": ErrTmuxNotFound,
-	}}
-	if got := CheckSettings(context.Background(), r, tmuxEnv()); got != "" {
-		t.Fatalf("got %q", got)
+func TestCheckSettingsSkipsUnknownOption(t *testing.T) {
+	out := goodTmuxOut()
+	out["tmux\000show\000-gv\000mouse"] = "off"
+	r := &fakeRunner{
+		out: out,
+		err: map[string]error{
+			"tmux\000show\000-gv\000extended-keys": errors.New("unknown option"),
+		},
+	}
+	got := CheckSettings(context.Background(), r, tmuxEnv())
+	if !strings.Contains(got, "mouse on") {
+		t.Fatalf("want mouse warning when extended-keys query fails, got %q", got)
 	}
 }
 
@@ -155,7 +161,7 @@ func TestHandoffPaneZoomedSkips(t *testing.T) {
 	r := &fakeRunner{out: map[string]string{
 		"tmux\000display\000-p\000#{window_zoomed_flag}": "1",
 	}}
-	if err := HandoffPane(context.Background(), r, "left"); err != nil {
+	if err := HandoffPane(context.Background(), r, tmuxEnv(), "left"); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range r.calls {
@@ -175,7 +181,7 @@ func TestHandoffPaneSelects(t *testing.T) {
 	}
 	for dir, flag := range dirs {
 		r.calls = nil
-		if err := HandoffPane(context.Background(), r, dir); err != nil {
+		if err := HandoffPane(context.Background(), r, tmuxEnv(), dir); err != nil {
 			t.Fatal(dir, err)
 		}
 		want := "tmux\000select-pane\000" + flag

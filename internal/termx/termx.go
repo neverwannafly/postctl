@@ -109,7 +109,10 @@ func CheckSettings(ctx context.Context, r Runner, env []string) string {
 	for _, c := range checks {
 		val, err := tmuxGlobal(ctx, r, c.name)
 		if err != nil {
-			return "" // timeout or tmux missing: stay quiet on start-up
+			if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+				return "" // overall budget exhausted
+			}
+			continue // unknown on this tmux version: keep checking others
 		}
 		if !c.ok(val) {
 			fixes = append(fixes, c.fix)
@@ -200,8 +203,8 @@ func paneFlag(dir string) string {
 
 // HandoffPane moves tmux focus in dir unless the window is zoomed or tmux is
 // unavailable. Errors are ignored except [ErrTmuxNotFound].
-func HandoffPane(ctx context.Context, r Runner, dir string) error {
-	if os.Getenv("TMUX") == "" {
+func HandoffPane(ctx context.Context, r Runner, env []string, dir string) error {
+	if !InTmux(env) {
 		return nil
 	}
 	zoomed, err := PaneZoomed(ctx, r)

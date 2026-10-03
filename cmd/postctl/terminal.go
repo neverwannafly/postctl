@@ -37,7 +37,7 @@ func startupNotice(r termx.Runner) tea.Cmd {
 func onEdge(r termx.Runner) func(tui.Direction) tea.Cmd {
 	return func(dir tui.Direction) tea.Cmd {
 		return func() tea.Msg {
-			err := termx.HandoffPane(context.Background(), r, dir.String())
+			err := termx.HandoffPane(context.Background(), r, os.Environ(), dir.String())
 			if errors.Is(err, termx.ErrTmuxNotFound) {
 				return tui.ToastMsg{Kind: ui.ToastWarning, Text: "tmux not found; install tmux for pane handoff"}
 			}

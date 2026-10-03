@@ -9,6 +9,7 @@ Add to `~/.tmux.conf` (reload with `tmux source-file ~/.tmux.conf`):
 ```tmux
 # Extended keys (Ctrl-Enter, distinct Esc sequences) — tmux 3.4+
 set -g extended-keys on
+# csi-u format needs tmux 3.5+; on 3.4 keep extended-keys on and omit the next line
 set -g extended-keys-format csi-u
 
 # Tell tmux Ghostty speaks the kitty keyboard protocol
@@ -27,28 +28,35 @@ set -g set-clipboard on
 set -g focus-events on
 ```
 
-On tmux versions without `extended-keys-format`, keep `extended-keys on` and omit the format line.
-
 ## vim-tmux-navigator with postctl
 
-So **Ctrl-h**, **Ctrl-j**, **Ctrl-k** and **Ctrl-l** reach postctl at the edge of its layout and then move to the neighbouring tmux pane, extend the usual `is_vim` check to include the postctl process:
+postctl uses **Ctrl-h**, **Ctrl-j**, **Ctrl-k** and **Ctrl-l** for pane focus inside the app. At the layout edge it runs `tmux select-pane -L|-D|-U|-R` (unless the tmux window is zoomed). For tmux to pass those keys through to postctl instead of changing panes immediately, add bindings like vim-tmux-navigator (detects vim and postctl on the pane tty):
 
-```bash
-is_vim='vim|nvim|vi|postctl'
-if [[ -n "$TMUX" ]] && [[ $# -eq 1 ]] && [[ $1 =~ $is_vim ]]; then
-  tmux send-keys -X "$1"
-else
-  # ... your existing select-pane bindings ...
-fi
+```tmux
+is_postctl="ps -o state= -o comm= -t '#{pane_tty}' | grep -iqE '^[^TXZ ]+ +(\\S+\\/)?(g?(view|l?n?vim?x?|fzf)(diff)?|postctl)$'"
+bind-key -n C-h if-shell "$is_postctl" 'send-keys C-h' 'select-pane -L'
+bind-key -n C-j if-shell "$is_postctl" 'send-keys C-j' 'select-pane -D'
+bind-key -n C-k if-shell "$is_postctl" 'send-keys C-k' 'select-pane -U'
+bind-key -n C-l if-shell "$is_postctl" 'send-keys C-l' 'select-pane -R'
+
+bind-key -T copy-mode-vi C-h select-pane -L
+bind-key -T copy-mode-vi C-j select-pane -D
+bind-key -T copy-mode-vi C-k select-pane -U
+bind-key -T copy-mode-vi C-l select-pane -R
 ```
 
-Map **Ctrl-h/j/k/l** in tmux only when the pane is *not* vim/postctl, or use a plugin that respects `is_vim`. postctl calls `tmux select-pane -L|-D|-U|-R` when focus is already at its edge (not when the tmux window is zoomed).
+When postctl is focused and you press **Ctrl-h** at its left edge, postctl hands off to tmux; when not at the edge, tmux forwards **Ctrl-h** into postctl.
 
 ## Ghostty
 
-- Prefer running postctl inside tmux with the config above so **Ctrl-Enter** and **Ctrl-i** use enhanced keyboard reporting.
-- If Ghostty intercepts **Ctrl-Enter**, add a passthrough keybind in `config` (see Ghostty docs), or send with **Ctrl-S** (always works).
-- Native text selection with the mouse usually needs **Shift**-drag while postctl mouse mode is on.
+Example `config` lines:
+
+```ini
+macos-option-as-alt = true
+clipboard-write = allow
+```
+
+Ghostty sends **Ctrl-Enter** via the kitty keyboard protocol by default, so you usually do not need an extra passthrough keybind. If you added a user `keybind` that captures **ctrl+enter**, remove or change it, or send with **Ctrl-S** (always works). Prefer postctl inside tmux with the settings above so **Ctrl-Enter** and **Ctrl-i** use enhanced keyboard reporting. Native text selection with the mouse usually needs **Shift**-drag while postctl mouse mode is on.
 
 ## Other terminals
 
