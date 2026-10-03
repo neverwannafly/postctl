@@ -1,0 +1,60 @@
+ postctl  payments-api                                                                                                                                                                        env  none
+ ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Find request  11 of 11                                                                                                                                                                       Esc Close
+ > search requests                                                                                                                                                                                     
+ ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ > GET   List charges  Payments > Charges  /v1/charges                                                                                                                                                 
+   POST  Create charge  Payments > Charges  /v1/charges                                                                                                                                                
+   DEL   Refund charge  Payments > Charges  /v1/charges/{{chargeId}}                                                                                                                                   
+   PATCH Update charge  Payments > Charges  /v1/charges/{{chargeId}}                                                                                                                                   
+   POST  Create customer  Payments > Customers  /v1/customers                                                                                                                                          
+   GET   Get customer  Payments > Customers  /v1/customers/{{customerId}}                                                                                                                              
+   PUT   Replace customer  Payments > Customers  /v1/customers/{{customerId}}                                                                                                                          
+   GET   Health  Payments  /health                                                                                                                                                                     
+   GET   List users  Internal admin  /admin/users                                                                                                                                                      
+   POST  Ban user  Internal admin  /admin/users/{{userId}}/ban                                                                                                                                         
+   OPT   Preflight  Internal admin  /admin/users                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+                                                                                                                                                                                                       
+ ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+ Enter Open   Up/Down Move   Esc Close

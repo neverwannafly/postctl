@@ -350,3 +350,6 @@ type OpenScreenMsg struct {
 	// Screen is the screen to open.
 	Screen Screen
 }
+
+// OpenSwitcherMsg asks the shell to open the request quick switcher overlay.
+type OpenSwitcherMsg struct{}
