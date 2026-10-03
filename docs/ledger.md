@@ -49,7 +49,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
-| UX-Q request switcher | Gemini 3.8 Flash (high) | Review fixes done, ready to merge | ws/ux-q-switcher | 2026-10-03 19:00 IST |
+| UX-Q request switcher | Gemini 3.8 Flash (high) | Re-review fixes done, ready to merge | ws/ux-q-switcher | 2026-10-03 19:05 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
 ## Entries
@@ -787,6 +787,16 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues. Secret leak sweep and golden tests all pass.
 - Blockers / questions: none.
 - Next: Ready for orchestrator merge into main.
+
+### 2026-10-03 19:05 IST · UX-Q · Gemini 3.8 Flash · PROGRESS
+- Branch/worktree: ws/ux-q-switcher · ~/work/postctl-wt/ux-q-switcher
+- Did: Addressed three re-review items. (1) cleanURLPath drops the first segment as authority for any scheme-less URL not starting with '/', fixing single-label host leaks (`host/path` -> `/path`, `localhost/p` -> `/p`, `api/v1` -> `/v1`). (2) Method text is sanitized (ANSI/control stripped) before matching and rendering, tested with ESC sequence in method. (3) Requests with empty names after sanitizing render as `(unnamed request)`.
+- Files: internal/tui/switcher.go, internal/tui/switcher_test.go, docs/ledger.md.
+- Decisions: Scheme-less authority handling simplified to unconditionally drop the first segment when not starting with '/'. Empty sanitized names consistently display `(unnamed request)`.
+- Tests: task agents:check (go build ./..., go test -race ./..., golangci-lint run) all green with 0 issues.
+- Blockers / questions: none.
+- Next: Ready for orchestrator merge into main.
+
 
 
 

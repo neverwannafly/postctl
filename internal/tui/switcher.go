@@ -62,43 +62,20 @@ func cleanURLPath(raw string) string {
 		return base
 	}
 
-	// Leading template {{...}} represents a host/base variable.
-	if strings.HasPrefix(base, "{{") {
-		end := strings.Index(base, "}}")
-		if end >= 0 {
-			rest := base[end+2:]
-			slash := findFirstSlash(rest)
-			if slash >= 0 {
-				return rest[slash:]
-			}
-			return "/"
-		}
-	}
-
-	// First segment before '/': check if it represents an authority (host[:port]).
+	// If the URL has no scheme and does not start with '/',
+	// ALWAYS treat the first segment as the authority and drop it.
 	slash := findFirstSlash(base)
-	var firstSeg string
 	if slash >= 0 {
-		firstSeg = base[:slash]
-	} else {
-		firstSeg = base
+		return base[slash:]
 	}
-
-	if isAuthority(firstSeg) {
-		if slash >= 0 {
-			return base[slash:]
-		}
-		return "/"
-	}
-
-	return "/" + base
+	return "/"
 }
 
 // findFirstSlash returns the index of the first '/' outside of {{...}} templates.
 func findFirstSlash(s string) int {
 	inTemplate := false
 	for i := 0; i < len(s); i++ {
-		if !inTemplate && i+1 < len(s) && s[i] == '{' && s[i+1] == '{' {
+		if !inTemplate && i+1 < len(s) && rawIsTemplateStart(s, i) {
 			inTemplate = true
 			i++
 			continue
@@ -115,15 +92,8 @@ func findFirstSlash(s string) int {
 	return -1
 }
 
-// isAuthority reports whether a leading segment looks like a host[:port].
-func isAuthority(seg string) bool {
-	if seg == "" {
-		return false
-	}
-	if seg == "localhost" || strings.HasPrefix(seg, "localhost:") {
-		return true
-	}
-	return strings.Contains(seg, ".") || strings.Contains(seg, ":")
+func rawIsTemplateStart(s string, i int) bool {
+	return s[i] == '{' && s[i+1] == '{'
 }
 
 // sanitizeText strips ANSI escape sequences and C0/C1 control characters.
@@ -192,6 +162,10 @@ type switcherItem struct {
 
 func newSwitcherItem(id model.ID, name, method, folder, urlPath string) switcherItem {
 	name = sanitizeText(name)
+	if strings.TrimSpace(name) == "" {
+		name = "(unnamed request)"
+	}
+	method = sanitizeText(method)
 	folder = sanitizeText(folder)
 	urlPath = sanitizeText(urlPath)
 

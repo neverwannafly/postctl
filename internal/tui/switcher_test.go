@@ -30,6 +30,9 @@ func TestCleanURLPath(t *testing.T) {
 		{"localhost port only", "localhost:8080", "/"},
 		{"template with ? inside variable", "{{base}}/p/{{a?b}}/c?x=1", "/p/{{a?b}}/c"},
 		{"template with # inside variable", "{{base}}/p/{{a#b}}/c#frag", "/p/{{a#b}}/c"},
+		{"schemeless host/path", "host/path", "/path"},
+		{"schemeless localhost/p", "localhost/p", "/p"},
+		{"schemeless api/v1", "api/v1", "/v1"},
 	}
 
 	for _, tc := range tests {
@@ -64,7 +67,7 @@ func TestSanitizeTextWithEmbeddedESC(t *testing.T) {
 	}
 
 	// Verify sanitized text behaves properly inside switcher
-	req := model.NewRequest("\x1b[31mDangerous\x1b[0m Name", "GET", "https://api.test/\x1b[32musers\x1b[0m")
+	req := model.NewRequest("\x1b[31mDangerous\x1b[0m Name", "\x1b[35mPOST\x1b[0m", "https://api.test/\x1b[32musers\x1b[0m")
 	ws := &model.Workspace{
 		ID:   "ws-esc",
 		Name: "ESC Test",
@@ -81,8 +84,42 @@ func TestSanitizeTextWithEmbeddedESC(t *testing.T) {
 	if !strings.Contains(screen, "Dangerous Name") {
 		t.Fatalf("rendered switcher missing stripped name: %q", screen)
 	}
+	if !strings.Contains(screen, "POST") {
+		t.Fatalf("rendered switcher missing stripped method: %q", screen)
+	}
 	if !strings.Contains(screen, "/users") {
 		t.Fatalf("rendered switcher missing stripped path: %q", screen)
+	}
+
+	// Method search matches sanitized method
+	hh.keys("P", "O", "S", "T")
+	screen = hh.screen()
+	if !strings.Contains(screen, "1 of 1") {
+		t.Fatalf("searching for method 'POST' should match, got:\n%s", screen)
+	}
+}
+
+func TestSwitcherUnnamedRequest(t *testing.T) {
+	reqEmpty := model.NewRequest("", "GET", "https://api.test/v1/empty")
+	reqEscOnly := model.NewRequest("\x1b[31m\x1b[0m", "POST", "https://api.test/v1/esc")
+	ws := &model.Workspace{
+		ID:   "ws-unnamed",
+		Name: "Unnamed Test",
+		Collections: []*model.Collection{
+			{ID: "c1", Name: "Requests", Items: []model.Item{reqEmpty, reqEscOnly}},
+		},
+	}
+	hh := newHarness(t, ws, 80, 24)
+	hh.msg(OpenSwitcherMsg{})
+	screen := hh.screen()
+	if !strings.Contains(screen, "(unnamed request)") {
+		t.Fatalf("expected '(unnamed request)' in screen, got:\n%s", screen)
+	}
+
+	hh.keys("u", "n", "n", "a", "m", "e", "d")
+	screen = hh.screen()
+	if !strings.Contains(screen, "2 of 2") {
+		t.Fatalf("expected '2 of 2' matching 'unnamed', got:\n%s", screen)
 	}
 }
 
