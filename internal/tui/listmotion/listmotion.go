@@ -37,7 +37,9 @@ func Key(k tea.KeyPressMsg, cfg Config, v *View) Result {
 			}
 		}
 	}
+	clamped := false
 	if cfg.Count > 0 {
+		beforeC, beforeT := v.Cursor, v.Top
 		v.Cursor = min(v.Cursor, cfg.Count-1)
 		if v.Cursor < 0 {
 			v.Cursor = 0
@@ -49,103 +51,105 @@ func Key(k tea.KeyPressMsg, cfg Config, v *View) Result {
 		if v.Top > max(0, cfg.Count-page) {
 			v.Top = max(0, cfg.Count-page)
 		}
+		clamped = v.Cursor != beforeC || v.Top != beforeT
 	}
 	page := max(1, cfg.Page)
+	moved := func(was bool) bool { return was || clamped }
 	half := max(1, page/2)
 	s := k.String()
 	switch s {
 	case "j", "down":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		next := min(cfg.Count-1, v.Cursor+1)
 		if next != v.Cursor {
 			v.Cursor = next
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "k", "up":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		next := max(0, v.Cursor-1)
 		if next != v.Cursor {
 			v.Cursor = next
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "ctrl+d", "pgdown":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		next := min(cfg.Count-1, v.Cursor+half)
 		if next != v.Cursor {
 			v.Cursor = next
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "ctrl+u", "pgup":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		next := max(0, v.Cursor-half)
 		if next != v.Cursor {
 			v.Cursor = next
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "g":
 		if v.GWait {
 			v.GWait = false
 			if v.Cursor != 0 {
 				v.Cursor = 0
 				v.Top = 0
-				return Result{Handled: true, Moved: true}
+				return Result{Handled: true, Moved: moved(true)}
 			}
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		v.GWait = true
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "G":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		last := cfg.Count - 1
 		if v.Cursor != last {
 			v.Cursor = last
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	case "home":
 		v.GWait = false
 		if cfg.Count > 0 && v.Cursor != 0 {
 			v.Cursor = 0
 			v.Top = 0
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: cfg.Count > 0}
+		return Result{Handled: cfg.Count > 0, Moved: moved(false)}
 	case "end":
 		v.GWait = false
 		if cfg.Count == 0 {
-			return Result{Handled: true}
+			return Result{Handled: true, Moved: moved(false)}
 		}
 		last := cfg.Count - 1
 		if v.Cursor != last {
 			v.Cursor = last
 			v.ensureVisible(page)
-			return Result{Handled: true, Moved: true}
+			return Result{Handled: true, Moved: moved(true)}
 		}
-		return Result{Handled: true}
+		return Result{Handled: true, Moved: moved(false)}
 	default:
 		v.GWait = false
 		return Result{}

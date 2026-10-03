@@ -60,6 +60,9 @@ func maskGlyph(th ui.Theme) string {
 // Focus returns the field to insert mode.
 func (f *Field) Focus() tea.Cmd { return f.ed.Focus() }
 
+// FocusNormal focuses the field in normal mode (form fields before i/a).
+func (f *Field) FocusNormal() tea.Cmd { return f.ed.FocusNormal() }
+
 // SetWidth sets the render width in cells.
 func (f *Field) SetWidth(w int) { f.ed.SetSize(max(4, w), 1) }
 
@@ -92,6 +95,9 @@ func (f *Field) Inserting() bool {
 
 // Blur leaves the field.
 func (f *Field) Blur() { f.ed.Blur() }
+
+// Focused reports whether the field has keyboard focus.
+func (f *Field) Focused() bool { return f.ed.Focused() }
 
 // Update applies msg and reports whether the buffer changed.
 func (f *Field) Update(msg tea.Msg) (changed bool, cmd tea.Cmd) {

@@ -133,7 +133,17 @@ func New(env tui.ScreenEnv, d Deps) *Model {
 	}
 	m.envID = env.ActiveEnv
 	m.scopeLabel = m.buildScopeLabel()
+	m.blurSetupFields()
+	m.exportPath.Blur()
 	return m
+}
+
+func (m *Model) blurSetupFields() {
+	for _, f := range []*screenfield.Field{m.iterations, m.dataPath, m.delayMS} {
+		if f != nil {
+			f.Blur()
+		}
+	}
 }
 
 func (m *Model) buildScopeLabel() string {
@@ -268,27 +278,29 @@ func (m *Model) VimMode() string {
 }
 
 func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
+	if f := m.activeField(); f != nil && f.Focused() {
+		_, _, cmd, leave, _ := f.UpdateEx(k)
+		if leave {
+			f.Blur()
+		}
+		return m, cmd
+	}
 	m.setupNav.Cursor = m.field
 	if r := listmotion.Key(k, listmotion.Config{Count: 7, Page: 7}, &m.setupNav); r.Handled {
 		if r.Moved {
+			m.blurSetupFields()
 			m.field = m.setupNav.Cursor
 		}
 		return m, nil
 	}
 	switch k.String() {
 	case "esc", "q":
-		if f := m.activeField(); f != nil {
-			if f.Inserting() {
-				_, _, cmd, _, _ := f.UpdateEx(k)
-				return m, cmd
-			}
-			f.Blur()
-			return m, nil
-		}
 		return nil, nil
 	case "tab":
+		m.blurSetupFields()
 		m.field = (m.field + 1) % 7
 	case "shift+tab":
+		m.blurSetupFields()
 		m.field = (m.field + 6) % 7
 	case " ":
 		switch m.field {
@@ -304,23 +316,7 @@ func (m *Model) setupKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 			return m, m.startRun()
 		}
 		if f := m.activeField(); f != nil {
-			if !f.Inserting() {
-				if f.VimMode() == "" {
-					return m, f.Focus()
-				}
-				_, _, cmd, leave, normal := f.UpdateEx(k)
-				if normal && !leave {
-					return m, tea.Batch(cmd, f.Focus())
-				}
-				return m, cmd
-			}
-			_, _, cmd, _, _ := f.UpdateEx(k)
-			return m, cmd
-		}
-	default:
-		if f := m.activeField(); f != nil {
-			_, _, cmd, _, _ := f.UpdateEx(k)
-			return m, cmd
+			return m, f.FocusNormal()
 		}
 	}
 	return m, nil

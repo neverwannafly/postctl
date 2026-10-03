@@ -52,7 +52,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
-| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done | ws/ux-v2b-screens | 2026-10-03 20:27 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | PROGRESS (review fixes) | ws/ux-v2b-screens | 2026-10-03 20:40 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Started | ws/ux-v3-response | 2026-10-03 20:20 IST |
@@ -972,7 +972,6 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Decisions: key forwarding from text fields in normal mode uses new `ForwardKeyMsg`/`ForwardSeqMsg` (owned by V2a); "always" keys work in panes and non-modal overlays only; H1 final fix round reassigned to GPT-5.6 Sol.
 - Next: V3 brief once H1 merges; M2 and QA after phase 2.
 
-<<<<<<< Updated upstream
 ### 2026-10-03 20:08 IST · UX-H1 · GPT-5.6 Sol · DONE
 - Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
 - Did: Completed the final correctness and security review round. Replaced the traced and small-input diff paths with linear-space middle-snake Myers, enforced the edit-cap notice, generation-guarded both async diff messages, wired hosted-screen `gg`, and covered reverse hunk navigation. Restores now preserve raw template variables in URLs, keep URL and query rows consistent when masked, never fall back to a resolved URL, cancel stale pending patches on the first different binding, and create restored requests through the shell tree-create helper. Added URL-encoded and form-data literal-secret coverage.
@@ -1036,4 +1035,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Branch/worktree: ws/ux-v2b-screens; merged main (H1, T, V3 brief); not pushed.
 - Did: Review fixes on 1c5c795 — envedit `applyTextIfChanged` + unhydrated-secret test; vimtext `Options.Mask` (reverted render Redact); leak sweep hydrates sentinel, env-editor normal/insert/visual at 80/140, runner setup + switcher, mask-glyph asserts (stub Mask to prove); runner field Esc/Enter ladder + listmotion on setup/summary; View purity sizing in SetSize; history vim filter + listmotion + VimMode; listmotion empty/shrink; keys.md via genkeys; Ctrl-R reveal before vimtext in envedit.
 - Tests: `task agents:check` green; `task tui:smoke` PASS. Leak proofs: sentinel absent and mask glyph present on env-editor frames; workspace files still mask-glyph-clean via `assertMaskGlyphsAbsent`.
+- Next: orchestrator re-review.
+
+### 2026-10-03 20:40 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; not pushed.
+- Did: Removed ledger conflict markers; runner setup routes keys to focused insert/visual fields before listmotion (blurred fields, Enter→normal); listmotion shrink reports Moved; vimtext ensureVisible EOL vs on-char; runner goldens refreshed.
+- Tests: `task agents:check` green; `task tui:smoke` PASS; `VIMTEXT_NVIM=1` differential green.
 - Next: orchestrator re-review.

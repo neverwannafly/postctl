@@ -2,7 +2,7 @@ postctl  demo — Run collection                                         env  no
 --------------------------------------------------------------------------------> Scope:  API (collection)
   Environment:  none
   Iterations:  1                   
-  Data file:                                                              
+  Data file:  path to CSV                                                 
   Delay (ms):  0           
   Bail on failure:  [ ]
   Persist variables:  [x]

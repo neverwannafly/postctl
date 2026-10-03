@@ -268,6 +268,32 @@ func TestReadOnlyNeverChanges(t *testing.T) {
 	}
 }
 
+func TestEnsureVisibleLineFitsWithCursorOnCharacter(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{SingleLine: true})
+	m.SetValue("1234567890")
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.mode = Normal
+	m.col = 9
+	m.ensureVisible()
+	if m.left != 0 {
+		t.Fatalf("left=%d want 0 when line fits with cursor on last char", m.left)
+	}
+}
+
+func TestEnsureVisiblePastEndNeedsRoomForCursor(t *testing.T) {
+	m := New(ui.NewTheme(true, true, false), Options{SingleLine: true})
+	m.SetValue("1234567890")
+	m.SetSize(10, 1)
+	_ = m.Focus()
+	m.mode = Insert
+	m.col = 10
+	m.ensureVisible()
+	if m.left == 0 {
+		t.Fatal("insert at EOL on full-width line should scroll")
+	}
+}
+
 func TestMaskKeepsCursorColumnsAligned(t *testing.T) {
 	th := ui.NewTheme(true, true, false)
 	m := New(th, Options{SingleLine: true, Mask: th.Glyphs.Mask})

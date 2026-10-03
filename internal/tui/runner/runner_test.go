@@ -29,6 +29,38 @@ func testEnv(w, h int) tui.ScreenEnv {
 	}
 }
 
+func TestSetupFieldKeysBeforeListMotion(t *testing.T) {
+	m := New(testEnv(80, 24), Deps{})
+	m.SetSize(80, 24)
+	m.field = 2
+	next, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if mm, ok := next.(*Model); ok {
+		m = mm
+	}
+	if m.field != 3 {
+		t.Fatalf("field=%d want 3 after j while navigating", m.field)
+	}
+	if strings.Contains(m.iterations.Value(), "j") {
+		t.Fatal("j must not insert into iterations while navigating")
+	}
+	m.field = 2
+	m.blurSetupFields()
+	for _, step := range []tea.KeyPressMsg{
+		{Code: tea.KeyEnter},
+		{Code: 'i', Text: "i"},
+		{Code: 'j', Text: "j"},
+		{Code: 'k', Text: "k"},
+	} {
+		next, _ = m.Update(step)
+		if mm, ok := next.(*Model); ok {
+			m = mm
+		}
+	}
+	if !strings.Contains(m.iterations.Value(), "jk") {
+		t.Fatalf("iterations=%q want jk inserted", m.iterations.Value())
+	}
+}
+
 func TestRunEventsReachSummary(t *testing.T) {
 	fr := &fakerun.Runner{
 		Scripts: []fakerun.Script{

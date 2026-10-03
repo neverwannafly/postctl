@@ -225,6 +225,14 @@ func (m *Model) Focus() tea.Cmd {
 	return nil
 }
 
+// FocusNormal focuses the editor in normal mode.
+func (m *Model) FocusNormal() tea.Cmd {
+	m.focused = true
+	m.mode = Normal
+	m.clearPending()
+	return nil
+}
+
 // Blur removes focus and clears transient state.
 func (m *Model) Blur() {
 	m.focused = false

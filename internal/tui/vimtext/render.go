@@ -179,7 +179,12 @@ func (m *Model) ensureVisible() {
 	for _, c := range cs {
 		total += clusterWidth(c, m.opts.TabText)
 	}
-	if total+cursorWidth <= room {
+	pastEnd := col >= len(cs)
+	if pastEnd {
+		if total+cursorWidth <= room {
+			m.left = 0
+		}
+	} else if total <= room {
 		m.left = 0
 	}
 }
