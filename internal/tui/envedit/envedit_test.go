@@ -221,6 +221,21 @@ func TestViewIsPure(t *testing.T) {
 	}
 }
 
+func TestViewIsPureInEditMode(t *testing.T) {
+	h := newHarness(t, 80, 24)
+	h.key("enter")
+	h.key("j")
+	h.key("enter")
+	if h.scr.in == nil {
+		t.Fatal("expected value field editor")
+	}
+	val := h.scr.in.Value()
+	first, second := h.m.View(), h.m.View()
+	if first != second || h.scr.in.Value() != val {
+		t.Fatal("View mutated the table editor while editing")
+	}
+}
+
 func (h *harness) mustHave(sub string) {
 	h.t.Helper()
 	if !strings.Contains(h.view(), sub) {
@@ -409,7 +424,7 @@ func TestAddEditVariable(t *testing.T) {
 
 func TestEmptyNewRowIsDropped(t *testing.T) {
 	h := newHarness(t, 100, 30)
-	h.key("enter", "a", "esc")
+	h.key("enter", "a", "esc", "esc")
 	if n := len(h.env("staging").Variables); n != 3 {
 		t.Fatalf("vars = %d", n)
 	}
@@ -451,8 +466,10 @@ func TestSecretsAreMaskedUntilRevealAndRevealHydrates(t *testing.T) {
 
 func TestEditingSecretValueIsMasked(t *testing.T) {
 	h := newHarness(t, 100, 30)
-	h.key("enter", "down", "enter") // token row, edit value
+	h.key("enter", "j", "enter") // token row, edit value (hydrates for editing)
 	h.mustHave("Value (secret)")
+	h.mustNotHave("s3cr3t-value")
+	h.key("esc", "shift+S") // normal, then change the whole line
 	h.typ("hunter2")
 	h.mustNotHave("hunter2")
 	if h.env("staging").Variables[1].Value != "hunter2" {
@@ -460,7 +477,7 @@ func TestEditingSecretValueIsMasked(t *testing.T) {
 	}
 	h.key("ctrl+r")
 	h.mustHave("hunter2")
-	h.key("esc")
+	h.key("esc", "esc")
 }
 
 func TestMakeSecretAndMakePlain(t *testing.T) {

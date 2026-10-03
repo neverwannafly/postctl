@@ -65,6 +65,10 @@ type SendResult struct {
 	Skipped bool
 	// Err is a transport, resolution or cancellation error.
 	Err error
+	// HistoryID is the history entry recorded for this send, or empty when
+	// nothing was recorded. The response pane uses it to find the previous
+	// send of the same request.
+	HistoryID string
 }
 
 // TestOutcome is one pm.test result.

@@ -183,6 +183,8 @@ func (m *Model) ensureVisible() {
 	if pastEnd {
 		if total+cursorWidth <= room {
 			m.left = 0
+		} else {
+			m.left = max(0, len(cs)-(room-cursorWidth))
 		}
 	} else if total <= room {
 		m.left = 0

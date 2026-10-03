@@ -447,7 +447,17 @@ type ScreenEnv struct {
 	ASCII bool
 	// RunScope seeds the collection runner when opening from the tree.
 	RunScope *RunScope
+	// HistoryRequest limits the history screen to one request's sends; empty
+	// lists every send.
+	HistoryRequest model.ID
+	// HistoryEntry is a history entry ID the history screen opens on (its
+	// detail view); empty opens the list.
+	HistoryEntry string
 }
+
+// ScreenOpenedMsg is sent to a hosted screen right after it opens so it can
+// start loading without waiting for another message.
+type ScreenOpenedMsg struct{}
 
 // ScreenFactory builds a screen.
 type ScreenFactory func(env ScreenEnv) Screen

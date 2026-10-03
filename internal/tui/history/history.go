@@ -91,7 +91,10 @@ type Model struct {
 
 // New builds the history browser.
 func New(env tui.ScreenEnv, d Deps) *Model {
-	m := &Model{th: env.Theme, env: env, deps: d, filter: newFilterField(env.Theme)}
+	m := &Model{
+		th: env.Theme, env: env, deps: d,
+		filter: newFilterField(env.Theme), requestID: env.HistoryRequest,
+	}
 	return m
 }
 
@@ -184,6 +187,8 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 	switch v := msg.(type) {
 	case tui.ThemeChangedMsg:
 		m.th = v.Theme
+	case tui.ScreenOpenedMsg:
+		return m, m.start()
 	case loadedMsg:
 		m.loaded = true
 		m.items = v.items
@@ -244,6 +249,18 @@ func (m *Model) Update(msg tea.Msg) (tui.Screen, tea.Cmd) {
 		return m, m.reload()
 	}
 	return m, nil
+}
+
+// start loads the list and, when the screen was opened on an entry, that
+// entry's detail.
+func (m *Model) start() tea.Cmd {
+	if m.deps.Log == nil {
+		return nil
+	}
+	if m.env.HistoryEntry == "" {
+		return m.reload()
+	}
+	return tea.Batch(m.reload(), m.loadEntry(m.env.HistoryEntry))
 }
 
 func (m *Model) reload() tea.Cmd {
@@ -474,6 +491,9 @@ func (m *Model) viewConfirm() string {
 func (m *Model) viewList() string {
 	t := m.th
 	title := "History"
+	if m.requestID != "" {
+		title = "History of this request"
+	}
 	if m.filterQ != "" {
 		title += "  /" + m.filterQ
 	}

@@ -1,0 +1,21 @@
+200 OK  67 ms  188 B  Tests 2/3                                                 
+Body (jq)  Headers(1)  Cookies  Tests(3)  Console(2)  Timeline                  
+━━━━━━━━━───────────────────────────────────────────────────────────────────────
+jq .data.items[]                                                                
+   1 {                                                                          
+   2   "id": "ch_1",                                                            
+   3   "amount": 1200                                                           
+   4 }                                                                          
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                

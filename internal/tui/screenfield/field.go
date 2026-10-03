@@ -19,13 +19,12 @@ type Field struct {
 func New(th ui.Theme, value, placeholder string, masked bool) (*Field, tea.Cmd) {
 	opts := vimtext.Options{SingleLine: true, StartInsert: true, Placeholder: placeholder}
 	if masked {
-		g := maskGlyph(th)
-		opts.Mask = g
+		opts.Mask = maskGlyph(th)
 		opts.Redact = func(s string) string {
 			if s == "" {
 				return ""
 			}
-			return strings.Repeat(g, uniseg.StringWidth(s))
+			return fixedMask(th)
 		}
 	}
 	ed := vimtext.New(th, opts)
@@ -55,6 +54,13 @@ func maskGlyph(th ui.Theme) string {
 		return "*"
 	}
 	return cluster
+}
+
+func fixedMask(th ui.Theme) string {
+	if th.ASCII {
+		return "****"
+	}
+	return th.Glyphs.Mask
 }
 
 // Focus returns the field to insert mode.

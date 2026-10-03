@@ -62,7 +62,7 @@ func (m *Model) tableKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.beginEdit(1)
+		return m, m.beginEditWithHydrate(1)
 	case "i":
 		if len(rows) == 0 {
 			if l := m.ensureList(); l != nil {
@@ -70,7 +70,7 @@ func (m *Model) tableKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.beginEdit(m.col)
+		return m, m.beginEditWithHydrate(m.col)
 	case "space", " ":
 		if l := m.list(); l != nil && m.cur < len(*l) {
 			(*l)[m.cur].Disabled = !(*l)[m.cur].Disabled
@@ -185,6 +185,23 @@ func (m *Model) field(v model.Variable, col int) string {
 	return v.Description
 }
 
+func (m *Model) beginEditWithHydrate(col int) tea.Cmd {
+	m.beginEdit(col)
+	return m.hydrateIfSecretValueEmpty()
+}
+
+func (m *Model) hydrateIfSecretValueEmpty() tea.Cmd {
+	l := m.list()
+	if l == nil || m.cur >= len(*l) {
+		return nil
+	}
+	v := (*l)[m.cur]
+	if m.col == 1 && v.IsSecret() && v.Value == "" && v.SecretRef != "" && !m.reveal {
+		return m.hydrate(m.ownerKey(), cloneVars(*l), thenEdit)
+	}
+	return nil
+}
+
 func (m *Model) beginEdit(col int) {
 	l := m.list()
 	if l == nil || m.cur >= len(*l) {
@@ -278,7 +295,7 @@ func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 		}
 	}
 	submit, changed, cmd, leave, normal := m.in.UpdateEx(k)
-	if leave || (s == "esc" && normal) {
+	if leave {
 		return tea.Batch(cmd, m.finish())
 	}
 	if submit || (s == "enter" && normal) {
@@ -290,8 +307,7 @@ func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 	switch s {
 	case "tab":
 		if m.col < 2 {
-			m.beginEdit(m.col + 1)
-			return nil
+			return m.beginEditWithHydrate(m.col + 1)
 		}
 		wasDraft := m.draft
 		cmd := m.finish()
@@ -310,7 +326,7 @@ func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 		return cmd
 	case "shift+tab":
 		if m.col > 0 {
-			m.beginEdit(m.col - 1)
+			return m.beginEditWithHydrate(m.col - 1)
 		}
 		return nil
 	case "up", "down":

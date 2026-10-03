@@ -106,6 +106,7 @@ const (
 	thenReveal hydrateThen = iota
 	thenUnsecret
 	thenDuplicate
+	thenEdit
 )
 
 // Model is the environment editor screen.
@@ -718,7 +719,7 @@ func (m *Model) onHydrated(h hydratedMsg) tea.Cmd {
 		}
 		m.beginName(intentDuplicate, src+" copy")
 		return note
-	case thenReveal, thenUnsecret:
+	case thenReveal, thenUnsecret, thenEdit:
 		if h.owner != m.ownerKey() {
 			return nil
 		}
@@ -739,11 +740,19 @@ func (m *Model) onHydrated(h hydratedMsg) tea.Cmd {
 				cur[i].Value = h.vars[i].Value
 			}
 		}
-		if h.then == thenUnsecret && m.cur < len(cur) && cur[m.cur].IsSecret() {
-			cur[m.cur].Type = model.VarDefault
-			cur[m.cur].SecretRef = ""
-			if k, ok := m.saveTarget(); ok {
-				return m.touch(k)
+		*l = cur
+		switch h.then {
+		case thenUnsecret:
+			if m.cur < len(cur) && cur[m.cur].IsSecret() {
+				cur[m.cur].Type = model.VarDefault
+				cur[m.cur].SecretRef = ""
+				if k, ok := m.saveTarget(); ok {
+					return m.touch(k)
+				}
+			}
+		case thenEdit:
+			if m.edit {
+				m.beginEdit(m.col)
 			}
 		}
 	}

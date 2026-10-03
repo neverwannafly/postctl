@@ -55,7 +55,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | PROGRESS (review fixes) | ws/ux-v2b-screens | 2026-10-03 20:40 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
-| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Started | ws/ux-v3-response | 2026-10-03 20:20 IST |
+| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Items 1-3 merged; item 4 waits for V2a | ws/ux-v3-response | 2026-10-03 20:42 IST |
 
 ## Entries
 
@@ -1042,3 +1042,34 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: Removed ledger conflict markers; runner setup routes keys to focused insert/visual fields before listmotion (blurred fields, Enter→normal); listmotion shrink reports Moved; vimtext ensureVisible EOL vs on-char; runner goldens refreshed.
 - Tests: `task agents:check` green; `task tui:smoke` PASS; `VIMTEXT_NVIM=1` differential green.
 - Next: orchestrator re-review.
+
+### 2026-10-03 20:19 IST · UX-V3 · Sonnet 5.5 (high) · STARTED
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: read the brief, AGENTS files and the response, history, diffview and leader code. Starting items 1-3 (History tab, diff with previous, jq filter). Item 4 (read-only vimtext body) waits for V2a on main.
+- Files: none yet.
+- Decisions: the response pane registers `history.request`, `response.diff` and `response.jq` itself (it owns the state they need); history access goes through a new `response.Deps` factory wired in `cmd/postctl/wire.go`.
+- Tests: none yet.
+- Blockers / questions: none.
+- Next: History tab, then diff, then jq.
+
+### 2026-10-03 20:37 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: items 1-3 shipped. (1) Per-request History tab in the response pane (`Space H`, `gH`, `d` diff with the selected entry, `Enter` opens the History screen filtered to the request). (2) Diff with previous (`Space x`, body and headers, `h` toggles). (3) jq filter (`Space j`, gojq v0.12.19: no env, no modules, 250 ms and 1 MiB limits, errors without data). Item 4 (read-only vimtext body) not started.
+- Files: new in `internal/tui/response` (`deps.go`, `history_tab.go`, `diff.go`, `jq.go`, `jq_pane.go`, tests, 45 new goldens, no existing golden changed); outside it: `internal/tui/send.go` (`SendResult.HistoryID`), `internal/tui/tuiengine/tuiengine.go`, `internal/tui/pane.go` (`ScreenEnv.HistoryRequest/HistoryEntry`, `ScreenOpenedMsg`), `internal/tui/response_actions.go` (new), `internal/tui/app.go` (one case), `internal/tui/history/history.go` (request filter, title), `cmd/postctl/main.go`, `cmd/postctl/wire.go`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/tui-stack.md`, `go.mod`, `go.sum` (gojq, timefmt-go; `go mod tidy` also moved uniseg to direct, which main already needed), `internal/qa/secret_leak_test.go`.
+- Decisions: the pane registers `history.request`, `response.diff`, `response.jq` itself (state lives there); the History tab, section and actions exist only when `Deps.Log` is set. The diff always compares redacted text on both sides, even with reveal on. jq works on the masked body; its output is tied to the reveal state it was computed for. `y` now copies masked text (jq output or masked body) unless reveal is on. History rows mask the server reason phrase with the current result's redactor. The base Body tab is still unmasked, as before (exempt in the leak sweep); item 4 owns that.
+- Tests: `task agents:check` green (0 lint issues), `task tui:smoke` PASS. Leak sweep extended (`renderResponseV3Frames`): History tab, History tab with a secret in the reason phrase, diff body, diff headers, jq whole-document and field filters, and the text a jq yank copies, for the Bearer and Folder requests. Proved by removing the masking: jq input (8 frames fail), diff body (2), diff headers (2), history reason phrase (2); all restored.
+- Blockers / questions: none. Brief deviations: actions registered in the pane rather than `response_actions.go`; `Space x` is enabled whenever a request is selected and toasts the reason when there is nothing to diff (not disabled).
+- Next: item 4 once V2a merges.
+
+### 2026-10-03 20:44 IST · UX-V3 · orchestrator (Claude Opus) · PROGRESS
+- Branch/worktree: items 1-3 of `ws/ux-v3-response` (ca99c24) merged into `main` with `--no-ff`; the worktree stays for item 4 (read-only vimtext body), which waits for UX-V2a.
+- Did: merged the response History tab (`gH`, `Space H`), diff with previous (`Space x`), jq filter (`Space j`, gojq v0.12.19).
+- Reviews: security approved (about 60 jq filters checked for leaks through error text; diff and jq leak cases re-proven by stubbing). Correctness raised one item (jq Esc); declined because the code follows the Esc ladder, and the brief was corrected (f44a1d3).
+- Decisions: the on-screen response Body tab stays unmasked (INT4 decision, leak-sweep exemption); yank, diff, jq and every external path stay masked. Follow-ups for item 4: no clock read in the History tab `View`; document that gojq has no memory cap.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+
+### 2026-10-03 21:05 IST · UX-V2b · Composer 2.5 (fast) · PROGRESS
+- Branch/worktree: ws/ux-v2b-screens; merged main (V3 1–3); not pushed.
+- Did: Security re-check fixes — leak sweep hydrates secret via `thenEdit`/`hydrate` (no Ctrl-R), captures insert/normal/visual env-editor frames and history vim filter; Esc once stays in field. Fixed mask: per-glyph while editing, fixed four-glyph `Redact` for yank; narrow-width `ensureVisible`; edit-mode purity tests (envedit, runner, screenfield). History merge keeps vim filter + per-request filter.
+- Tests: `task agents:check`, `task tui:smoke`, nvim differential. Leak stub proofs (/tmp copy): unset `screenfield` `Options.Mask` fails env-editor insert 80+140; vimtext render mask disabled fails insert 80+140; identity `Redact` does not fail display frames (yank length covered by `TestYankMaskedSecretUsesFixedMask`).
+- Next: orchestrator merge.

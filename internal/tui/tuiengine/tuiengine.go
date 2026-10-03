@@ -64,6 +64,7 @@ func result(out *engine.Outcome) tui.SendResult {
 		Skipped:   out.Skipped,
 		Redactor:  out.Redactor,
 		Err:       out.Err,
+		HistoryID: out.HistoryID,
 	}
 	for _, warning := range out.Warnings {
 		res.Warnings = append(res.Warnings, mask(warning))

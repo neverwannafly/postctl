@@ -185,6 +185,30 @@ func TestNoSecretsInSetupView(t *testing.T) {
 	}
 }
 
+func TestViewIsPureInEditMode(t *testing.T) {
+	m := New(testEnv(80, 24), Deps{})
+	m.SetSize(80, 24)
+	for range 2 {
+		next, _ := m.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+		if next != nil {
+			m = next.(*Model)
+		}
+	}
+	next, _ := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	if next != nil {
+		m = next.(*Model)
+	}
+	next, _ = m.Update(tea.KeyPressMsg{Code: '5', Text: "5"})
+	if next != nil {
+		m = next.(*Model)
+	}
+	val := m.iterations.Value()
+	first, second := m.View(), m.View()
+	if first != second || m.iterations.Value() != val {
+		t.Fatal("View mutated setup field while editing")
+	}
+}
+
 func TestSetupCtrlEnterStartsRun(t *testing.T) {
 	fr := &fakerun.Runner{Scripts: []fakerun.Script{{Name: "A", Method: "GET", Status: 200}}}
 	m := New(testEnv(80, 24), Deps{Runner: fr})

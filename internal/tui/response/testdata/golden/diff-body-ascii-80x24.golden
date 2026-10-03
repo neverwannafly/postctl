@@ -1,0 +1,21 @@
+Response diff                                                                   
+Previous  404  120 ms  2048 B  ↔  Current  200  67 ms  188 B                    
+@@ -2,11 +2,15 @@                                                               
+    "data": {                                                                   
+      "items": [                                                                
+        {                                                                       
+-         "amount": 1200,                                                       
++         "amount": 1500,                                                       
+          "id": "ch_1"                                                          
++       },                                                                      
++       {                                                                       
++         "amount": 300,                                                        
++         "id": "ch_2"                                                          
+        }                                                                       
+      ],                                                                        
+-     "total": 1                                                                
++     "total": 2                                                                
+    },                                                                          
+    "ok": true                                                                  
+Hunk 1/1  n/N hunk  h toggle headers                                            
+                                                                                
