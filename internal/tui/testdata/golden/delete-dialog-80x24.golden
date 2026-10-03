@@ -1,6 +1,6 @@
  postctl  payments-api                                                env  none
  ──────────────────────────────────────────────────────────────────────────────
- › 1 Collections    2 Request    3 Response                                    
+ › [1] Collections    [2] Request    [3] Response                              
    ▾ Payments                                                                 8
      ▾ Ch╭────────────────────────────────────────────────────────────╮       4
          │ ! Delete folder                                            │        

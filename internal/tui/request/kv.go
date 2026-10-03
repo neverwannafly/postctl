@@ -335,14 +335,14 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool, cmd tea
 	case "a", "insert":
 		k.addRow(p, items)
 		return true, true, nil
-	case "enter":
+	case "enter", "i": // i edits the cell in insert, like Enter
 		if len(items) == 0 {
 			k.addRow(p, items)
 			return true, true, nil
 		}
 		k.beginEdit(p, items, 1)
 		return true, false, nil
-	case "space", " ":
+	case "x", "space", " ":
 		if k.cur < len(items) && !items[k.cur].path {
 			items[k.cur].Disabled = !items[k.cur].Disabled
 			storeItems(k.kind, p.req, items)
@@ -352,7 +352,7 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool, cmd tea
 			return true, true, nil
 		}
 		return true, false, nil
-	case "d", "delete", "backspace":
+	case "d", "delete":
 		if k.cur < len(items) && !items[k.cur].path {
 			items = append(items[:k.cur], items[k.cur+1:]...)
 			storeItems(k.kind, p.req, items)
@@ -451,8 +451,6 @@ func (k *kvView) editKey(p *Pane, m tea.KeyPressMsg, items []kvItem) (bool, bool
 			k.beginEdit(p, items, col)
 		}
 		return true, changed, nil
-	case "ctrl+r":
-		return true, false, nil
 	}
 	if k.in.Update(m) {
 		return true, k.applyText(p), nil
@@ -583,7 +581,7 @@ func (k *kvView) hints(p *Pane) []ui.Hint {
 	hs := []ui.Hint{
 		{Key: "Enter", Label: "Edit", Priority: 2},
 		{Key: "a", Label: "Add", Priority: 2},
-		{Key: "Space", Label: "Toggle", Priority: 3},
+		{Key: "x", Label: "Toggle", Priority: 3},
 		{Key: "d", Label: "Delete", Priority: 3},
 		{Key: "Alt-↑↓", Label: "Move", Priority: 5},
 	}

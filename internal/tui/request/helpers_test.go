@@ -214,6 +214,30 @@ func (h *harness) key(keys ...string) {
 	}
 }
 
+// actionCmd returns the command of the pane action id without running it,
+// as the shell does after a leader key; it fails when the action is missing
+// or disabled.
+func (h *harness) actionCmd(id string) tea.Cmd {
+	h.t.Helper()
+	for _, a := range h.p.Actions() {
+		if a.ID != id {
+			continue
+		}
+		if a.Enabled != nil && !a.Enabled() {
+			h.t.Fatalf("action %s is disabled", id)
+		}
+		return a.Run()
+	}
+	h.t.Fatalf("no action %s", id)
+	return nil
+}
+
+// action runs the pane action id and delivers what it produces.
+func (h *harness) action(id string) {
+	h.t.Helper()
+	h.run(h.actionCmd(id))
+}
+
 // typ types text a rune at a time.
 func (h *harness) typ(s string) {
 	h.t.Helper()

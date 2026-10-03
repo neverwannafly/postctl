@@ -41,10 +41,6 @@ func (p *Pane) dispatch(m tea.KeyPressMsg) tea.Cmd {
 	switch m.String() {
 	case "ctrl+s", "ctrl+enter":
 		return p.primary()
-	case "ctrl+l":
-		p.stopEditing()
-		p.setZone(zBar)
-		return nil
 	case "esc":
 		if l := p.peek(); l != nil && l.state == stConnecting && !p.searching && p.rename == nil {
 			return p.cancelConnect()
@@ -283,7 +279,7 @@ func (p *Pane) KeyHints() []ui.Hint {
 			label = "Disconnect"
 		}
 		hs = []ui.Hint{
-			{Key: "←→", Label: "Tab", Priority: 2},
+			{Key: "[ ]", Label: "Tab", Priority: 2},
 			{Key: "↓", Label: "Edit", Priority: 2},
 			{Key: "c", Label: label, Priority: 3},
 			primary,

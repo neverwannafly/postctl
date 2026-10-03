@@ -1,6 +1,6 @@
  postctl  payments-api                                                                                        env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- › Collections  11 requests    │   2 Request    3 Response                                                             
+ › Collections  11 requests    │   [2] Request    [3] Response                                                         
    ▾ Payments                8 │ POST    {{baseUrl}}/v1/charges                                                        
      ▾ Charges               4 │ Payments › Charges › Create charge                                                    
          GET   List charges    │                                                                                       
@@ -37,4 +37,4 @@
                                │                                                                                       
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Enter Open   n New   / Filter   r Rename   d Delete   m Move   D Duplicate   ? Help   Ctrl-P Palette   E Environments
+ Enter Open   Space a New   / Filter   Space r Rename   Space d Delete   ? Help   Ctrl-P Palette   Space Actions

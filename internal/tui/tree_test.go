@@ -42,7 +42,7 @@ func TestTreeFoldUnfoldAndNavigation(t *testing.T) {
 	if r, _ := h.a.tree.current(); r.label != "Charges" {
 		t.Fatalf("left on a request goes to its folder, cursor on %q", r.label)
 	}
-	h.keys("space")
+	h.keys("left") // on a request: to its folder; on a folder: fold
 	h.mustNotHave("List charges")
 	h.keys("enter") // enter toggles folders too
 	h.mustHave("List charges")
@@ -144,7 +144,7 @@ func TestFuzzyRanking(t *testing.T) {
 func TestCreateRequestInFolderPersists(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Charges")
-	h.keys("n")
+	h.keys("space", "a")
 	h.mustHave("New")
 	h.mustHave("in Payments › Charges")
 	h.typeText("Capture charge")
@@ -176,7 +176,7 @@ func TestCreateRequestInFolderPersists(t *testing.T) {
 func TestCreateRequestAfterSelectedRequest(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Create charge")
-	h.keys("n")
+	h.keys("space", "a")
 	h.typeText("Right after")
 	h.keys("enter")
 	coll := h.be.last[h.a.ws.Collections[0].ID]
@@ -197,7 +197,7 @@ func itemNames(items []model.Item) []string {
 func TestCreateFolderAndCollection(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Payments")
-	h.keys("n", "tab") // Request -> Folder
+	h.keys("space", "a", "tab") // Request -> Folder
 	h.mustHave("(•) Folder")
 	h.typeText("Webhooks")
 	h.keys("enter")
@@ -209,7 +209,7 @@ func TestCreateFolderAndCollection(t *testing.T) {
 		t.Fatal("creating a folder keeps focus in the tree")
 	}
 
-	h.keys("n", "tab", "tab") // -> Collection
+	h.keys("space", "a", "tab", "tab") // -> Collection
 	h.mustHave("(•) Collection")
 	h.typeText("Reports")
 	h.keys("enter")
@@ -223,7 +223,7 @@ func TestCreateFolderAndCollection(t *testing.T) {
 
 func TestPromptValidatesName(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
-	h.keys("n", "enter")
+	h.keys("space", "a", "enter")
 	h.mustHave("Enter a name.")
 	h.keys("esc")
 	if h.a.ov != nil || len(h.be.saved) != 0 {
@@ -235,7 +235,7 @@ func TestRenamePersists(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Create charge")
 	id := h.a.tree.sel
-	h.keys("r")
+	h.keys("space", "r")
 	h.mustHave("Rename request")
 	h.keys("ctrl+a") // start of line
 	h.typeText("Make ")
@@ -254,7 +254,7 @@ func TestDuplicateGivesFreshIDs(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Charges")
 	orig := h.a.tree.sel
-	h.keys("D")
+	h.keys("space", "D")
 	coll := h.be.last[h.a.ws.Collections[0].ID]
 	cp, ok := find(coll, "Charges copy").(*model.Folder)
 	if !ok {
@@ -283,7 +283,7 @@ func TestDuplicateGivesFreshIDs(t *testing.T) {
 func TestMoveWithinAndAcrossCollections(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Health")
-	h.keys("m")
+	h.keys("space", "m")
 	h.mustHave("Move Health to")
 	h.mustHave("Payments › Customers")
 	h.mustNotHave("Payments  ") // the current parent is not offered
@@ -297,7 +297,7 @@ func TestMoveWithinAndAcrossCollections(t *testing.T) {
 
 	// Across collections: written destination first, then source.
 	h.selectByName("Health")
-	h.keys("m")
+	h.keys("space", "m")
 	h.typeText("Internal")
 	h.keys("enter")
 	if len(h.be.saved) < 2 {
@@ -319,7 +319,7 @@ func TestMoveWithinAndAcrossCollections(t *testing.T) {
 func TestCannotMoveFolderIntoItself(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Charges")
-	h.keys("m")
+	h.keys("space", "m")
 	h.mustNotHave("Payments › Charges")
 	h.keys("esc")
 }
@@ -343,7 +343,7 @@ func TestReorderWithinFolder(t *testing.T) {
 func TestDeleteDefaultsToCancel(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Refund charge")
-	h.keys("d")
+	h.keys("space", "d")
 	h.mustHave("Delete request")
 	h.mustHave("Refund charge")
 	h.mustHave("[ Cancel ]")
@@ -358,12 +358,12 @@ func TestDeleteDefaultsToCancel(t *testing.T) {
 		t.Fatal("request was deleted")
 	}
 
-	h.keys("d", "esc")
+	h.keys("space", "d", "esc")
 	if find(h.a.ws.Collections[0], "Refund charge") == nil || h.a.ov != nil {
 		t.Fatal("escape cancels")
 	}
 
-	h.keys("d", "right", "enter")
+	h.keys("space", "d", "right", "enter")
 	if find(h.a.ws.Collections[0], "Refund charge") != nil {
 		t.Fatal("request should be gone")
 	}
@@ -379,7 +379,7 @@ func TestDeleteDefaultsToCancel(t *testing.T) {
 func TestDeleteWithYThenEnter(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Customers")
-	h.keys("d")
+	h.keys("space", "d")
 	h.mustHave("and its 3 requests")
 	h.keys("y")
 	if find(h.a.ws.Collections[0], "Customers") == nil {
@@ -395,7 +395,7 @@ func TestDeleteCollection(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.selectByName("Internal admin")
 	id := h.a.tree.sel
-	h.keys("d", "right", "enter")
+	h.keys("space", "d", "right", "enter")
 	if len(h.a.ws.Collections) != 1 {
 		t.Fatal("collection should be removed")
 	}
@@ -408,7 +408,7 @@ func TestSaveFailureIsExplained(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.be.saveErr = errBoom
 	h.selectByName("Create charge")
-	h.keys("D")
+	h.keys("space", "D")
 	h.mustHave("Could not save Payments")
 	h.mustHave("disk on fire")
 	h.mustHave("still on screen but not on disk")
@@ -422,6 +422,7 @@ func TestSavesCoalesce(t *testing.T) {
 	h.be.gate = make(chan struct{})
 	h.selectByName("Create charge")
 	for i := 0; i < 5; i++ {
+		h.a.Update(keyPress("space"))
 		h.a.Update(keyPress("D"))
 	}
 	// One save is running; the four others coalesced into one waiting op.
@@ -435,6 +436,7 @@ func TestEditsNeverBlockOnDisk(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.be.gate = make(chan struct{}) // the disk is stuck
 	h.selectByName("Create charge")
+	h.a.Update(keyPress("space"))
 	_, cmd := h.a.Update(keyPress("D"))
 	if cmd == nil {
 		t.Fatal("expected a save command")

@@ -145,8 +145,7 @@ func (s *settingsView) hints(p *Pane) []ui.Hint {
 		return []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Tab", Label: "Next field", Priority: 3}}
 	}
 	return []ui.Hint{
-		{Key: "Space", Label: "Toggle", Priority: 2},
-		{Key: "Enter", Label: "Edit", Priority: 2},
+		{Key: "Enter", Label: "Toggle or edit", Priority: 2},
 		{Key: "↑↓", Label: "Field", Priority: 4},
 	}
 }

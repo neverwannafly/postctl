@@ -76,11 +76,32 @@ type Titled interface {
 }
 
 // Editor is implemented by panes with text fields. While Editing reports true
-// the shell forwards every key (except Ctrl-P, Ctrl-B and Alt-1/2/3) to the
-// pane, so typing "E", "q" or "1" never triggers a global shortcut.
+// the shell forwards every key (except Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S,
+// Ctrl-Enter and Ctrl-C, which acts as Esc) to the pane, so typing Space, "g",
+// "q", ":" or "1" never triggers a global shortcut or starts a leader sequence.
 type Editor interface {
 	// Editing reports whether a text field has focus.
 	Editing() bool
+}
+
+// ModeReporter is implemented by panes whose text fields have an editing mode.
+// The footer starts with the label while the pane has focus. Until the vim
+// editor lands (plan U1, V2a), existing widgets report "INSERT" while a text
+// field is being edited and "" otherwise.
+type ModeReporter interface {
+	// VimMode returns "NORMAL", "INSERT", "VISUAL", "VISUAL LINE", or "" when
+	// no text field has focus.
+	VimMode() string
+}
+
+// SectionLister is implemented by panes that have named sections (tabs). The
+// shell uses it to decide which section jumps (g prefix) and section steps
+// ([ and ]) are valid, so the which-key popup never lists a key that does
+// nothing.
+type SectionLister interface {
+	// Sections returns the section names the pane currently offers, in tab
+	// order, using the Section constants.
+	Sections() []string
 }
 
 // ActionSource lets a pane contribute command-palette actions. The shell asks
@@ -218,6 +239,57 @@ type FocusPaneMsg struct {
 	// Slot is the slot to focus.
 	Slot Slot
 }
+
+// Section names carried by [FocusSectionMsg]. The request pane understands
+// the first eight, the WebSocket pane [SectionMessages] and the shared ones,
+// and the response pane the Resp ones.
+const (
+	// SectionURL is the URL bar.
+	SectionURL = "url"
+	// SectionParams is the query parameters tab.
+	SectionParams = "params"
+	// SectionAuth is the authorization tab.
+	SectionAuth = "auth"
+	// SectionHeaders is the request headers tab.
+	SectionHeaders = "headers"
+	// SectionBody is the request body tab.
+	SectionBody = "body"
+	// SectionPre is the pre-request script tab.
+	SectionPre = "pre"
+	// SectionTests is the tests script tab.
+	SectionTests = "tests"
+	// SectionSettings is the request settings tab.
+	SectionSettings = "settings"
+	// SectionMessages is the WebSocket messages tab.
+	SectionMessages = "messages"
+	// SectionRespBody is the response Body tab.
+	SectionRespBody = "resp-body"
+	// SectionRespHistory is the response History tab (ignored until it
+	// exists).
+	SectionRespHistory = "resp-history"
+)
+
+// FocusSectionMsg asks the pane that owns Section to show it and put the
+// cursor there. The shell sends it after focusing the owning slot, in answer
+// to a g-prefix jump (gu, gp, ga, gh, gb, gs, gt, gS, gm, gr, gH). A pane
+// ignores a section it does not have.
+type FocusSectionMsg struct {
+	// Section is one of the Section constants.
+	Section string
+}
+
+// SectionStepMsg asks the focused pane to move to the previous (Delta -1) or
+// next (Delta +1) section tab. It is sent for [ and ] while no text field has
+// focus.
+type SectionStepMsg struct {
+	// Delta is -1 or +1.
+	Delta int
+}
+
+// CancelOAuthMsg asks the request pane to cancel a running OAuth 2.0 sign-in.
+// The shell sends it for Esc when another pane has focus, so the flow can be
+// stopped from anywhere like a running send.
+type CancelOAuthMsg struct{}
 
 // ToastMsg asks the shell to show a transient status line.
 type ToastMsg struct {

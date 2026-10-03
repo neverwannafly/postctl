@@ -499,7 +499,7 @@ func (b *bodyView) hints(p *Pane) []ui.Hint {
 	z := lay[min(b.cur, len(lay)-1)]
 	switch {
 	case b.on:
-		hs := []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}, {Key: "Ctrl-O", Label: "$EDITOR", Priority: 4}}
+		hs := []ui.Hint{{Key: "Esc", Label: "Done", Priority: 1}}
 		if z == zkQuery || z == zkVars {
 			hs = append(hs, ui.Hint{Key: "Tab", Label: "Query/Variables", Priority: 3})
 		}
@@ -511,7 +511,7 @@ func (b *bodyView) hints(p *Pane) []ui.Hint {
 	case z == zkLang:
 		return []ui.Hint{{Key: "←→", Label: "Language", Priority: 1}, {Key: "f", Label: "Format JSON", Priority: 2}}
 	}
-	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "f", Label: "Format JSON", Priority: 3}, {Key: "Ctrl-O", Label: "$EDITOR", Priority: 4}}
+	return []ui.Hint{{Key: "Enter", Label: "Edit", Priority: 1}, {Key: "f", Label: "Format JSON", Priority: 3}, {Key: "Space o", Label: "$EDITOR", Priority: 4}}
 }
 
 func (b *bodyView) view(p *Pane, w, h int) string {

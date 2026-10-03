@@ -1,46 +1,104 @@
 # Keyboard Shortcut Reference
 
 `postctl` is designed for fast, keyboard-first navigation without requiring a mouse.
-Shortcuts use standard navigation and editing keys (arrows, Tab, Enter, Esc). In accordance with plan §0 (Q11), there are no modal vim bindings.
+Keys follow plan §0 U1-U4: vim motions in lists and panes, actions behind the `Space` leader (press it and wait 300 ms to see the choices), `g` and `[ ]` prefixes for sections. Arrow keys, Enter and Escape keep working everywhere, so nobody is ever stuck. Text fields insert what you type, including Space, `g`, `q` and `:`; modal editing inside text fields is a separate workstream and is not advertised here until it ships.
 
 ## Quick Reference Cheat Sheet
 
 | Key | Action |
 | --- | --- |
 | `Ctrl-S` / `Ctrl-Enter` | Send active request |
-| `Ctrl-P` | Command palette |
+| `Space` | Leader: wait to see the actions (`Space e` environment, `Space a` new, `Space q` quit) |
+| `Ctrl-P` / `:` | Command palette / command line |
 | `?` | Context help overlay |
 | `Tab` / `Shift-Tab` | Next / previous pane |
 | `1` / `2` / `3` | Focus Collections / Request / Response |
-| `Ctrl-B` | Show / hide Collections sidebar |
-| `E` | Switch active environment |
-| `Ctrl-E` | Open Environment & Variable Editor |
-| `R` | Run collection or folder |
-| `H` | Open request send history |
-| `q` | Quit postctl |
+| `Ctrl-h` `Ctrl-j` `Ctrl-k` `Ctrl-l` | Move to the neighbouring pane |
+| `g` then `u` `p` `h` `b` `r` ... | Go to the URL, Params, Headers, Body, Response, ... |
+| `[` / `]` | Previous / next section tab |
+| `Ctrl-o` | Back to the previous request |
+| `Esc` | Back, close, cancel a send |
+| `Ctrl-C` twice / `q` | Quit postctl |
 
 ## Global Shortcuts
 
-Available everywhere unless a modal text input or editor captures input.
+Available everywhere unless a text field is being edited. Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter work even while typing. Ctrl-P, Alt-1/2/3, Ctrl-S and Ctrl-Enter also work in the palette, request switcher, help, environment switcher and which-key popup (the popup closes, then the key acts); Ctrl-B does not. Confirmation dialogs and prompts must be answered first and ignore them; full-screen screens (environments, history, runner, cookies) keep their own keys, except Ctrl-P, which closes them. Ctrl-Enter and Ctrl-i need a terminal with enhanced keyboard reporting.
 
 | Key | Action | Description |
 | --- | --- | --- |
 | `?` | Help | Open the keyboard shortcut and context help overlay |
-| `Ctrl-P` | Command palette | Open the fuzzy command palette (press again to close) |
-| `E` | Environments | Open the active environment switcher overlay |
-| `Ctrl-E` | Edit environments | Open the full-screen environment and variable editor |
-| `q` | Quit | Quit postctl (prompts if unsaved changes are pending) |
-| `Ctrl-C` | Force quit | Immediately terminate postctl |
+| `Ctrl-P` | Command palette | Open the fuzzy command palette (press again to close; inside the request switcher it moves the cursor up) |
+| `:` | Command line | Open the palette as a command line: q or wq quits, q! quits without waiting for saves, w saves now |
+| `Space` | Leader | Start a key sequence; after 300 ms the which-key popup lists the keys that are available (see Leader keys) |
+| `g` | Go to | Start a g sequence: gg top, gu URL, gp Params, ... (see Go-to and section keys) |
+| `[, ]` | Previous / next section tab | Step through the tabs of the focused pane; press again to keep stepping |
+| `q` | Quit | Quit postctl (waits for pending saves) |
+| `Ctrl-C` | Quit | Press twice within a second to quit; in a text field it acts as Esc, and it cancels a pending Space or g |
 | `Tab` | Next pane | Cycle focus forward: Collections → Request → Response |
 | `Shift-Tab` | Previous pane | Cycle focus backward: Response → Request → Collections |
 | `Ctrl-B` | Toggle sidebar | Show or hide the Collections sidebar |
-| `/` | Filter requests | Focus the sidebar and start filtering requests by name/path |
-| `Ctrl-R` | Reload workspace | Reload workspace YAML and script files from disk |
-| `H` | History | Open the request send history screen |
+| `/` | Filter / search | Contextual: with Collections focused it filters requests by name/path; in the Response pane it searches the body; in the WebSocket pane it searches the log; elsewhere it does nothing |
 | `1, Alt-1` | Collections pane | Jump directly to the Collections sidebar |
 | `2, Alt-2` | Request pane | Jump directly to the Request editor pane |
 | `3, Alt-3` | Response pane | Jump directly to the Response viewer pane |
-| `Esc` | Back / cancel | Close open overlays, dismiss dialogs, or return focus |
+| `Ctrl-h` | Pane to the left | Move focus to the neighbouring pane on the left (the edge hands the move to the host, for example tmux) |
+| `Ctrl-j` | Pane below | Move focus to the pane below (two- and single-pane layouts stack Request above Response) |
+| `Ctrl-k` | Pane above | Move focus to the pane above |
+| `Ctrl-l` | Pane to the right | Move focus to the neighbouring pane on the right |
+| `Ctrl-o` | Jump back | Go back to the previously opened request (jump list, 100 entries) |
+| `Ctrl-i` | Jump forward (needs enhanced keyboard) | Go forward in the jump list; on terminals without enhanced keyboard reporting Ctrl-i is Tab, use Space ] instead |
+| `Esc` | Back / cancel | Leave a text field, then close overlays and dialogs, then cancel a running send or OAuth login (from any pane) |
+
+## Leader keys (Space)
+
+Press Space, then one of these keys. A key is listed and works only when its action exists and is enabled for the focused pane; otherwise it is hidden and does nothing. Every row is also a command-palette action. Keys whose feature has not shipped yet are not listed.
+
+| Key | Action | Description |
+| --- | --- | --- |
+| `Space f, Space Space` | Find request | Open the request switcher: fuzzy-find any request in the workspace, most recent first |
+| `Space p` | Command palette | Open the command palette |
+| `Space e` | Switch environment | Open the active environment switcher |
+| `Space E` | Edit environments | Open the environment and variable editor |
+| `Space h` | History | Open the request send history screen |
+| `Space a` | New | Create a request, folder or collection (on the first-run screen: create a workspace) |
+| `Space r` | Rename | Rename the selected collection, folder or request |
+| `Space d` | Delete | Delete the selected item (confirms; Cancel is the default) |
+| `Space D` | Duplicate | Duplicate the selected request or folder with fresh IDs |
+| `Space m` | Move | Move the selected item to another folder |
+| `Space R` | Run collection | Open the collection runner for the selected collection or folder |
+| `Space y` | Copy as curl | Copy the request as curl with secrets masked |
+| `Space Y` | Copy curl (with secrets) | Copy the request as curl with secret values revealed |
+| `Space o` | Open in $EDITOR | Edit the current request tab in your external editor |
+| `Space v` | Reveal secrets | Show or hide masked secret fields in the Auth tab |
+| `Space i` | Insert snippet | Open the snippet list on a script tab |
+| `Space c` | Cookies | Open the cookie manager |
+| `Space b` | Toggle sidebar | Show or hide the Collections sidebar |
+| `Space l` | Reload workspace | Reload workspace YAML and script files from disk |
+| `Space s` | Send | Send the request, or connect and send for a WebSocket request |
+| `Space [, Space ]` | Jump back / forward | Walk the jump list of opened requests |
+| `Space q` | Quit | Quit postctl |
+| `Space ?` | All keys | Open the help overlay |
+| `Esc` | Cancel | Cancel the pending sequence without doing anything |
+
+## Go-to and section keys (g, [, ])
+
+A g key lists only the sections the focused pane really has. Pressing a section key focuses that pane and shows the section.
+
+| Key | Action | Description |
+| --- | --- | --- |
+| `gg` | Top | First row of the tree, or the top of the focused pane |
+| `G` | Bottom | Last row of the tree, or the end of the focused pane |
+| `gu` | URL | Edit the request URL |
+| `gp` | Params | Request: Params tab |
+| `ga` | Auth | Request: Auth tab |
+| `gh` | Headers | Request: Headers tab |
+| `gb` | Body | Request: Body tab |
+| `gs` | Pre-request script | Request: Pre-request tab |
+| `gt` | Tests | Request: Tests tab |
+| `gS` | Settings | Request: Settings tab |
+| `gm` | Messages | WebSocket: Messages tab |
+| `gr` | Response body | Focus the response pane on its Body tab |
+| `[, ]` | Previous / next tab | Step through the tabs of the focused pane; repeat without the prefix |
 
 ## Collections Sidebar (Tree)
 
@@ -48,26 +106,21 @@ Navigating, organizing, and executing collections, folders, and requests.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `↑, Up` | Move up | Move selection to the previous item in the tree |
-| `↓, Down` | Move down | Move selection to the next item in the tree |
-| `PgUp, PageUp` | Page up | Scroll selection up one page |
-| `PgDn, PageDown` | Page down | Scroll selection down one page |
-| `Home` | First row | Jump to the very first item in the tree |
-| `End` | Last row | Jump to the very last item in the tree |
-| `←, Left` | Fold folder | Collapse expanded folder, or jump to parent container |
-| `→, Right` | Unfold folder | Expand collapsed folder to reveal children |
+| `↑, k` | Move up | Move selection to the previous item in the tree |
+| `↓, j` | Move down | Move selection to the next item in the tree |
+| `PgUp, PageUp, Ctrl-u` | Page up | Scroll selection up one page |
+| `PgDn, PageDown, Ctrl-d` | Page down | Scroll selection down one page |
+| `Home, gg` | First row | Jump to the very first item in the tree |
+| `End, G` | Last row | Jump to the very last item in the tree |
+| `←, h` | Fold folder or go to parent | Collapse expanded folder, or jump to parent container |
+| `→, l` | Unfold folder | Expand collapsed folder to reveal children |
 | `Enter` | Open / toggle | Open request in editor, or expand/collapse folder |
-| `Space` | Toggle folder | Fold or unfold the selected folder |
-| `n` | New item | Prompt to create a new Request, Folder, or Collection |
-| `r` | Rename | Rename the selected collection, folder, or request |
-| `D` | Duplicate | Duplicate selected request or folder (assigns fresh IDs) |
-| `m` | Move | Open folder picker to move item to another container |
-| `d` | Delete | Delete item and associated files (confirms before deletion) |
 | `Alt-↑, Alt-Up` | Move up in folder | Reorder item up among siblings in its folder |
 | `Alt-↓, Alt-Down` | Move down in folder | Reorder item down among siblings in its folder |
-| `R` | Run collection | Open collection runner setup for selected collection or folder |
+| `Space a / r / D / m / d / R` | Organize | New, rename, duplicate, move, delete and run act on the selected row through the leader (see Leader keys) |
+| `u, Ctrl-r` | Undo / redo | Undo or redo the last edit of the open request |
 | `/` | Filter requests | Activate fuzzy filter across collection requests |
-| `Esc` | Clear filter / Close | Clear filter text; close overlay in single-pane mode |
+| `Esc` | Clear filter / Close | Clear filter text; close the overlay in single-pane mode; otherwise stop the selected request's running send |
 
 ## Request Pane — General & URL Bar
 
@@ -75,11 +128,12 @@ Editing request target, method, and global pane shortcuts.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `Ctrl-S, Ctrl-Enter` | Send request | Send the active request immediately (Ctrl-S always works) |
-| `Ctrl-Z` | Undo | Undo the previous edit in the request editor |
-| `Ctrl-Y` | Redo | Redo the previously undone edit |
-| `e, Ctrl-O` | Open in $EDITOR | Open the current request tab in your external $EDITOR when not typing |
-| `Ctrl-L` | Focus URL bar | Jump cursor directly to the URL input line |
+| `Ctrl-S, Ctrl-Enter` | Send request | Send the active request immediately (Ctrl-S always works; Ctrl-Enter needs enhanced keyboard reporting) |
+| `u` | Undo | Undo the previous edit (when not typing) |
+| `Ctrl-r` | Redo | Redo the previously undone edit (when not typing) |
+| `Ctrl-Z` | Undo (typing) | Undo the previous edit while typing in a field |
+| `Ctrl-Y` | Redo (typing) | Redo the previously undone edit while typing in a field |
+| `gu` | Focus URL bar | Jump cursor directly to the URL input line |
 | `Esc` | Cancel send / OAuth | Cancel in-flight HTTP request or pending OAuth2 browser login |
 | `Enter (URL bar)` | Send request | Send request immediately while editing URL |
 | `Shift-Tab (URL bar)` | Method selector | Open the HTTP method dropdown selector |
@@ -96,13 +150,13 @@ Navigating request sections and generating curl commands.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `←, →` | Switch tab | Cycle between Params, Auth, Headers, Body, Pre, Tests, Settings |
+| `←, →, [, ]` | Switch tab | Cycle between Params, Auth, Headers, Body, Pre, Tests, Settings (gp ga gh gb gs gt gS jump straight to one) |
 | `Home, End` | First / last tab | Jump to first tab (Params) or last tab (Settings) |
 | `↑` | Focus URL | Move focus back up to the URL address bar |
 | `↓, Enter` | Focus tab content | Move focus into the active tab's fields or editor |
 | `m` | Method selector | Open the HTTP method dropdown selector |
-| `y` | Copy as curl | Copy shell-quoted curl command to clipboard (secrets masked) |
-| `Y, Shift-Y` | Copy curl (with secrets) | Copy curl command with revealed secret variable values |
+| `Space y` | Copy as curl | Copy shell-quoted curl command to clipboard (secrets masked) |
+| `Space Y` | Copy curl (with secrets) | Copy curl command with revealed secret variable values |
 
 ## Request Pane — Key-Value Tables (Params, Headers, Form)
 
@@ -115,8 +169,8 @@ Managing query parameters, headers, URL-encoded fields, and form-data parts.
 | `Home, End` | First / last row | Jump to first or last table row |
 | `a, Insert` | Add row | Insert a new row at the bottom of the table |
 | `Enter` | Edit field | Edit active cell (or add new row if table is empty) |
-| `Space` | Toggle enabled | Enable or disable current row without deleting it |
-| `d, Delete, Backspace` | Delete row | Delete the selected row |
+| `x` | Toggle enabled | Enable or disable current row without deleting it (Space is the leader) |
+| `d, Delete` | Delete row | Delete the selected row |
 | `Alt-↑, Shift-↑` | Move row up | Shift current row up in evaluation order |
 | `Alt-↓, Shift-↓` | Move row down | Shift current row down in evaluation order |
 | `b` | Bulk edit | Open raw multiline text area to paste key:value pairs |
@@ -133,11 +187,11 @@ Configuring request payload across raw, form, binary, and GraphQL modes.
 | Key | Action | Description |
 | --- | --- | --- |
 | `←, → (Type row)` | Body type | Cycle: none, raw, form-urlencoded, form-data, file, graphql |
-| `Enter, Space (Type)` | Next type | Advance to next body type |
+| `Enter (Type)` | Next type | Advance to next body type |
 | `←, → (Lang row)` | Language | Cycle raw syntax: JSON, XML, HTML, Text, JavaScript |
 | `Enter, i` | Edit body | Focus inline textarea to edit raw or GraphQL body |
 | `f` | Format JSON | Pretty-print and format JSON body (preserves {{variables}}) |
-| `Ctrl-O` | Open in $EDITOR | Edit full payload in external editor and reload on save |
+| `Space o` | Open in $EDITOR | Edit full payload in external editor and reload on save |
 | `Tab (GraphQL)` | Query / Vars | Switch editor focus between GraphQL Query and Variables |
 | `Esc` | Exit editor | Leave body textarea and return to field navigation |
 
@@ -148,12 +202,11 @@ Configuring authentication schemes and OAuth 2.0 token acquisition.
 | Key | Action | Description |
 | --- | --- | --- |
 | `←, → (Type row)` | Auth type | Cycle: inherit, none, bearer, basic, apikey, digest, oauth2, awsv4, hawk, ntlm |
-| `Enter, Space (Type)` | Next auth type | Advance to next authentication scheme |
+| `Enter (Type)` | Next auth type | Advance to next authentication scheme |
 | `Enter` | Edit field | Focus form field for editing |
 | `Tab, Shift-Tab` | Navigate fields | Move focus forward or backward through auth inputs |
-| `r` | Reveal secrets | Toggle visibility of masked secret inputs in the form |
-| `Ctrl-R` | Reveal while typing | Toggle secret masking while actively typing in input |
-| `g` | Get OAuth token | Initiate browser login for OAuth2 with local loopback listener |
+| `Space v` | Reveal secrets | Toggle visibility of masked secret inputs in the form (not while typing) |
+| `Enter (Get new token)` | Get OAuth token | Initiate browser login for OAuth2 with local loopback listener |
 | `c` | Copy sign-in link | Copy OAuth authorization URL to clipboard while waiting |
 | `Esc` | Cancel OAuth / Done | Cancel waiting OAuth login or commit field editing |
 
@@ -164,16 +217,15 @@ Authoring pre-request and test scripts, code snippets, and request options.
 | Key | Action | Description |
 | --- | --- | --- |
 | `Enter, i` | Edit script | Focus script editor textarea |
-| `s, Ctrl-G` | Snippets picker | Open dropdown of Chai assertions and pm.* snippet templates |
-| `Ctrl-O` | Open in $EDITOR | Edit script in external editor (saved as .pre.js or .test.js) |
+| `Space i` | Snippets picker | Open dropdown of Chai assertions and pm.* snippet templates |
+| `Space o` | Open in $EDITOR | Edit script in external editor (saved as .pre.js or .test.js) |
 | `Tab (editing script)` | Indent | Insert two spaces at cursor |
 | `Esc (editing script)` | Exit editor | Commit script changes and leave textarea |
 | `↑, ↓ (Snippets)` | Select snippet | Highlight code snippet in dropdown picker |
 | `Enter (Snippets)` | Insert snippet | Insert snippet code at cursor in script editor |
 | `Esc (Snippets)` | Close snippets | Dismiss snippets picker without inserting |
 | `↑, ↓ (Settings)` | Select setting | Move through request options (Timeout, TLS, Redirects) |
-| `Space (Settings)` | Toggle boolean | Toggle boolean options (Follow redirects, Verify TLS) |
-| `Enter (Settings)` | Edit value | Edit numeric or duration settings (e.g. timeout: 30s) |
+| `Enter (Settings)` | Toggle or edit | Toggle boolean options (Follow redirects, Verify TLS) or edit numeric and duration settings (e.g. timeout: 30s) |
 
 ## Response Pane
 
@@ -181,13 +233,15 @@ Inspecting response payload, headers, timings, test results, and searching.
 
 | Key | Action | Description |
 | --- | --- | --- |
-| `Tab, →` | Next tab | Cycle forward: Body → Headers → Tests → Timeline → Raw |
-| `Shift-Tab, ←` | Previous tab | Cycle backward through response tabs |
-| `1, 2, 3, 4, 5, 6` | Jump to tab | Directly activate tab 1–6 |
+| `]` | Next tab | Cycle forward: Body → Headers → Cookies → Tests → Console → Timeline |
+| `[` | Previous tab | Cycle backward through response tabs |
+| `gr` | Body tab | Focus the response pane on its Body tab |
 | `↑, k` | Scroll up | Scroll response viewer up one line |
 | `↓, j` | Scroll down | Scroll response viewer down one line |
-| `PgUp` | Page up | Scroll response up by half screen |
-| `PgDn` | Page down | Scroll response down by half screen |
+| `PgUp, Ctrl-u` | Page up | Scroll response up by half screen |
+| `PgDn, Ctrl-d` | Page down | Scroll response down by half screen |
+| `Home, gg` | Top | Scroll to the top of the response |
+| `End, G` | Bottom | Scroll to the end of the response |
 | `w` | Toggle wrap | Toggle soft line wrapping on long response lines |
 | `r` | Pretty / raw | Toggle formatted JSON with syntax colors vs raw response text |
 | `y` | Copy body | Copy entire response body to system clipboard |
@@ -195,7 +249,7 @@ Inspecting response payload, headers, timings, test results, and searching.
 | `n` | Next match | Jump to next occurrence of search term |
 | `N` | Previous match | Jump to previous occurrence of search term |
 | `.` | Path filter | Filter JSON response using gjson path syntax (e.g. users.#.id) |
-| `Space` | Toggle folding | Expand or collapse JSON object or array at cursor |
+| `Enter` | Toggle folding | Expand or collapse JSON object or array at cursor |
 | `h, ←` | Fold JSON node | Collapse JSON block at cursor |
 | `l, →` | Unfold JSON node | Expand JSON block at cursor |
 | `f` | Filter tests | On Tests tab: toggle showing failed assertions only |
@@ -203,7 +257,7 @@ Inspecting response payload, headers, timings, test results, and searching.
 | `Ctrl-S` | Retry request | Retry sending when transport error occurred |
 | `Esc` | Cancel send | Cancel active HTTP request in flight |
 
-## Environment and Variable Editor (Ctrl-E)
+## Environment and Variable Editor (Space E)
 
 Managing workspace environments, globals, and collection variables.
 
@@ -249,7 +303,7 @@ Inspecting and clearing persistent workspace cookies (.postctl/cookies.json).
 | `Esc, n (dialog)` | Cancel | Cancel clear confirmation dialog |
 | `Esc, q` | Close cookies | Close cookie manager and return to main screen |
 
-## Collection Runner (R)
+## Collection Runner (Space R)
 
 Configuring, executing, and analyzing multi-request runs like newman.
 
@@ -257,7 +311,7 @@ Configuring, executing, and analyzing multi-request runs like newman.
 | --- | --- | --- |
 | `Tab, Shift-Tab` | Navigate fields | Cycle through Iterations, Data file, Delay, Bail, Persist |
 | `Space` | Toggle option | Toggle Bail (stop on failure) and Persist variables options |
-| `Ctrl-Enter` | Start run | Begin executing the collection run |
+| `Ctrl-Enter` | Start run | Begin executing the collection run (needs enhanced keyboard reporting) |
 | `Enter (last field)` | Start run | Begin collection run from bottom of setup form |
 | `Esc (live run)` | Cancel run | Prompt confirmation to cancel running collection |
 | `f (live run)` | Failures only | Filter live progress list to failed requests only |
@@ -270,7 +324,7 @@ Configuring, executing, and analyzing multi-request runs like newman.
 | `Esc (detail)` | Back | Return from request detail view to run summary |
 | `Esc, q` | Close runner | Exit collection runner screen and return to workspace |
 
-## Request Send History (H)
+## Request Send History (Space h)
 
 Reviewing, filtering, and re-executing past requests (.postctl/history/).
 
@@ -294,6 +348,19 @@ Reviewing, filtering, and re-executing past requests (.postctl/history/).
 | `Esc (confirm)` | Cancel clear | Cancel clear prompt and keep history |
 | `Esc, q` | Close history | Exit history viewer and return to workspace |
 
+## Request switcher (Space f)
+
+Fuzzy-find a request by name, path or URL host. Opens on the most recently used requests.
+
+| Key | Action | Description |
+| --- | --- | --- |
+| `Type text` | Filter | Narrow the list; Space and letters are text here |
+| `↑, ↓, Ctrl-p, Ctrl-n` | Move | Move the cursor (Ctrl-p is a cursor key here, not the palette) |
+| `PgUp, PgDn` | Page | Move a page at a time |
+| `Enter` | Open | Reveal the request in the tree and open it |
+| `Esc` | Close | Close the switcher without opening anything |
+| `Ctrl-S, Alt-1/2/3` | Always-keys | Close the switcher, then send or jump as usual |
+
 ## Command Palette (Ctrl-P)
 
 Quick-opening requests, switching environments, and executing actions.
@@ -312,7 +379,9 @@ Connecting, composing, saving, and inspecting WebSocket messages.
 | Key | Action | Description |
 | --- | --- | --- |
 | `Ctrl-S, Ctrl-Enter` | Connect / send | Connect when idle; send the composer message when connected |
-| `Ctrl-L` | Focus URL bar | Jump to the WebSocket URL input |
+| `gu` | Focus URL bar | Jump to the WebSocket URL input |
+| `gm, gp, gh, ga, gS` | Go to tab | Messages, Params, Headers, Auth and Settings tabs |
+| `[, ]` | Previous / next tab | Step through the WebSocket tabs |
 | `Enter (URL bar)` | Connect / disconnect | Toggle the current WebSocket connection |
 | `Esc (connecting)` | Cancel connection | Cancel an in-progress connection attempt |
 | `←, →, Home, End` | Switch tab | Navigate Messages, Params, Headers, Auth, and Settings |

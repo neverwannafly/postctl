@@ -6,7 +6,7 @@
  › GET   Payments › Customers › Get customer                                                                                                                                                           
    POST  Payments › Customers › Create customer                                                                                                                                                        
    PUT   Payments › Customers › Replace customer                                                                                                                                                       
-                                                                                                                                                                                                       
+   Back to the previous request                                                                                                                                                        Ctrl-o / Space [
                                                                                                                                                                                                        
                                                                                                                                                                                                        
                                                                                                                                                                                                        
@@ -57,4 +57,4 @@
                                                                                                                                                                                                        
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Enter Choose   ↑↓ Move   Esc Close
+ INSERT   Enter Choose   ↑↓ Move   Esc Close

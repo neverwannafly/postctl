@@ -554,7 +554,7 @@ func TestSwitcherEmptyWorkspace(t *testing.T) {
 		t.Run(mode.name, func(t *testing.T) {
 			hh := newHarness(t, ws, 80, 24, mode.opt)
 			hh.msg(OpenSwitcherMsg{})
-			hh.mustHave("No requests yet. Press Esc, then n to create one.")
+			hh.mustHave("No requests yet. Press Esc, then Space a to create one.")
 			hh.mustHave("0 of 0")
 		})
 	}
@@ -578,8 +578,8 @@ func TestSwitcherPaletteAction(t *testing.T) {
 	if findAct.Group != "Navigation" {
 		t.Errorf("group = %q, want 'Navigation'", findAct.Group)
 	}
-	if findAct.Keys != "" {
-		t.Errorf("keys = %q, want '' (empty until V0 binds it)", findAct.Keys)
+	if findAct.Keys != "Space f / Space Space" {
+		t.Errorf("keys = %q, want the leader bindings", findAct.Keys)
 	}
 
 	// Running the action opens the switcher

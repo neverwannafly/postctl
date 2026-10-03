@@ -288,6 +288,12 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	case tea.KeyboardEnhancementsMsg:
 		p.enhanced = m.SupportsKeyDisambiguation()
 		return p, nil
+	case tui.FocusSectionMsg:
+		return p, p.onFocusSection(m)
+	case tui.SectionStepMsg:
+		return p, p.onSectionStep(m)
+	case tui.CancelOAuthMsg:
+		return p, p.cancelOAuth()
 	case tea.KeyPressMsg:
 		return p, p.onKey(m)
 	case tea.PasteMsg:
