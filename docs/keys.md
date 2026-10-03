@@ -267,12 +267,13 @@ Inspecting response payload, headers, timings, test results, and searching.
 | `/, ?, n, N` | Search (Body tab) | Search the body forward or backward; n and N jump between matches |
 | `v, V` | Select (Body tab) | Select by character or by line; y copies the selection, Esc cancels |
 | `y, yy` | Copy (Body tab) | Copy the selection, the line or a motion. Credential values and known secrets are masked unless revealed with u. The screen shows the body as the server sent it |
+| `za, zo, zc, zR, zM` | Fold JSON (Body tab) | On a pretty-printed JSON body: toggle, open or close the object or array under the cursor, or open or close all. A closed node is one line such as {…} 12 keys or […] 3 items. Copies take the text on screen, so a closed node yields its summary. Folds reset with a new response, path filter or r |
 | `r` | Pretty / raw | Toggle formatted JSON vs the raw response text |
 | `.` | Path filter | On a JSON body: filter by a gjson path (e.g. users.#.id); Enter applies, Esc closes |
 | `Esc (Body tab)` | Leave the body | In normal mode, return to the Request pane; in visual mode, cancel the selection |
 | `Space, g…, Tab, Ctrl-h/j/k/l, :, q` | Shell keys (Body tab) | Keys the buffer does not own work as everywhere: the leader, section jumps, pane movement, the command line |
-| `j, k, ↑, ↓, PgUp, PgDn, Ctrl-u, Ctrl-d, Home, End, G` | Scroll (large body, jq output, other tabs) | Bodies of 5 MiB or more, binary bodies, the jq view and the other tabs use the plain viewer; the footer says Large body: vim keys limited |
-| `w` | Toggle wrap (plain viewer) | Toggle soft line wrapping in a large body |
+| `j, k, ↑, ↓, PgUp, PgDn, Ctrl-u, Ctrl-d, Home, End, G` | Scroll (large body, jq output, other tabs) | Bodies of 5 MiB or more, binary bodies, the jq view and the other tabs use the plain viewer; the footer says why (Large body, Binary body or jq output: vim keys limited) |
+| `w` | Toggle wrap (plain viewer) | Toggle soft line wrapping in a large body (not offered for the hex dump or jq output) |
 | `y (plain viewer)` | Copy body | Copy the whole body, or the jq output while a filter is applied, masked unless revealed |
 | `f` | Filter tests | On Tests tab: toggle showing failed assertions only |
 | `u` | Reveal secrets | Reveal redacted secrets in timeline and header traces, and in copies from the Body tab, until you leave the tab |

@@ -114,6 +114,7 @@ func TestGoldenRenders(t *testing.T) {
 			p.sendingID = id
 			p.sendStep = "Waiting for response"
 			p.sendStarted = time.Now().Add(-2 * time.Second)
+			p.sendElapsed = 2 * time.Second
 		}},
 		{name: "transport-err", setup: func(p *Pane) {
 			id := model.NewID()

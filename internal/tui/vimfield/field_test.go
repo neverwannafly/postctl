@@ -186,3 +186,16 @@ func TestPureRef(t *testing.T) {
 		}
 	}
 }
+
+func TestSetCursorClamps(t *testing.T) {
+	f := New(theme(), vimtext.Options{})
+	f.Set("ab\ncd")
+	f.SetCursor(9, 9)
+	if r, _ := f.Cursor(); r != 1 {
+		t.Fatalf("row %d, want 1", r)
+	}
+	f.SetCursor(0, 1)
+	if r, c := f.Cursor(); r != 0 || c != 1 {
+		t.Fatalf("cursor %d,%d", r, c)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -99,7 +100,10 @@ type Pane struct {
 	vimGen               int
 	themeGen             int
 	lastYankMasked       bool
-	yanked               bool // the buffer wrote to the clipboard during this key
+	foldPending          bool // z was pressed in the Body buffer; its second key folds
+	fold                 foldState
+	vimLatest            *atomic.Int64 // generation of the newest wanted build; older builds stop early
+	yanked               bool          // the buffer wrote to the clipboard during this key
 	th                   ui.Theme
 	w, h                 int
 	focused              bool
@@ -108,6 +112,7 @@ type Pane struct {
 	sendingID            model.ID
 	sendStep             string
 	sendStarted          time.Time
+	sendElapsed          time.Duration // stamped by Update; View never reads the clock
 	tab                  tab
 	bodyMode             bodyMode
 	scroll               int
@@ -116,10 +121,8 @@ type Pane struct {
 	pathFilter           string
 	pathInput            textinput.Model
 	pathActive           bool
-	jsonDoc              *jsonDoc
 	rawIdx               lineIndex
 	bodyKind             BodyKind
-	bodyKey              string // cache key: request id + mode + filter
 	testsFilterFailed    bool
 	testScroll           int
 	consoleScroll        int
@@ -274,6 +277,9 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 	if p.tab == tabHistory {
 		p.hist.now = p.deps.now()
 	}
+	if p.sendingID != "" && !p.sendStarted.IsZero() {
+		p.sendElapsed = time.Since(p.sendStarted)
+	}
 	cmd = tea.Batch(cmd, p.ensureVim())
 	p.syncVimFocus()
 	return p, cmd
@@ -340,6 +346,7 @@ func (p *Pane) update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		p.sendingID = msg.RequestID
 		p.sendStep = "Starting"
 		p.sendStarted = time.Now()
+		p.sendElapsed = 0
 		if p.ref.Request != nil && p.ref.Request.ID == msg.RequestID {
 			cmds = append(cmds, p.spin.Tick, tickElapsed())
 		}
@@ -384,7 +391,6 @@ func (p *Pane) update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 				case "enter":
 					p.pathActive = false
 					p.pathFilter = strings.TrimSpace(p.pathInput.Value())
-					p.jsonDoc = nil
 					p.scroll = 0
 					p.prepareCurrent()
 				case "esc":
@@ -517,15 +523,36 @@ func (p *Pane) KeyHints() []ui.Hint {
 		{Key: "y", Label: "Copy body", Priority: 4},
 	}
 	if p.tab == tabBody {
-		h = append(h, ui.Hint{Key: "w", Label: "Wrap", Priority: 6})
+		note := p.limitedNote()
+		if note != binaryBodyNote && note != jqOutputNote { // the hex dump and the jq view do not wrap
+			h = append(h, ui.Hint{Key: "w", Label: "Wrap", Priority: 6})
+		}
 		if p.jq.filter != "" {
 			h = append(h, ui.Hint{Key: "Esc", Label: "Clear jq", Priority: 1})
 		}
-		if p.largeBody() {
-			h = append(h, ui.Hint{Key: largeBodyNote, Priority: 0})
+		if note != "" {
+			h = append(h, ui.Hint{Key: note, Priority: 0})
 		}
 	}
 	return h
+}
+
+// limitedNote says why the Body tab is not the vim buffer, when it has a body
+// and is not: the footer shows it so the missing keys are not a surprise.
+func (p *Pane) limitedNote() string {
+	st := p.current()
+	if st == nil || st.result.Response == nil || len(st.result.Response.Body) == 0 {
+		return ""
+	}
+	switch {
+	case p.jq.filter != "":
+		return jqOutputNote
+	case p.bodyMode == modeHex || p.bodyKind == BodyBinary:
+		return binaryBodyNote
+	case p.largeBody():
+		return largeBodyNote
+	}
+	return ""
 }
 
 // View implements [tui.Pane].
@@ -592,10 +619,7 @@ func (p *Pane) render() string {
 
 func (p *Pane) viewSending(w int) string {
 	t := p.th
-	elapsed := time.Since(p.sendStarted)
-	if p.sendStarted.IsZero() {
-		elapsed = 0
-	}
+	elapsed := p.sendElapsed
 	line := t.Busy(p.spin.View(), p.sendStep)
 	if elapsed > 0 {
 		line += "  " + t.Render(ui.TextSecondary, ui.FormatDuration(elapsed))
@@ -808,6 +832,9 @@ func (p *Pane) viewBodyContent(r tui.SendResult, w, h int) string {
 		}
 		return out
 	}
+	if p.vimPending() && p.bodyMode == modePretty && kind == BodyJSON {
+		return t.EmptyState("Formatting…", "Preparing the response body for viewing.", "", w)
+	}
 	if len(body) >= largeBodyThreshold && p.bodyMode == modePretty && kind == BodyJSON {
 		note := fmt.Sprintf("Body is %s — pretty-print uses lazy lines; scroll with ↑/↓.", ui.FormatSize(int64(len(body))))
 		lines := p.renderBodyLines(body, kind, w, h-1)
@@ -835,9 +862,6 @@ func (p *Pane) renderBodyLines(body []byte, kind BodyKind, w, h int) string {
 		if kind == BodyBinary {
 			return t.Render(ui.TextSecondary, fmt.Sprintf("Binary, %s", ui.FormatSize(int64(len(body))))) + "\n" + p.renderHex(body, w, h)
 		}
-		if kind == BodyJSON && len(body) < largeBodyThreshold {
-			return p.renderJSON(body, w, h)
-		}
 		lang := highlightLang(kind)
 		p.rawIdx.build(body)
 		total := p.rawIdx.lineCount()
@@ -857,28 +881,6 @@ func (p *Pane) renderBodyLines(body []byte, kind BodyKind, w, h int) string {
 		}
 		return strings.Join(lines, "\n")
 	}
-}
-
-func (p *Pane) renderJSON(body []byte, w, h int) string {
-	t := p.th
-	key := p.cacheKey()
-	if p.jsonDoc == nil || p.bodyKey != key {
-		doc, err := buildJSONDoc(body, p.pathFilter)
-		if err != nil {
-			return t.ErrorState("Could not format JSON", err.Error(), "Switch to Raw with r.", w)
-		}
-		p.jsonDoc = doc
-		p.bodyKey = key
-	}
-	total := p.jsonDoc.visibleLineCount()
-	p.clampScrollTotal(total)
-	var lines []string
-	for i := 0; i < h && p.scroll+i < total; i++ {
-		_, text, _ := p.jsonDoc.visibleLine(p.scroll + i)
-		line := highlightLine(t, "json", text)
-		lines = append(lines, fmt.Sprintf("%4d %s", p.scroll+i+1, line))
-	}
-	return strings.Join(lines, "\n")
 }
 
 func (p *Pane) renderRawVirtual(body []byte, w, h int) string {
@@ -1036,8 +1038,6 @@ func clipLines(s string, scroll, h int) string {
 func (p *Pane) applyResult(r tui.SendResult) {
 	p.byID[r.RequestID] = &storedResult{result: r}
 	p.sendingID = ""
-	p.jsonDoc = nil
-	p.bodyKey = ""
 	p.scroll = 0
 	p.prepareCurrent()
 	p.ensureVimInline()
@@ -1052,7 +1052,6 @@ func (p *Pane) current() *storedResult {
 
 func (p *Pane) syncViewFromSelection() {
 	p.scroll = 0
-	p.jsonDoc = nil
 	p.prepareCurrent()
 	p.ensureVimInline()
 }
@@ -1075,14 +1074,6 @@ func (p *Pane) prepareCurrent() {
 		p.bodyMode = modeHex
 	}
 	p.rawIdx.build(body)
-	if p.bodyMode == modePretty && p.bodyKind == BodyJSON && len(body) < largeBodyThreshold {
-		key := p.cacheKey()
-		if p.jsonDoc == nil || p.bodyKey != key {
-			if doc, err := buildJSONDoc(body, p.pathFilter); err == nil {
-				p.jsonDoc, p.bodyKey = doc, key
-			}
-		}
-	}
 	p.clampScroll()
 }
 
@@ -1103,21 +1094,11 @@ func (p *Pane) remapAfterReload(ws *model.Workspace) {
 	}
 }
 
-func (p *Pane) cacheKey() string {
-	if p.ref.Request == nil {
-		return ""
-	}
-	return p.ref.Request.ID.String() + p.pathFilter + fmt.Sprint(p.bodyMode)
-}
-
 func (p *Pane) clampScroll() { p.clampScrollTotal(p.scrollTotal()) }
 
 func (p *Pane) scrollTotal() int {
 	if p.jqShowing() {
 		return len(p.jq.lines)
-	}
-	if p.jsonDoc != nil && p.bodyMode == modePretty {
-		return p.jsonDoc.visibleLineCount()
 	}
 	return p.rawIdx.lineCount()
 }
@@ -1148,7 +1129,6 @@ func (p *Pane) togglePrettyRaw() {
 	} else {
 		p.bodyMode = modePretty
 	}
-	p.jsonDoc = nil
 	p.scroll = 0
 	p.prepareCurrent()
 	p.ensureVimInline()

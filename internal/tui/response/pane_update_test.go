@@ -105,10 +105,9 @@ func TestViewIsPure(t *testing.T) {
 			Scroll               int
 			Mode                 bodyMode
 			Kind                 BodyKind
-			Key                  string
 			Offsets              []int
 			LastTransportRequest model.ID
-		}{p.scroll, p.bodyMode, p.bodyKind, p.bodyKey, append([]int(nil), p.rawIdx.offsets...), p.lastTransportRequest}
+		}{p.scroll, p.bodyMode, p.bodyKind, append([]int(nil), p.rawIdx.offsets...), p.lastTransportRequest}
 	}
 	before := snapshot()
 	first, second := p.View(), p.View()

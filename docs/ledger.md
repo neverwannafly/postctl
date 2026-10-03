@@ -55,7 +55,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
-| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done (item 4 on branch, ready to merge) | ws/ux-v3-response | 2026-10-03 21:47 IST |
+| UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done (item 4 + review fixes on branch, ready to merge) | ws/ux-v3-response | 2026-10-03 21:59 IST |
 
 ## Entries
 
@@ -1197,3 +1197,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `vimbody_test.go` (motions and search, masked and revealed yank incl. a selection inside a credential value and a multi-line secret, inert editing keys, forwarded keys and sequences, Esc ladder, large and medium bodies, stale build, wheel, purity, hints, jq and diff coexistence, blur while the jq input is open, NO_COLOR selection, theme change), `shell_test.go` (real shell with the real response and request panes: leader, `:`, `[ ]`, `gu`, Esc, Ctrl-h, Tab, `q`, visual-mode keys are text, yank toast), History clock test. Leak sweep `yankBodyBuffer`: whole buffer, every line, every line to its end and word by word, for the Bearer and Folder outcomes. Proof in a scratch `git clone` of this branch with `redactYank` stubbed to return its input: the sweep failed on the "body yank" frames (Bearer 3, Folder 3 distinct frames, repeated across the two assertions); the clone was deleted. `task agents:check` green (0 lint issues), `task tui:smoke` PASS, `postctl --help` ok, `go mod tidy` no diff.
 - Blockers / questions: none. Limit: a secret made of several lines that is only partly selected is masked as a whole yank (safe, coarse).
 - Next: merge `ws/ux-v3-response` into main (ledger and `docs/keys.md` may conflict; regenerate keys with `task keys`).
+
+### 2026-10-03 21:59 IST · UX-V3 · Sonnet 5.5 (high) · PROGRESS
+- Branch/worktree: ws/ux-v3-response · `/Users/shubham/work/postctl-wt/ux-v3-response`
+- Did: review fixes to 93ba056, each test first. (1) JSON folding is back in the Body buffer: `za zo zc zR zM` on the node under the cursor (`internal/tui/response/vimfold.go`). The pane owns the `z` prefix (`foldPending`, footer shows the fold keys, Esc cancels, any other z key is swallowed); vimtext is unchanged, so the nvim differential test is untouched. Closed nodes render as `{…} 12 keys` / `[…] 3 items` (trailing comma kept). (2) 64 KiB to 5 MiB JSON is no longer formatted in Update: the format, fold index and spans run in the guarded command, Update shows "Formatting…", and a shared atomic generation lets a superseded build return before the spans and before the highlighter. `jsonDoc` is no longer stored on the pane. (3) Footer notes for every plain-viewer case (Large body, Binary body, jq output: vim keys limited); `w Wrap` is offered only where it works (not for the hex dump or jq output). (4) Shell routing tests for `gH`/`gr` and Ctrl-h/j/k/l from the buffer (120 columns for the stacked layout). (5) The sending elapsed time is stamped in `Update` (`sendElapsed`), `View` no longer reads the clock.
+- Fold design: the buffer holds the visible text, so motions, search and the highlighter see a closed node as the one line it looks like. A yank copies what is on screen (a closed node yields its summary, never hidden text), still masked by `redactYank` over the visible text. Cursor goes back to the source line it was on, or to the closed node hiding it (`vimfield.SetCursor`, additive). Fold state is per response, mode and path filter and starts open for a new one; the fold index is reused across toggles so only the highlight is redone.
+- Files: `internal/tui/response/{vimfold.go,vimbody.go,pane.go,jsonview.go}` and tests, `internal/tui/vimfield/{field.go,field_test.go}`, `cmd/genkeys/main.go`, `docs/keys.md`, `docs/design-language.md`.
+- Goldens: 0 changed (the sending scene sets `sendElapsed` directly).
+- Tests: `vimfold_test.go` (11), medium-JSON formatting and superseded-build tests, footer-note test, sending-elapsed test, shell tests. `task agents:check` green (0 lint issues), `task tui:smoke` PASS, `postctl --help` ok, `go mod tidy` no diff.
+- Blockers / questions: none.
+- Next: merge `ws/ux-v3-response` into main.

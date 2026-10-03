@@ -44,12 +44,3 @@ func buildJSONDoc(body []byte, path string) (*jsonDoc, error) {
 	doc.filtered = append([]byte(nil), src...)
 	return doc, nil
 }
-
-func (d *jsonDoc) visibleLineCount() int { return len(d.lines) }
-
-func (d *jsonDoc) visibleLine(vis int) (lineNum int, text string, ok bool) {
-	if vis < 0 || vis >= len(d.lines) {
-		return 0, "", false
-	}
-	return vis + 1, d.lines[vis], true
-}

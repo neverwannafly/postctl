@@ -28,7 +28,11 @@ type shellRig struct {
 	req   *model.Request
 }
 
-func newShellRig(t *testing.T) *shellRig {
+func newShellRig(t *testing.T) *shellRig { return newShellRigSized(t, 140, 40) }
+
+// newShellRigSized runs the shell at w x h. The response pane has a history
+// log, so gH has a History tab to reach.
+func newShellRigSized(t *testing.T, w, h int) *shellRig {
 	t.Helper()
 	dir := t.TempDir()
 	ws := tuitest.Demo()
@@ -41,7 +45,11 @@ func newShellRig(t *testing.T) *shellRig {
 			r.req = req
 		}
 	}
-	factory := Factory(Deps{Clipboard: func(s string) tea.Cmd { r.clip = append(r.clip, s); return nil }})
+	log := &fakeLog{}
+	factory := Factory(Deps{
+		Clipboard: func(s string) tea.Cmd { r.clip = append(r.clip, s); return nil },
+		Log:       func() (tui.HistoryReader, error) { return log, nil },
+	})
 	r.m = tui.New(tui.Options{
 		Backend:        tui.NewStoreBackend(dir, store.WithSecretStore(store.NewMemorySecrets())),
 		NoWatch:        true,
@@ -52,7 +60,7 @@ func newShellRig(t *testing.T) *shellRig {
 			return p
 		},
 	})
-	r.send(tea.WindowSizeMsg{Width: 140, Height: 40})
+	r.send(tea.WindowSizeMsg{Width: w, Height: h})
 	r.run(r.m.Init())
 	r.pump(300 * time.Millisecond)
 	return r
@@ -262,4 +270,55 @@ func TestShellResponseYankReachesTheClipboard(t *testing.T) {
 		t.Fatalf("yy copied %q", r.clip)
 	}
 	r.mustHave("Copied")
+}
+
+func TestShellResponseGHJumpsToTheHistoryTabFromTheBuffer(t *testing.T) {
+	r := newShellRig(t)
+	r.open()
+	if !r.pane.vimLive() {
+		t.Fatal("the buffer should be live")
+	}
+	r.keys("g", "H")
+	if r.pane.tab != tabHistory || !r.pane.focused {
+		t.Fatalf("gH should show the History tab with the response pane focused, tab = %v focused = %v", r.pane.tab, r.pane.focused)
+	}
+	r.mustHave("History")
+	r.keys("g", "r")
+	if r.pane.tab != tabBody || !r.pane.vimLive() {
+		t.Fatalf("gr should come back to the Body buffer, tab = %v", r.pane.tab)
+	}
+}
+
+// At 120 columns the shell stacks Request above Response, so Ctrl-k and Ctrl-j
+// move between them; every Ctrl-h/j/k/l press from the buffer reaches the
+// shell and none edits or moves inside the buffer.
+func TestShellResponseCtrlMovementKeysReachTheShell(t *testing.T) {
+	r := newShellRigSized(t, 120, 40)
+	r.open()
+	before := r.pane.vim.f.Text()
+	row, col := vimPos(r.pane)
+
+	r.keys("ctrl+k")
+	if r.pane.focused {
+		t.Fatal("Ctrl-k should move focus to the pane above (Request)")
+	}
+	r.keys("ctrl+j")
+	if !r.pane.focused || !r.pane.vimLive() {
+		t.Fatal("Ctrl-j should come back down to the response buffer")
+	}
+	r.keys("ctrl+l") // nothing to the right: focus stays, the buffer is untouched
+	if !r.pane.focused {
+		t.Fatal("Ctrl-l with no pane to the right must keep focus")
+	}
+	r.keys("ctrl+h")
+	if r.pane.focused {
+		t.Fatal("Ctrl-h should move focus to the Collections pane")
+	}
+	r.keys("alt+3")
+	if r2, c2 := vimPos(r.pane); r.pane.vim.f.Text() != before || r2 != row || c2 != col {
+		t.Fatal("the movement keys changed the buffer or its cursor")
+	}
+	if r.quit {
+		t.Fatal("none of those keys quits")
+	}
 }

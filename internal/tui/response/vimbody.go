@@ -3,6 +3,7 @@ package response
 import (
 	"sort"
 	"strings"
+	"sync/atomic"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
@@ -29,6 +30,13 @@ const vimInlineMax = 64 << 10
 // largeBodyNote is the footer note when the virtual viewer shows a text body.
 const largeBodyNote = "Large body: vim keys limited"
 
+// binaryBodyNote and jqOutputNote are the same footer note for the hex dump and
+// for the jq result, which also use the virtual viewer.
+const (
+	binaryBodyNote = "Binary body: vim keys limited"
+	jqOutputNote   = "jq output: vim keys limited"
+)
+
 // vimKey identifies what a built buffer shows; a different key means the
 // buffer is stale and gets rebuilt.
 type vimKey struct {
@@ -36,6 +44,7 @@ type vimKey struct {
 	mode  bodyMode
 	path  string
 	theme int
+	fold  int // version of the fold state the text was built for
 }
 
 // span is a byte range of the buffer text that holds secret material.
@@ -49,6 +58,11 @@ type bodyVim struct {
 	ct    string // content type whose redaction rules apply
 	rd    *history.Redactor
 	spans []span // credential values and known secrets in doc
+	// fold, vis and closed describe a foldable (pretty JSON) buffer: its
+	// nodes, the source line each buffer row starts at, and the closed nodes.
+	fold   *foldIndex
+	vis    []int
+	closed map[int]bool
 	// wholeOnly is set when a secret is only found across lines. Any yank is
 	// then fully masked, since it cannot be told which part holds it.
 	wholeOnly bool
@@ -87,7 +101,18 @@ func (p *Pane) wantVimKey() (vimKey, bool) {
 	if !p.vimEligible(st) {
 		return vimKey{}, false
 	}
-	return vimKey{st: st, mode: p.bodyMode, path: p.pathFilter, theme: p.themeGen}, true
+	k := vimKey{st: st, mode: p.bodyMode, path: p.pathFilter, theme: p.themeGen}
+	if p.fold.base == p.foldBaseNow() {
+		k.fold = p.fold.ver
+	}
+	return k, true
+}
+
+// vimPending reports whether the Body buffer for the current response is being
+// built in a command.
+func (p *Pane) vimPending() bool {
+	want, ok := p.wantVimKey()
+	return ok && p.vimWant == want && p.readyVim() == nil
 }
 
 // readyVim returns the built buffer when it matches what the pane wants.
@@ -127,8 +152,16 @@ func (p *Pane) ensureVim() tea.Cmd { return p.syncVim(true) }
 func (p *Pane) ensureVimInline() { _ = p.syncVim(false) }
 
 func (p *Pane) syncVim(async bool) tea.Cmd {
+	if p.vimLatest == nil {
+		p.vimLatest = new(atomic.Int64)
+	}
+	if base := p.foldBaseNow(); p.fold.base != base {
+		p.fold = foldState{base: base}
+	}
 	want, ok := p.wantVimKey()
 	if !ok {
+		p.vimGen++
+		p.vimLatest.Store(int64(p.vimGen)) // a build still running is superseded
 		p.vim, p.vimWant = nil, vimKey{}
 		return nil
 	}
@@ -139,18 +172,26 @@ func (p *Pane) syncVim(async bool) tea.Cmd {
 	if p.vimWant == want || p.tab != tabBody {
 		return nil
 	}
+	var reuse *foldIndex
+	if p.vim != nil && p.vim.key.st == want.st && p.vim.key.mode == want.mode && p.vim.key.path == want.path {
+		reuse = p.vim.fold
+	}
+	closed := p.fold.closed
 	if len(want.st.result.Response.Body) <= vimInlineMax {
 		p.vimWant = vimKey{}
-		p.setVim(p.buildVim(p.th, want))
+		p.setVim(p.buildVim(p.th, want, closed, reuse, nil, 0))
 		return nil
 	}
 	if !async {
 		return nil
 	}
 	p.vimGen++
+	p.vimLatest.Store(int64(p.vimGen))
 	p.vimWant = want
-	gen, th := p.vimGen, p.th
-	return func() tea.Msg { return vimBuiltMsg{gen: gen, key: want, v: p.buildVim(th, want)} }
+	gen, th, latest := p.vimGen, p.th, p.vimLatest
+	return func() tea.Msg {
+		return vimBuiltMsg{gen: gen, key: want, v: p.buildVim(th, want, closed, reuse, latest, int64(gen))}
+	}
 }
 
 func (p *Pane) onVimBuilt(msg vimBuiltMsg) {
@@ -158,7 +199,7 @@ func (p *Pane) onVimBuilt(msg vimBuiltMsg) {
 		return
 	}
 	p.vimWant = vimKey{}
-	if want, ok := p.wantVimKey(); ok && want == msg.key {
+	if want, ok := p.wantVimKey(); ok && want == msg.key && msg.v != nil {
 		p.setVim(msg.v)
 	}
 }
@@ -167,6 +208,7 @@ func (p *Pane) setVim(v *bodyVim) {
 	p.vim = v
 	p.syncVimFocus()
 	p.fitVim()
+	p.restoreFoldCursor(v)
 }
 
 // syncVimFocus gives the buffer the keyboard exactly while the pane has focus
@@ -176,6 +218,7 @@ func (p *Pane) syncVimFocus() {
 	v := p.readyVim()
 	switch {
 	case v == nil:
+		p.foldPending = false
 		if p.vim != nil {
 			p.vim.f.Blur()
 		}
@@ -184,6 +227,7 @@ func (p *Pane) syncVimFocus() {
 			v.f.Focus()
 		}
 	case v.f.Focused():
+		p.foldPending = false
 		v.f.Blur()
 	}
 }
@@ -213,24 +257,46 @@ func (p *Pane) vimRows(r tui.SendResult) int {
 	return max(1, h)
 }
 
-// buildVim builds the buffer for key. It reads only the stored result, the
-// settings in key and th, so it can run in a command.
-func (p *Pane) buildVim(th ui.Theme, key vimKey) *bodyVim {
+// buildVim builds the buffer for key with the nodes in closed folded. It reads
+// only the stored result, the settings in key and th, so it can run in a
+// command. When latest is set and no longer holds gen, a newer build has been
+// asked for: buildVim then stops before the next costly step and returns nil.
+func (p *Pane) buildVim(th ui.Theme, key vimKey, closed map[int]bool, reuse *foldIndex, latest *atomic.Int64, gen int64) *bodyVim {
+	stale := func() bool { return latest != nil && latest.Load() != gen }
 	r := key.st.result
 	body := r.Response.Body
 	ct := history.ContentType(r.Response.Headers)
 	kind := DetectBodyKind(ct, body)
-	text := string(body)
+	var (
+		text string
+		ix   *foldIndex
+		vis  []int
+	)
 	if key.mode == modePretty && kind == BodyJSON {
-		if doc, err := buildJSONDoc(body, key.path); err == nil {
-			text = strings.Join(doc.lines, "\n")
+		if ix = reuse; ix == nil {
+			if doc, err := buildJSONDoc(body, key.path); err == nil {
+				ix = indexFolds(doc.lines)
+			}
 		}
+	}
+	if ix != nil {
+		var lines []string
+		lines, vis = ix.visible(closed)
+		text = strings.Join(lines, "\n")
+	} else {
+		text = string(body)
+	}
+	if stale() {
+		return nil
 	}
 	if kind == BodyJSON {
 		ct = "application/json" // the redaction rules for JSON apply to JSON-looking bodies
 	}
-	v := &bodyVim{key: key, doc: strings.ReplaceAll(text, "\r\n", "\n"), ct: ct, rd: resultRedactor(r), w: -1, h: -1}
+	v := &bodyVim{key: key, doc: strings.ReplaceAll(text, "\r\n", "\n"), ct: ct, rd: resultRedactor(r), w: -1, h: -1, fold: ix, vis: vis, closed: closed}
 	v.spans, v.wholeOnly = secretSpans(v.rd, ct, v.doc)
+	if stale() {
+		return nil
+	}
 
 	opts := vimtext.Options{ReadOnly: true, LineNumbers: true, Redact: func(s string) string { return p.redactYank(v, s) }}
 	if lang := highlightLang(kind); lang != "" {
@@ -245,7 +311,7 @@ func (p *Pane) buildVim(th ui.Theme, key vimKey) *bodyVim {
 		return write(text)
 	}
 	v.f = vimfield.New(th, opts)
-	v.f.Set(v.doc)
+	v.f.Set(v.doc) // the highlighter runs here for the lines on screen
 	return v
 }
 
@@ -375,8 +441,15 @@ func (p *Pane) vimKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	v := p.vim
 	f := v.f
 	idle := f.Mode() == vimtext.Normal && f.Pending() == ""
+	if p.foldPending {
+		p.foldPending = false
+		return p.foldKey(msg.String())
+	}
 	if idle {
 		switch msg.String() {
+		case "z":
+			p.foldPending = true
+			return nil
 		case "r":
 			p.togglePrettyRaw()
 			return p.ensureVim()
@@ -423,6 +496,8 @@ func (p *Pane) vimKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 func (p *Pane) vimHints() []ui.Hint {
 	f := p.vim.f
 	switch {
+	case p.foldPending:
+		return foldPendingHints()
 	case strings.HasPrefix(f.Pending(), "/") || strings.HasPrefix(f.Pending(), "?"):
 		return []ui.Hint{{Key: "Enter", Label: "Search", Priority: 0}, {Key: "Esc", Label: "Cancel", Priority: 1}}
 	case f.Mode() != vimtext.Normal:
@@ -435,6 +510,9 @@ func (p *Pane) vimHints() []ui.Hint {
 		{Key: "[ ]", Label: "Tab", Priority: 4},
 		{Key: "r", Label: "Raw/pretty", Priority: 5},
 		{Key: "Esc", Label: "Request", Priority: 6},
+	}
+	if p.vim.fold != nil {
+		h = append(h, ui.Hint{Key: "za", Label: "Fold", Priority: 8})
 	}
 	if p.revealSecrets {
 		h = append(h, ui.Hint{Key: "Copies unmasked", Priority: 0})

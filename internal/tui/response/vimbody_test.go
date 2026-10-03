@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/history"
@@ -281,14 +282,14 @@ func TestVimBodyMediumBodyBuildsInACommand(t *testing.T) {
 	p, id, _ := v3Pane(t, nil, v3Theme())
 	res := v3Result(id, medium, "", nil)
 
-	// The buffer is built off the Update goroutine; until it arrives the
-	// virtual viewer shows the body.
+	// The buffer is formatted and built off the Update goroutine; until it
+	// arrives the pane says so.
 	_, cmd := p.Update(tui.SendResultMsg{Result: res})
 	if p.vim != nil || p.vimLive() {
 		t.Fatal("a medium body must not be built on the Update goroutine")
 	}
-	if !strings.Contains(v3Frame(p), `"items"`) {
-		t.Fatalf("the body should show while the editor builds:\n%s", v3Frame(p))
+	if !strings.Contains(v3Frame(p), "Formatting…") {
+		t.Fatalf("the pane should say it is formatting while the editor builds:\n%s", v3Frame(p))
 	}
 	v3Run(t, p, cmd)
 	if !p.vimLive() {
@@ -511,5 +512,96 @@ func TestVimBodyDotOpensThePathFilter(t *testing.T) {
 	p.Update(v3Key("enter"))
 	if p.pathActive || p.vim.f.Text() != `"alice"` {
 		t.Fatalf("the buffer should hold the filtered value, got %q", p.vim.f.Text())
+	}
+}
+
+// mediumJSON is a JSON body above vimInlineMax and below the large-body
+// threshold.
+func mediumJSON(tag string) string {
+	return `{"id":"` + tag + `","items":[` + strings.Repeat(`{"id":"abcdef","n":1},`, vimInlineMax/20) + `{}]}`
+}
+
+func TestVimBodyMediumJSONIsFormattedInTheCommand(t *testing.T) {
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	_, cmd := p.Update(tui.SendResultMsg{Result: v3Result(id, mediumJSON("one"), "", nil)})
+	frame := v3Frame(p)
+	if !strings.Contains(frame, "Formatting…") {
+		t.Fatalf("a waiting state should say the body is being formatted:\n%s", frame)
+	}
+	v3Run(t, p, cmd)
+	if !p.vimLive() || strings.Contains(v3Frame(p), "Formatting…") {
+		t.Fatal("the formatted buffer should replace the waiting state")
+	}
+}
+
+func TestVimBodySupersededBuildStopsBeforeTheHighlighter(t *testing.T) {
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	_, first := p.Update(tui.SendResultMsg{Result: v3Result(id, mediumJSON("one"), "", nil)})
+	_, second := p.Update(tui.SendResultMsg{Result: v3Result(id, mediumJSON("two"), "", nil)})
+	built, ok := first().(vimBuiltMsg)
+	if !ok || built.v != nil {
+		t.Fatalf("a superseded build must return without a buffer, got %+v ok=%v", built.v != nil, ok)
+	}
+	if built, ok := second().(vimBuiltMsg); !ok || built.v == nil {
+		t.Fatal("the current build must produce its buffer")
+	}
+}
+
+func footerHas(p *Pane, key string) bool {
+	for _, h := range p.KeyHints() {
+		if h.Key == key {
+			return true
+		}
+	}
+	return false
+}
+
+func TestVimBodyFooterSaysVimKeysAreLimitedInEveryFallback(t *testing.T) {
+	// Binary body: hex dump.
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	res := v3Result(id, "\x00\x01\x02binary", "", nil)
+	res.Response.Headers = []model.KV{{Key: "Content-Type", Value: "application/octet-stream"}}
+	v3Pump(t, p, tui.SendResultMsg{Result: res})
+	if !footerHas(p, "Binary body: vim keys limited") {
+		t.Fatalf("binary footer: %v", p.KeyHints())
+	}
+	if footerHas(p, "w") {
+		t.Fatal("a hex dump has no wrap; the footer must not offer w")
+	}
+
+	// jq output.
+	q, qid, _ := v3Pane(t, nil, v3Theme())
+	v3Pump(t, q, tui.SendResultMsg{Result: v3Result(qid, vimDoc, "", nil)})
+	v3ApplyFilter(t, q, ".name")
+	if !footerHas(q, "jq output: vim keys limited") {
+		t.Fatalf("jq footer: %v", q.KeyHints())
+	}
+	if footerHas(q, "w") {
+		t.Fatal("the jq view does not wrap; the footer must not offer w")
+	}
+
+	// Large text body keeps its note and may wrap.
+	big := strings.Repeat("a line of plain text\n", largeBodyThreshold/21+10)
+	r, rid, _ := v3Pane(t, nil, v3Theme())
+	lres := v3Result(rid, big, "", nil)
+	lres.Response.Headers = []model.KV{{Key: "Content-Type", Value: "text/plain"}}
+	v3Pump(t, r, tui.SendResultMsg{Result: lres})
+	if !footerHas(r, largeBodyNote) || !footerHas(r, "w") {
+		t.Fatalf("large footer: %v", r.KeyHints())
+	}
+}
+
+func TestSendingElapsedIsStampedInUpdate(t *testing.T) {
+	p, id, _ := v3Pane(t, nil, v3Theme())
+	p.Update(tui.SendStartedMsg{RequestID: id})
+	p.sendStarted = p.sendStarted.Add(-3 * time.Second)
+	p.Update(elapsedTickMsg{})
+	if p.sendElapsed < 3*time.Second {
+		t.Fatalf("the tick should stamp the elapsed time, got %v", p.sendElapsed)
+	}
+	before := p.View()
+	time.Sleep(150 * time.Millisecond)
+	if p.View() != before {
+		t.Fatal("View must not read the clock")
 	}
 }
