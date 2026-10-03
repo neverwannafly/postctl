@@ -1,0 +1,9 @@
+Response diff
+Marked  200  12 ms  100 B  ↔  Current  404  40 ms  80 B
+  {
+-   "n": 1,
+-   "ok": true
++   "n": 2,
++   "ok": false
+  }
+Hunk 1/1  n/N hunk  h toggle headers

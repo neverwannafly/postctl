@@ -1,0 +1,8 @@
+postctl  demo — History diff                                                                                   env  none
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────Response diff
+Marked  200  10 ms  0 B  ↔  Current  404  20 ms  0 B
+  {
+-   "a": 1
++   "a": 2
+  }
+Hunk 1/1  n/N hunk  h toggle headers

@@ -109,6 +109,8 @@ my-service/
 | `Ctrl-E` | Open full-screen **Environment & Variable Editor** |
 | `R` | Open **Collection Runner** for selected collection or folder |
 | `H` | Open request **Send History** viewer |
+| `m` / `d` (in History) | Mark an entry, then **diff** its response against another |
+| `r` (in History detail) | **Restore** that send's unresolved request into the editor (confirm first) |
 | `/` | Filter requests in sidebar, or search text in response pane |
 | `Ctrl-B` | Show or hide the Collections sidebar |
 | `Ctrl-O` | Open current request, body, or script in your external `$EDITOR` |

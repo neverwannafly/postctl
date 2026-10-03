@@ -159,6 +159,10 @@ type Outcome struct {
 	// substituted, inherited auth flattened. It can contain secrets. Never
 	// log it.
 	Resolved *model.Request
+	// Unresolved is the request after pre-request scripts and before
+	// variable resolution. It is used to build the history template. It
+	// can contain secrets. Never log it.
+	Unresolved *model.Request
 	// Response is nil when the request was skipped or the transport failed.
 	Response *httpx.Response
 	// Tests are the test outcomes in execution order.

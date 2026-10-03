@@ -318,6 +318,8 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 			p.notice = ""
 		}
 		return p, nil
+	case tui.ApplyRequestPatchMsg:
+		return p, p.applyHistoryTemplate(m)
 	}
 	return p, nil
 }

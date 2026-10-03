@@ -50,9 +50,18 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Started | ws/ux-q-switcher | 2026-10-03 18:20 IST |
-| UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
+| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 19:05 IST |
 
 ## Entries
+
+### 2026-10-03 18:35 IST · UX-H1 · Composer 2.5 (fast) · STARTED
+- Branch/worktree: ws/ux-h1-history
+- Did: Read UX-H1 brief, plan U5, history/redactor/engine record path, history screen, request undo/autosave, leak sweep.
+- Files: (implementation starting)
+- Decisions: Template built from pre-resolve request after pre-request scripts; sensitive fields keep value only when pure {{var}} refs (brief regex); diffview is a reusable package for V3.
+- Tests: pending
+- Blockers / questions: none
+- Next: history template + record, restore message, diffview, history UI, leak sweep extension, docs, gate
 
 ### 2026-09-29 22:45 IST · Plan · Orchestrator · STARTED
 - Did: Read `~/work/prod-console-tui` docs (design-language, tui-stack, plan, AGENTS, README; skipped okta.md as requested). Drafted `docs/plan.md` v0 with architecture, storage proposal, import mapping, script API tiers, workstreams and model assignments.

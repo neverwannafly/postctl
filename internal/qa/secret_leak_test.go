@@ -19,6 +19,7 @@ import (
 	"github.com/shubham/postctl/internal/report"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/diffview"
 	tuihistory "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
 	"github.com/shubham/postctl/internal/tui/response"
@@ -166,6 +167,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if entry.Template == nil {
+		t.Fatal("history entry has no restore template")
+	}
 	curl, err := tuihistory.DefaultCurl(context.Background(), entry)
 	if err != nil {
 		t.Fatal(err)
@@ -193,6 +197,9 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	for name, frame := range renderLeakSweepFrames(t, ws, env, coll, folderRequest, folderOutcome, log) {
 		frames["folder "+name] = frame
 	}
+	restoreFrame, diffFrame := renderRestoreAndDiffFrames(t, ws, env, coll, bearer, entries, log)
+	frames["history restore"] = restoreFrame
+	frames["history diff"] = diffFrame
 	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
 	for _, secret := range []string{sentinel, folderSentinel} {
@@ -270,6 +277,51 @@ func renderLeakSweepFrames(
 		"response timeline": timelineFrame,
 		"history":           historyScreen.View(),
 	}
+}
+
+func renderRestoreAndDiffFrames(
+	t *testing.T,
+	ws *model.Workspace,
+	env *model.Environment,
+	coll *model.Collection,
+	req *model.Request,
+	entries []history.Entry,
+	log *history.Log,
+) (restore, diff string) {
+	t.Helper()
+	theme := ui.NewTheme(true, true, false)
+	paneEnv := tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}
+	full, err := log.Get(entries[0].ID)
+	if err != nil || full.Template == nil {
+		t.Fatal("need history entry with template")
+	}
+	rp := request.New(paneEnv, request.Deps{})
+	rp.SetSize(140, 40)
+	_, _ = rp.Update(tui.WorkspaceReloadedMsg{Workspace: ws})
+	_, _ = rp.Update(tui.EnvironmentChangedMsg{Env: env})
+	_, _ = rp.Update(tui.SelectionMsg{Ref: tui.RequestRef{Collection: coll, Request: req, Path: []string{coll.Name, req.Name}}})
+	_, _ = rp.Update(tui.ApplyRequestPatchMsg{RequestID: req.ID, Template: *full.Template})
+	restore = rp.View()
+	if len(entries) < 2 {
+		return restore, ""
+	}
+	left, _ := log.Get(entries[1].ID)
+	right := full
+	dm := diffview.New(theme,
+		diffview.SideSummary{Label: "Marked", Status: "200"},
+		diffview.SideSummary{Label: "Current", Status: "200"},
+		responseBodyForDiff(left), responseBodyForDiff(right),
+	)
+	dm.SetSize(140, 40)
+	diff = dm.View()
+	return restore, diff
+}
+
+func responseBodyForDiff(e *history.Entry) string {
+	if e == nil || e.Response == nil {
+		return ""
+	}
+	return e.Response.Body
 }
 
 func assertWorkspaceFilesClean(t *testing.T, root, sentinel string) {

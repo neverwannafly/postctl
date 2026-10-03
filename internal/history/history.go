@@ -70,6 +70,9 @@ type Entry struct {
 	// Request is the redacted request as it went on the wire, or as it
 	// would have if the transport failed.
 	Request RequestSnapshot `json:"request"`
+	// Template is the redacted unresolved request for restore into the
+	// editor. Nil on entries written before this field existed.
+	Template *RequestTemplate `json:"template,omitempty"`
 	// Status is the HTTP status code, or 0 when there was no response.
 	Status int `json:"status"`
 	// StatusText is the reason phrase.
@@ -371,6 +374,15 @@ func (l *Log) add(offset int64, length int, e Entry) {
 	s.Response = nil
 	s.Request.Body = ""
 	s.Request.BodyTruncated = false
+	if s.Template != nil {
+		t := *s.Template
+		t.BodyRaw = ""
+		t.BodyURLEncoded = nil
+		t.BodyFormData = nil
+		t.BodyGraphQLVariables = ""
+		t.BodyTruncated = false
+		s.Template = &t
+	}
 	l.byID[e.ID] = len(l.index)
 	l.index = append(l.index, indexed{offset: offset, length: length, summary: s})
 }
