@@ -48,7 +48,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | DOC-AGENTS agent guides (AGENTS.md, nested guides, CLAUDE.md, Cursor rules) | Sonnet 5.5 | Done, merged to main | docs/agents | 2026-09-30 14:00 IST |
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done, merged to main | ws/ux-v0-shell | 2026-10-03 19:44 IST |
-| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
+| UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done, merged to main | ws/ux-v1-vimtext | 2026-10-03 20:08 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
@@ -845,3 +845,82 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: two review rounds (key-map conformance; invariants and regressions). Accepted all findings. Decision recorded in the design language: "always" keys work in panes and non-modal overlays (palette, switcher, help, which-key); modal dialogs and prompts ignore them; full-screen screens keep their own keys. Known gap until V2b: overlay inputs close on Esc instead of entering normal mode.
 - Tests: `task agents:check` green on main after merge; `task tui:smoke` PASS (3 checks); `postctl --help` starts.
 - Next: V1 (oracle round), H1 (security re-review pending), then phase 2 briefs.
+
+### 2026-10-03 18:27 IST · UX-V1 · GPT-5.6 Sol · STARTED
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Read the vimtext brief, phase overview, binding decisions, design-language key map, TUI package rules, stack policy, and existing text widgets. Began the standalone modal editor package.
+- Files: `docs/ledger.md`
+- Decisions: Implement the exact public API in the brief with no root TUI or engine dependency; keep rendering pure and clipboard text redacted before command creation.
+- Tests: Not run yet.
+- Blockers / questions: none.
+- Next: Implement the editor, then add the complete behavior, routing, rendering, corpus, golden, and benchmark coverage.
+
+### 2026-10-03 18:36 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Added the standalone modal editor with normal, insert, visual and visual-line modes; Vim motions, operators, text objects, registers, undo/redo/repeat, search, completion, redacted clipboard commands, grapheme-aware rendering, line numbers, semantic Chroma highlighting, and pure cached views. Added 241 corpus cases, routing/security/completion/purity tests, six multi-state golden files across three looks and two sizes, and a 5,000-line benchmark.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Public API matches the brief without deviations. Highlight updates recompute the edited line while structural changes refresh the full cached span set.
+- Tests: `go test -race ./internal/tui/vimtext`, focused package lint, and `task agents:check` green. Benchmarks on Apple M3 Pro: `G`/`gg` 4.56 µs/op, 100 typed characters 1.14 ms total, edited-line highlight recompute 0.91 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator review and phase-2 adoption.
+
+### 2026-10-03 18:45 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Began reviewer remediation for data-loss, Vim fidelity, routing, rendering, history, and purity findings. Verified the operator indentation defect and started by expanding the permanent keystroke corpus before implementation changes.
+- Files: `internal/tui/vimtext/`, `docs/ledger.md`
+- Decisions: Every reported behavior will have a Vim-compatible corpus case before its fix; nvim defaults are authoritative for edge semantics.
+- Tests: Baseline package tests are green before adding the rejecting cases.
+- Blockers / questions: none.
+- Next: add at least 120 regression cases, confirm they fail, then fix sections A through D.
+
+### 2026-10-03 19:00 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Fixed all reviewer findings in sections A–D: operator and empty-object data loss, linewise undo, word/search/pair/operator/count/dot semantics, single-line restrictions, completion placement and routing, scroll/cursor rendering, bounded history, deep-copy purity coverage, join/find/yank/visual details, and cursor placement. Added 184 permanent nvim-compatible regression cases, growing the corpus from 241 to 425.
+- Files: `internal/tui/vimtext/`, `docs/ledger.md`
+- Decisions: No findings were deferred. Multiline inner-pair edits preserve nvim's indentation and line structure; linewise single-line registers are charwise and contain no newline.
+- Tests: `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` green. Six goldens regenerated and reviewed. Apple M3 Pro benchmarks: `G`/`gg` 9.28 µs/op, 100 typed characters 2.91 ms total, edited-line highlight recompute 1.66 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.
+
+### 2026-10-03 19:07 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Began the second reviewer remediation by replacing hand-tuned edge-case convergence with a permanent batched nvim 0.11 differential oracle. Started adding the newly reported blocker, major, and minor cases to the shared corpus.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: `nvim --clean --headless -n` with autoindent enabled is authoritative. Intentional deviations are explicit and limited to literal search semantics.
+- Tests: Previous 425-case corpus and repository gate were green before this remediation.
+- Blockers / questions: none.
+- Next: land the opt-in differential harness, run corpus plus seeded random comparisons, then fix every non-allowlisted mismatch.
+
+### 2026-10-03 19:33 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Added the permanent batched nvim differential oracle and fixed all newly reported data-loss and fidelity regressions, including final-word operators, row-local inner objects, failed finds, nested pairs, visual text objects, multiline pair objects, autoindent, search reuse/counts, undo/redo cursors, visual end-of-line deletion, and whole-word `*`. The permanent corpus now has 472 cases.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: The oracle compares 460 eligible corpus cases and 500 seeded 3–12-key generated cases. Nvim uses two-space `expandtab` settings to match the documented `TabText` default. The only allowlisted difference is literal search versus Nvim regular-expression search.
+- Tests: `VIMTEXT_NVIM=1 go test ./internal/tui/vimtext -run TestDifferentialNvim` passed with `corpus=460 random=500 mismatches=0 allowed=1`; `go test -race ./internal/tui/vimtext`, package lint, and `task agents:check` passed. Six goldens regenerated with no diff. Apple M3 Pro: `G`/`gg` 6.95–7.18 µs per three-key cycle, 100 typed keys 1.06–1.08 ms total, highlight recompute 0.862–0.871 ms/key.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.
+
+### 2026-10-03 19:45 IST · UX-V1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Reworked the oracle after the independent mutation audit: original keys now use typed `nvim_feedkeys`, each case has fresh process state and a timeout, final mode is compared, corpus inclusion/exclusion counts are pinned, and the seeded generator emits one to three grammar commands over 13 buffers while asserting operator coverage. Added the reviewer regressions to the permanent corpus and began fixing newly exposed semantics.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: Process-per-case isolation is stronger than chunk reset and remains fast enough for the opt-in test. Literal non-regex search remains the sole allowlisted deviation.
+- Tests: Intermediate honest-oracle run exposed 115 mismatches, including the planted last-line `dd` behavior; iterative runs reduced that count without adding deviations.
+- Blockers / questions: none.
+- Next: reach zero mismatches, mutation-check all three planted faults, rerun goldens, benchmarks, and the repository gate.
+
+### 2026-10-03 20:05 IST · UX-V1 · GPT-5.6 Sol · DONE
+- Branch/worktree: `ws/ux-v1-vimtext` · `~/work/postctl-wt/ux-v1-vimtext`
+- Did: Completed the honest nvim oracle and fixed the exposed editing semantics: counted line/tail operations, text-object counts, Han word classes, operator `ge`, failed repeat-find, insertion undo boundaries, replacement, visual object/mode/cursor behavior, and final-line deletion. The permanent corpus now has 488 cases.
+- Files: `internal/tui/vimtext/`, `docs/tui-stack.md`, `docs/ledger.md`
+- Decisions: The oracle compares all 476 eligible corpus cases and exactly 500 seeded random cases; exclusions are pinned as 9 single-line, 2 read-only, and 1 clipboard-paste case. The only allowlist entry is literal search because Vim regex syntax is out of scope.
+- Tests: Honest differential summary `corpus=476 random=500 mismatches=0 allowed=1`. Random operator distribution: `<<=27 >>=26 C=26 D=25 J=33 P=26 X=26 c=25 d=27 p=21 r=23 s=23 x=25 y=81 ~=35` (visual `<`/`>` also generated). First keys covered 32 forms; most frequent were `0=189`, `y=53`, `4=43`, `2=41`, `3=32`. Mutation copies failed as required: `e` one-short (10 mismatches), `ci(` delimiters included (11), last-line `dd` retained (3). `task agents:check` green; six goldens regenerated with no diff. Apple M3 Pro benchmarks: `G`/`gg` 6.83–6.91 µs/op, 100 typed keys 1.55–1.57 ms total, highlight recompute 1.19–1.22 ms/op.
+- Blockers / questions: none.
+- Next: orchestrator re-review and merge.
+
+### 2026-10-03 20:08 IST · UX-V1 · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-v1-vimtext merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: four review rounds (vim fidelity against nvim 0.11.2; routing and rendering). Data-loss bugs found by reviewers (indent operator deleting, empty pairs, `w`/`dw` across lines, inner objects on rows > 0, failed `f`/`t` under operators) are permanent corpus cases. The permanent `TestDifferentialNvim` (opt-in with `VIMTEXT_NVIM=1`, skips without nvim) feeds original keys in typed mode, isolates cases, compares text, cursor and mode, and caught three planted mutations.
+- Decisions: nvim `--clean` defaults are the reference (nostartofline, autoindent); literal search is the only allowlisted deviation.
+- Tests: orchestrator reran the differential: corpus 476, random 500, mismatches 0, allowed 1; `task agents:check` green on main after merge.
+- Next: phase 2 adoption (V2a request + WebSocket panes, V2b screens and overlays, V3 response pane).

@@ -81,6 +81,29 @@ The tree may be adjusted as workstreams land. Avoid splitting every screen into 
 - Put storage, secrets, HTTP, and script execution behind narrow interfaces so state transitions can use fakes.
 - `internal/engine` has zero TUI imports; the TUI and the CLI are both thin clients over it.
 
+### vimtext
+
+`internal/tui/vimtext` is postctl's reusable modal editor for single-line fields,
+multi-line scripts and bodies, prompts, and read-only response text. It is
+custom instead of wrapping Bubbles `textarea` because every field needs the
+same Vim operators and text objects, parent key routing, redacted OSC 52 yanks,
+completion, syntax spans, grapheme-safe movement, and pure cached rendering.
+It adds no dependency: Chroma, Lip Gloss, `x/ansi`, and `uniseg` were already
+in the module graph. The supported bindings are the **Text fields** rows in
+the [design-language key map](design-language.md#key-map).
+
+Vim semantics are checked by the opt-in `TestDifferentialNvim` oracle. Set
+`VIMTEXT_NVIM=1` to compare the eligible keystroke corpus and 500 seeded,
+3–12-key generated cases with `nvim --clean --headless -n`. Each case runs in
+an isolated process with a per-case timeout, cleared registers and search
+state, and the original keys fed in typed mode; text, grapheme cursor position,
+and final mode are compared. The harness pins corpus inclusion and exclusion
+counts, asserts generated command/operator coverage, and uses two-space
+`expandtab` settings to match `Options.TabText`'s documented default.
+The sole intentional compatibility deviation is search syntax: vimtext treats
+the pattern literally, while Nvim treats it as a regular expression. The
+allowlist is kept in `internal/tui/vimtext/deviations.go`.
+
 ### Storage and secret rules
 
 - The workspace is a directory tree of YAML and `.js` files (see [model.md](model.md)); it is designed to live in git. Local, non-versioned state (history, cookies, active environment) lives under `.postctl/`, which is gitignored.
