@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/rivo/uniseg"
 	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -22,13 +23,15 @@ type Field struct {
 	single bool
 	m      *vimtext.Model
 	w, h   int
+	// glyph is the single-cell glyph SetMask(true) hides the text behind.
+	glyph string
 }
 
 // New builds an unfocused field. The theme must be the one the editor draws
 // with; later theme changes need a new field (callers rebuild on
 // ThemeChangedMsg).
 func New(th ui.Theme, o vimtext.Options) *Field {
-	return &Field{m: vimtext.New(th, o), w: 1, h: 1, single: o.SingleLine}
+	return &Field{m: vimtext.New(th, o), w: 1, h: 1, single: o.SingleLine, glyph: maskGlyph(th)}
 }
 
 // Set replaces the text unless it already is the text, so a reload does not
@@ -67,8 +70,25 @@ func (f *Field) Fit(w, h int) {
 	f.m.SetSize(f.w, f.h)
 }
 
-// SetMask hides the text behind the theme's mask glyph.
-func (f *Field) SetMask(on bool) { f.m.SetMask(on) }
+// SetMask hides the text behind one mask glyph per character (on) or reveals
+// it (off). It uses vimtext's Options.Mask, so cursor and selection still map
+// to the real text.
+func (f *Field) SetMask(on bool) {
+	if on {
+		f.m.SetMask(f.glyph)
+		return
+	}
+	f.m.SetMask("")
+}
+
+// maskGlyph is the first cluster of the theme's mask glyph ("*" in ASCII).
+func maskGlyph(th ui.Theme) string {
+	cluster, _, _, _ := uniseg.FirstGraphemeClusterInString(th.Glyphs.Mask, -1)
+	if cluster == "" {
+		return "*"
+	}
+	return cluster
+}
 
 // Cursor is the zero-based row and column of the cursor.
 func (f *Field) Cursor() (row, col int) { return f.m.Cursor() }
@@ -269,4 +289,17 @@ func (h *varHighlighter) Highlight(lines []string) [][]vimtext.Span {
 		out[i] = append(spans, out[i]...)
 	}
 	return out
+}
+
+// PureRef reports whether text is exactly one {{reference}}, optionally
+// surrounded by whitespace. A secret field shows such a value as it is (it
+// names a variable, not a secret); any literal text next to or around it keeps
+// the field masked.
+func PureRef(text string) bool {
+	t := strings.TrimSpace(text)
+	if !strings.HasPrefix(t, "{{") || !strings.HasSuffix(t, "}}") || len(t) <= 4 {
+		return false
+	}
+	inner := t[2 : len(t)-2]
+	return strings.TrimSpace(inner) != "" && !strings.Contains(inner, "{{") && !strings.Contains(inner, "}}")
 }

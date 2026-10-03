@@ -20,6 +20,9 @@ type fieldSpec struct {
 	// the owner with SetMask while the value is a literal.
 	secret      bool
 	placeholder string
+	// plain drops variable highlighting and completion (prompts such as the
+	// log search and the template name).
+	plain bool
 }
 
 // newField builds a vim field wired to the pane: {{variable}} highlighting and
@@ -31,6 +34,9 @@ func (p *Pane) newField(spec fieldSpec) *vimfield.Field {
 		Placeholder: spec.placeholder,
 		Clipboard:   p.deps.Clipboard,
 	}
+	if spec.plain {
+		return vimfield.New(p.th, o)
+	}
 	var base vimtext.Highlighter
 	if spec.lang != "" {
 		base = vimtext.ChromaHighlighter(p.th, spec.lang)
@@ -39,7 +45,12 @@ func (p *Pane) newField(spec fieldSpec) *vimfield.Field {
 	o.Completer = complete.Vars(p.layers, complete.Glyphs{Mask: p.th.Glyphs.Mask, Dot: p.th.Glyphs.Dot, Ellipsis: p.th.Glyphs.Ellipsis})
 	if spec.secret {
 		mask := p.th.Glyphs.Mask
-		o.Redact = func(string) string { return mask }
+		o.Redact = func(s string) string {
+			if s == "" {
+				return ""
+			}
+			return mask
+		}
 		o.Completer = nil
 	}
 	return vimfield.New(p.th, o)
@@ -89,8 +100,14 @@ func batch(cmds ...tea.Cmd) tea.Cmd { return tea.Batch(cmds...) }
 // activeField is the text field that has the keyboard: the URL bar, the
 // composer, or the open tab's focused field. Nil when none has it.
 func (p *Pane) activeField() *vimfield.Field {
-	if !p.editable() || p.confirm != nil || p.searching || p.rename != nil {
+	if !p.editable() || p.confirm != nil {
 		return nil
+	}
+	if p.searching {
+		return p.search
+	}
+	if p.rename != nil {
+		return p.rename
 	}
 	if p.urlE {
 		return p.url

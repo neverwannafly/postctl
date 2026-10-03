@@ -249,7 +249,7 @@ var KeyCatalog = []Section{
 			{"Ctrl-S, Ctrl-Enter", "Send / connect", "Works in insert, normal and visual mode"},
 			{"{{", "Variable completion", "Type {{ to list variables (nearest scope wins; secrets show as masked dots); Tab or Enter accepts, Esc closes the menu"},
 			{"pm. (scripts)", "pm.* completion", "Type pm. in a script to list the Postman API members"},
-			{"Space o", "Open in $EDITOR", "Edit the URL, a table cell, a form field, a body or a script in your editor (a hidden secret is refused until revealed)"},
+			{"Space o", "Open in $EDITOR", "Edit the URL, a table cell, a form field, the WebSocket composer, a body or a script in your editor (a hidden secret is refused until revealed)"},
 			{"u, Ctrl-r (in a field)", "Editor undo", "Inside a field they are the editor's own undo and redo; Ctrl-Z and Ctrl-Y undo the request"},
 		},
 	},
@@ -436,6 +436,7 @@ var KeyCatalog = []Section{
 			{"↑, ↓, PgUp, PgDn, Home, End (detail)", "Scroll detail", "Scroll the selected message detail"},
 			{"c (detail)", "Copy message", "Copy the selected message"},
 			{"Esc", "Back", "Return to the previous WebSocket section"},
+			{"Enter, Esc (search, rename)", "Log search and template name", "Both are one-line modal editors that start in insert mode: Enter keeps the results or saves the name; Esc returns to normal mode, then clears the search or cancels the rename"},
 		},
 	},
 }

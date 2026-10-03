@@ -298,6 +298,7 @@ func (p *Pane) Focus() tea.Cmd {
 // writes unsaved edits through BlurCmd.
 func (p *Pane) Blur() {
 	p.focused = false
+	p.endField() // a later visit is a separate request-level undo step
 	if f := p.activeField(); f != nil {
 		f.Blur()
 	}

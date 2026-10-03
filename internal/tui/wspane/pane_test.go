@@ -376,7 +376,7 @@ func TestSaveTemplateAndRename(t *testing.T) {
 	if !h.p.Editing() {
 		t.Fatal("naming a message is text entry")
 	}
-	h.key("ctrl+u") // clear the suggested name
+	h.key("esc", "c", "c") // normal mode, then change the whole suggested name
 	h.typ("Subscribe ETH")
 	h.key("enter")
 	if got := h.p.messages()[0].Name; got != "Subscribe ETH" {

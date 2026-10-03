@@ -96,7 +96,7 @@ func (f *form) step(rows []formRow, dir int) bool {
 }
 
 func (f *form) maskFor(r formRow, text string) bool {
-	return r.secret && !f.reveal && !strings.Contains(text, "{{")
+	return r.secret && !f.reveal && !vimfield.PureRef(text)
 }
 
 // rowWidth is the width the open row editor gets.

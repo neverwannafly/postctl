@@ -1,12 +1,16 @@
 package request
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
 )
 
@@ -355,5 +359,176 @@ func TestLongScriptViewDoesNotMoveTheWindow(t *testing.T) {
 	_ = h.p.View()
 	if f.Render(40, 5) != before {
 		t.Fatal("View scrolled the editor")
+	}
+}
+
+// Blurring the pane ends the field session: edits before and after separate
+// visits are separate request-level undo steps, even in the same field.
+func TestBlurEndsTheFieldSessionForUndo(t *testing.T) {
+	h := newHarness(t)
+	orig := h.req.URL.Raw
+	h.key("up", "A")
+	h.typ("1")
+	h.p.Blur()
+	_ = h.p.Focus()
+	if !h.p.activeField().Typing() {
+		h.key("A")
+	}
+	h.typ("2")
+	h.key("esc", "esc") // leave the field
+	if h.req.URL.Raw != orig+"12" {
+		t.Fatalf("URL after both visits has %d characters, want %d", len(h.req.URL.Raw), len(orig)+2)
+	}
+	h.key("u")
+	if h.req.URL.Raw != orig+"1" {
+		t.Fatalf("first undo should only revert the second visit (%d characters)", len(h.req.URL.Raw))
+	}
+	h.key("u")
+	if h.req.URL.Raw != orig {
+		t.Fatal("second undo should revert the first visit")
+	}
+}
+
+// Sending flushes the pending autosave: the request that goes out and the
+// request on disk are the same one.
+func TestSendFlushesPendingAutosave(t *testing.T) {
+	h := newHarness(t)
+	h.key("up", "A")
+	h.typ("zq")
+	h.out = nil
+	h.key("ctrl+s")
+	var sent *tui.SendRequestMsg
+	for _, m := range h.out {
+		if s, ok := m.(tui.SendRequestMsg); ok {
+			sent = &s
+		}
+	}
+	if sent == nil || !strings.HasSuffix(sent.Request.Request.URL.Raw, "zq") {
+		t.Fatal("the sent request lacks the edit")
+	}
+	if len(h.saves()) != 1 || h.saves()[0].ID != h.req.ID {
+		t.Fatalf("saves emitted with the send = %d, want 1 for this request", len(h.saves()))
+	}
+}
+
+// A secret row shows its text unmasked only when the whole value is one
+// {{reference}}; any literal text keeps it masked.
+func TestSecretRowMasksEverythingButAPureReference(t *testing.T) {
+	r := formRow{secret: true}
+	f := &form{}
+	for _, c := range []struct {
+		text string
+		want bool
+	}{
+		{"{{token}}", false},
+		{" {{ token }} ", false},
+		{"ab{{cd", true},
+		{"Bearer {{token}}", true},
+		{"{{a}}tail", true},
+		{"plain-literal", true},
+		{"", true},
+	} {
+		if got := f.maskFor(r, c.text); got != c.want {
+			t.Errorf("maskFor(%d chars) = %v, want %v", len(c.text), got, c.want)
+		}
+	}
+	f.reveal = true
+	if f.maskFor(r, "literal") {
+		t.Error("a revealed row must not be masked")
+	}
+	if (&form{}).maskFor(formRow{}, "literal") {
+		t.Error("a plain row is never masked")
+	}
+}
+
+// ---- save round trip next to a hidden secret --------------------------------------------
+
+// Editing the user name beside a hidden password must save the password
+// unchanged: no mask glyph reaches the model or the YAML, and a yank of the
+// hidden password is the fixed mask, never the text.
+func TestSavingNextToAHiddenSecretKeepsItIntact(t *testing.T) {
+	const password = "pw-sentinel-synthetic-0001"
+	r := newShellRigWith(t, "", func(req *model.Request) {
+		req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Username: "alice", Password: password}}
+	})
+	r.keys("g", "a")        // the Auth tab
+	r.keys("down", "enter") // the user name row
+	r.mustHave("NORMAL")
+	r.keys("A")
+	r.keys("2")
+	r.keys("esc", "esc")
+	r.keys("down", "enter") // the password row
+	r.mustHave("NORMAL")
+	if strings.Contains(r.screen(), password) {
+		t.Fatal("the hidden password is on screen")
+	}
+	r.keys("y", "y") // yank the whole line
+	for _, c := range r.clip {
+		if strings.Contains(c, password) || strings.Trim(c, "•*") != "" {
+			t.Fatalf("a yank of the hidden password was %d characters of something other than the mask", len(c))
+		}
+	}
+	if len(r.clip) == 0 {
+		t.Fatal("the yank copied nothing, so the mask is unproven")
+	}
+	r.keys("esc", "esc")
+	r.keys("1") // focus leaves the pane: unsaved edits are written
+	r.pump(600 * time.Millisecond)
+
+	st, err := store.Open(r.dir, store.WithSecretStore(store.NewMemorySecrets()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws, err := st.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saved *model.Request
+	for _, req := range ws.Collections[0].Requests() {
+		if req.Name == "Create charge" {
+			saved = req
+		}
+	}
+	if saved == nil || saved.Auth == nil || saved.Auth.Basic == nil {
+		t.Fatal("the saved request lost its basic auth")
+	}
+	if saved.Auth.Basic.Username != "alice2" {
+		t.Fatalf("the user name was not saved (%d characters)", len(saved.Auth.Basic.Username))
+	}
+	if saved.Auth.Basic.Password != password {
+		t.Fatal("the stored password changed")
+	}
+	err = filepath.WalkDir(r.dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			return rerr
+		}
+		for _, glyph := range []string{"••••", "****"} {
+			if strings.Contains(string(raw), glyph) {
+				t.Errorf("%s holds the mask glyph %q", filepath.Base(path), glyph)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The temporary file handed to $EDITOR is private to the user.
+func TestEditorTempFileIsPrivate(t *testing.T) {
+	out := filepath.Join(t.TempDir(), "mode")
+	h := newHarness(t, editorDeps(`stat -f %Lp "$1" > `+out+`; printf 'x\n' > "$1"`))
+	h.key("up")
+	h.action("request.editor")
+	got, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("the editor never ran: %v", err)
+	}
+	if strings.TrimSpace(string(got)) != "600" {
+		t.Fatalf("temp file mode = %s, want 600", strings.TrimSpace(string(got)))
 	}
 }

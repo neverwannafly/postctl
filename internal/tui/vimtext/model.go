@@ -124,7 +124,6 @@ type Model struct {
 	preferred   int
 	mode        Mode
 	focused     bool
-	mask        bool
 	width       int
 	height      int
 	top         int
@@ -250,11 +249,16 @@ func (m *Model) Blur() {
 	m.clearPending()
 }
 
-// SetMask hides the buffer behind the theme's mask glyph (one per cell) while
-// it is drawn. The text itself is unchanged and still edited normally. Fields
-// holding secrets use it; they should also set Options.Redact and leave
-// Options.Completer nil.
-func (m *Model) SetMask(on bool) { m.mask = on }
+// SetMask changes [Options.Mask] after construction: a non-empty glyph hides
+// the buffer behind it (one glyph per grapheme cluster), the empty string
+// reveals it. The text is unchanged and edited normally; cursor, scroll and
+// selection keep mapping to the real buffer, so the view is re-fitted.
+// Fields holding secrets also set [Options.Redact] and leave
+// [Options.Completer] nil.
+func (m *Model) SetMask(glyph string) {
+	m.opts.Mask = glyph
+	m.ensureVisible()
+}
 
 // Completing reports whether the completion popup is open, so a parent can
 // leave Up, Down, Enter and Tab to it.

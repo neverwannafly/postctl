@@ -26,11 +26,21 @@ type shellRig struct {
 	token string
 	quit  bool // the shell asked to quit
 	ws    *model.Workspace
+	dir   string // the workspace root on disk
 }
 
 const shellBearer = "shell-test-bearer-0001"
 
 func newShellRig(t *testing.T, editor string) *shellRig {
+	t.Helper()
+	return newShellRigWith(t, editor, func(req *model.Request) {
+		req.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: shellBearer}}
+	})
+}
+
+// newShellRigWith is newShellRig with a caller-chosen setup of the "Create
+// charge" request before it is written to disk.
+func newShellRigWith(t *testing.T, editor string, setup func(*model.Request)) *shellRig {
 	t.Helper()
 	dir := t.TempDir()
 	ws := tuitest.Demo()
@@ -40,11 +50,11 @@ func newShellRig(t *testing.T, editor string) *shellRig {
 			target = r
 		}
 	}
-	target.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: shellBearer}}
+	setup(target)
 	if _, err := tuitest.Write(dir, ws); err != nil {
 		t.Fatal(err)
 	}
-	r := &shellRig{t: t, inbox: make(chan tea.Msg, 1024), token: shellBearer}
+	r := &shellRig{t: t, inbox: make(chan tea.Msg, 1024), token: shellBearer, dir: dir}
 	deps := Deps{
 		Clipboard: func(text string) tea.Cmd { r.clip = append(r.clip, text); return nil },
 		TempDir:   t.TempDir(),
@@ -248,7 +258,7 @@ func TestShellKeysWorkFromAFieldInNormalMode(t *testing.T) {
 	r.keys(":")
 	r.mustHave("Command")
 	r.keys("esc", "esc") // the command line is modal: insert to normal, then close
-	r.keys("g", "b") // the Body tab
+	r.keys("g", "b")     // the Body tab
 	r.mustHave("Body")
 	if r.quit {
 		t.Fatal("none of those keys quits")

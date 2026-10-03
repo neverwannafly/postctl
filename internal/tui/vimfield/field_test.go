@@ -162,3 +162,27 @@ func TestPasteInNormalModeInserts(t *testing.T) {
 		t.Fatalf("mode after paste = %q", f.ModeName())
 	}
 }
+
+func TestPureRef(t *testing.T) {
+	for text, want := range map[string]bool{
+		"{{token}}":        true,
+		"  {{ token }}\t":  true,
+		"{{$guid}}":        true,
+		"":                 false,
+		"{{}}":             false,
+		"{{ }}":            false,
+		"ab{{cd":           false,
+		"ab{{cd}}":         false,
+		"{{cd}}ab":         false,
+		"{{a}}{{b}}":       false,
+		"{{a}} {{b}}":      false,
+		"{{a":              false,
+		"a}}":              false,
+		"Bearer {{token}}": false,
+		"{{a{{b}}":         false,
+	} {
+		if got := PureRef(text); got != want {
+			t.Errorf("PureRef(%d chars, %q) = %v, want %v", len(text), "shape", got, want)
+		}
+	}
+}

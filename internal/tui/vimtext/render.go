@@ -97,9 +97,6 @@ func (m *Model) renderLine(row, width int) string {
 		} else if source == "\t" {
 			cell = strings.Repeat(" ", max(1, len(m.opts.TabText)))
 		}
-		if m.mask {
-			cell = m.maskCell()
-		}
 		cw := max(1, uniseg.StringWidth(cell))
 		if used+cw > width {
 			break
@@ -122,14 +119,6 @@ func (m *Model) renderLine(row, width int) string {
 		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(" "))
 	}
 	return b.String()
-}
-
-// maskCell is the single-cell glyph that stands in for hidden text.
-func (m *Model) maskCell() string {
-	if r := []rune(m.th.Glyphs.Mask); len(r) > 0 {
-		return string(r[0])
-	}
-	return "*"
 }
 
 func (m *Model) styleAt(row, _ int, byteOff int) lipgloss.Style {

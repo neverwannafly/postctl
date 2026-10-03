@@ -47,7 +47,9 @@ func (p *Pane) sendNow() tea.Cmd {
 		return p.setNotice("Enter a URL first")
 	}
 	req := tui.SendRequest{Collection: p.coll, Request: p.req, Environment: p.activeEnv}
-	return msgCmd(tui.SendRequestMsg{Request: req})
+	// The send carries the live request; the pending autosave is written with
+	// it so the file on disk is the request that went out.
+	return tea.Batch(p.flush(p.req.ID), msgCmd(tui.SendRequestMsg{Request: req}))
 }
 
 // cancelSend asks the shell to stop the in-flight send.

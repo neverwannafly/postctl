@@ -140,7 +140,7 @@ func (p *Pane) toggleConnect() tea.Cmd {
 	}
 	switch l.state {
 	case stIdle:
-		return p.connect()
+		return p.withFlush(p.connect())
 	case stConnecting:
 		return p.cancelConnect()
 	case stOpen:
@@ -395,7 +395,7 @@ func (p *Pane) reconnect() tea.Cmd {
 		return nil
 	}
 	p.abort(l, "Reconnecting")
-	return p.connect()
+	return p.withFlush(p.connect())
 }
 
 // ---- send and ping ------------------------------------------------------------

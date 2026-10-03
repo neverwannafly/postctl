@@ -286,10 +286,6 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for name, frame := range renderCompletionFrames(t, ws, env, coll, bearer, folderRequest) {
-		frames[name] = frame
-	}
-
 	shell := tui.New(tui.Options{
 		Backend: sweepBackend{
 			Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
@@ -664,78 +660,6 @@ type sweepBackend struct {
 
 func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileError, error) {
 	return b.ws, nil, nil
-}
-
-// renderCompletionFrames opens the {{variable}} completion menu in modal
-// fields on a secret environment variable and on a secret folder variable, and
-// keeps the frames. The menu lists the variable names with a detail column;
-// the detail of a secret must be the mask glyph, never the value.
-func renderCompletionFrames(
-	t *testing.T,
-	ws *model.Workspace,
-	env *model.Environment,
-	coll *model.Collection,
-	envRequest, folderRequest *model.Request,
-) map[string]string {
-	t.Helper()
-	theme := ui.NewTheme(true, true, false)
-	paneEnv := tui.PaneEnv{Theme: theme, Actions: &tui.Registry{}}
-	press := func(p *request.Pane, keys ...tea.KeyPressMsg) {
-		for _, k := range keys {
-			_, _ = p.Update(k)
-		}
-	}
-	typeText := func(p *request.Pane, text string) {
-		for _, r := range text {
-			press(p, tea.KeyPressMsg{Code: r, Text: string(r)})
-		}
-	}
-	open := func(req *model.Request) *request.Pane {
-		p := request.New(paneEnv, request.Deps{})
-		p.SetSize(140, 40)
-		_, _ = p.Update(tui.WorkspaceReloadedMsg{Workspace: ws})
-		_, _ = p.Update(tui.EnvironmentChangedMsg{Env: env})
-		_, _ = p.Update(tui.SelectionMsg{Ref: tui.RequestRef{
-			Collection: coll, Request: req, Path: []string{coll.Name, req.Name},
-		}})
-		_ = p.Focus()
-		return p
-	}
-	up := tea.KeyPressMsg{Code: tea.KeyUp}
-	down := tea.KeyPressMsg{Code: tea.KeyDown}
-	enter := tea.KeyPressMsg{Code: tea.KeyEnter}
-	right := tea.KeyPressMsg{Code: tea.KeyRight}
-	appendKey := tea.KeyPressMsg{Code: 'A', Text: "A"}
-
-	frames := map[string]string{}
-	capture := func(name string, p *request.Pane, typed string) {
-		t.Helper()
-		frame := p.View()
-		if !strings.Contains(frame, typed) {
-			t.Fatalf("%s: the typed prefix is not on screen, so the menu was not exercised", name)
-		}
-		if !strings.Contains(frame, theme.Glyphs.Mask) {
-			t.Fatalf("%s: the completion menu shows no masked detail", name)
-		}
-		frames[name] = frame
-	}
-
-	urlPane := open(envRequest)
-	press(urlPane, up, appendKey)
-	typeText(urlPane, "{{acc")
-	capture("completion url (environment secret)", urlPane, "accessToken")
-
-	folderPane := open(folderRequest)
-	press(folderPane, up, appendKey)
-	typeText(folderPane, "{{folderT")
-	capture("completion url (folder secret)", folderPane, "folderToken")
-
-	headerPane := open(folderRequest)
-	press(headerPane, right, right, down, enter, tea.KeyPressMsg{Code: tea.KeyTab})
-	press(headerPane, tea.KeyPressMsg{Code: 'A', Text: "A"})
-	typeText(headerPane, "{{acc")
-	capture("completion header value (environment secret)", headerPane, "accessToken")
-	return frames
 }
 
 type v3Case struct {

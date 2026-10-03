@@ -51,7 +51,12 @@ func (p *Pane) newField(spec fieldSpec) *vimfield.Field {
 	}
 	if spec.secret {
 		mask := p.th.Glyphs.Mask
-		o.Redact = func(string) string { return mask }
+		o.Redact = func(s string) string {
+			if s == "" {
+				return ""
+			}
+			return mask
+		}
 	}
 	return vimfield.New(p.th, o)
 }

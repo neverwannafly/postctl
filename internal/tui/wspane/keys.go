@@ -78,11 +78,20 @@ func (p *Pane) primary() tea.Cmd {
 	l := p.cur()
 	switch l.state {
 	case stIdle:
-		return p.connect()
+		return p.withFlush(p.connect())
 	case stOpen:
-		return p.sendComposer()
+		return p.withFlush(p.sendComposer())
 	}
 	return nil
+}
+
+// withFlush writes the pending autosave together with cmd, so the file on disk
+// is the request that was used.
+func (p *Pane) withFlush(cmd tea.Cmd) tea.Cmd {
+	if p.req == nil {
+		return cmd
+	}
+	return tea.Batch(p.flush(p.req.ID), cmd)
 }
 
 // ---- URL bar ---------------------------------------------------------------------
@@ -233,14 +242,15 @@ func (p *Pane) onPaste(m tea.PasteMsg) tea.Cmd {
 		}
 		return nil
 	case p.searching:
-		p.search.Update(m)
-		if l := p.cur(); p.search.Text() != l.log.query {
+		p.fitPrompts()
+		if l := p.cur(); p.search.Paste(m).Changed && p.search.Text() != l.log.query {
 			l.log.query = p.search.Text()
 			l.log.refilter()
 		}
 		return nil
 	case p.rename != nil:
-		p.rename.Update(m)
+		p.fitPrompts()
+		p.rename.Paste(m)
 		return nil
 	case p.zone != zBody:
 		return nil
@@ -351,7 +361,7 @@ func (p *Pane) bodyHints(state connState) []ui.Hint {
 			ui.Hint{Key: "Ctrl-X", Label: "Save message", Priority: 4})
 	case sSaved:
 		if p.rename != nil {
-			return []ui.Hint{{Key: "Enter", Label: "Save name", Priority: 1}, {Key: "Esc", Label: "Cancel", Priority: 1}}
+			return append([]ui.Hint{{Key: "Enter", Label: "Save name", Priority: 1}}, fieldHints(p.rename, "Cancel")...)
 		}
 		send := "Send"
 		if state != stOpen {
@@ -367,7 +377,7 @@ func (p *Pane) bodyHints(state connState) []ui.Hint {
 	}
 	switch {
 	case p.searching:
-		return []ui.Hint{{Key: "Enter", Label: "Keep results", Priority: 1}, {Key: "Esc", Label: "Clear", Priority: 1}}
+		return append([]ui.Hint{{Key: "Enter", Label: "Keep results", Priority: 1}}, fieldHints(p.search, "Clear")...)
 	case p.detail != nil:
 		return []ui.Hint{
 			{Key: "Esc", Label: "Back", Priority: 1},

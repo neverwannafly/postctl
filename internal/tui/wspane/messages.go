@@ -9,7 +9,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
-	"github.com/shubham/postctl/internal/tui/textin"
 	"github.com/shubham/postctl/internal/ui"
 	"github.com/shubham/postctl/internal/wsx"
 )
@@ -259,32 +258,37 @@ func (p *Pane) beginRename() {
 	if !ok {
 		return
 	}
-	p.rename = textin.New(m.Name)
-	p.rename.Placeholder = "name"
+	p.rename = p.newField(fieldSpec{single: true, plain: true, placeholder: "name"})
+	p.rename.Set(m.Name)
 	p.renameID = m.ID
+	p.fitPrompts()
+	p.rename.Begin("A")
 }
 
+// renameKey edits the template name. Enter saves it, Esc in normal mode
+// cancels (Esc in insert mode only returns to normal mode).
 func (p *Pane) renameKey(m tea.KeyPressMsg) tea.Cmd {
-	switch m.String() {
-	case "esc":
+	p.fitPrompts()
+	res := p.rename.Update(m)
+	switch res.Event.Kind {
+	case vimtext.Leave:
 		p.rename = nil
-	case "enter":
+		return res.Cmd
+	case vimtext.Submit:
 		name := strings.TrimSpace(p.rename.Text())
 		p.rename = nil
-		if name == "" {
-			return nil
-		}
-		ms := p.messages()
-		for i := range ms {
-			if ms[i].ID == p.renameID && ms[i].Name != name {
-				ms[i].Name = name
-				return p.touched()
+		if name != "" {
+			ms := p.messages()
+			for i := range ms {
+				if ms[i].ID == p.renameID && ms[i].Name != name {
+					ms[i].Name = name
+					return tea.Batch(res.Cmd, p.touched())
+				}
 			}
 		}
-	default:
-		p.rename.Update(m)
+		return res.Cmd
 	}
-	return nil
+	return tea.Batch(res.Cmd, forward(p.rename, res.Event))
 }
 
 func (p *Pane) askDeleteSaved() tea.Cmd {
@@ -365,25 +369,34 @@ func (p *Pane) beginSearch() {
 	l := p.cur()
 	p.searching = true
 	p.search.Set(l.log.query)
+	p.fitPrompts()
+	p.search.Begin("A")
 }
 
+// searchKey edits the log search. The results follow the text; Enter keeps
+// them and closes the prompt, Esc in normal mode clears the search (Esc in
+// insert mode only returns to normal mode).
 func (p *Pane) searchKey(m tea.KeyPressMsg) tea.Cmd {
 	l := p.cur()
-	switch m.String() {
-	case "enter":
+	p.fitPrompts()
+	res := p.search.Update(m)
+	if q := p.search.Text(); res.Changed && q != l.log.query {
+		l.log.query = q
+		l.log.refilter()
+	}
+	switch res.Event.Kind {
+	case vimtext.Submit:
 		p.searching = false
-	case "esc":
+		p.search.Blur()
+		return res.Cmd
+	case vimtext.Leave:
 		p.searching = false
+		p.search.Blur()
 		l.log.query = ""
 		l.log.refilter()
-	default:
-		p.search.Update(m)
-		if q := p.search.Text(); q != l.log.query {
-			l.log.query = q
-			l.log.refilter()
-		}
+		return res.Cmd
 	}
-	return nil
+	return tea.Batch(res.Cmd, forward(p.search, res.Event))
 }
 
 func (p *Pane) clearLog() tea.Cmd {

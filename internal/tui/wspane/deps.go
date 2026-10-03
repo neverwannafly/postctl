@@ -11,6 +11,7 @@ package wspane
 import (
 	"context"
 	"net/http"
+	"os/exec"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -73,6 +74,15 @@ type Deps struct {
 	Debounce time.Duration
 	// Clipboard puts text on the system clipboard; tea.SetClipboard when nil.
 	Clipboard func(text string) tea.Cmd
+	// Exec runs an external program with the terminal handed over
+	// (tea.ExecProcess). Tests replace it with a synchronous function.
+	Exec func(cmd *exec.Cmd, done tea.ExecCallback) tea.Cmd
+	// EditorCommand builds the editor command for a file; the default honours
+	// $VISUAL, then $EDITOR, then vi.
+	EditorCommand func(path string) *exec.Cmd
+	// TempDir holds temporary files for $EDITOR round trips; os.TempDir when
+	// empty.
+	TempDir string
 }
 
 // Factory returns the pane factory for tui.Options.NewPaneForKind.

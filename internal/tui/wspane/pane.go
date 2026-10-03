@@ -6,7 +6,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
-	"github.com/shubham/postctl/internal/tui/textin"
 	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/ui"
 )
@@ -79,17 +78,19 @@ type Pane struct {
 	compErr  string // why the composer's message cannot be sent, or ""
 	savedCur int
 	savedTop int
-	rename   *textin.Input
+	rename   *vimfield.Field
 	renameID model.ID
 
 	searching bool
-	search    *textin.Input
+	search    *vimfield.Field
 	detail    *detailState
 
 	confirm *confirmState
 
-	lives map[model.ID]*live
-	saves map[model.ID]*saveState
+	// editorReq is the open external-editor round trip, if any.
+	editorReq *editorIntent
+	lives     map[model.ID]*live
+	saves     map[model.ID]*saveState
 
 	notice     string
 	noticeWarn bool
@@ -110,8 +111,7 @@ func New(env tui.PaneEnv, d Deps) *Pane {
 		saves:    map[model.ID]*saveState{},
 	}
 	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter a ws:// or wss:// URL"})
-	p.search = textin.New("")
-	p.search.Placeholder = "search messages"
+	p.search = p.newField(fieldSpec{single: true, plain: true, placeholder: "search messages"})
 	p.buildComposer("")
 	return p
 }
@@ -147,6 +147,14 @@ func (p *Pane) applyTheme() {
 	p.url = p.newField(fieldSpec{single: true, placeholder: "Enter a ws:// or wss:// URL"})
 	p.url.Set(text)
 	p.buildComposer(p.comp.Text())
+	query := p.search.Text()
+	p.search = p.newField(fieldSpec{single: true, plain: true, placeholder: "search messages"})
+	p.search.Set(query)
+	if p.rename != nil {
+		name := p.rename.Text()
+		p.rename = p.newField(fieldSpec{single: true, plain: true, placeholder: "name"})
+		p.rename.Set(name)
+	}
 	p.stopEditing()
 	if p.zone == zBar {
 		p.zone = zTabs
@@ -217,8 +225,23 @@ func (p *Pane) SetSize(w, h int) {
 	p.w, p.h = w, h
 	p.fitURL()
 	p.fitComposer()
+	p.fitPrompts()
 	p.rebuildDetail()
 }
+
+// fitPrompts sizes the log search and the template name field. Like the other
+// fits it runs in Update paths only.
+func (p *Pane) fitPrompts() {
+	w, h := p.bodySize()
+	g := msgLayout(w, h, len(p.messages()))
+	p.search.Fit(max(4, g.logW-2), 1)
+	if p.rename != nil {
+		p.rename.Fit(renameWidth(g.savedW), 1)
+	}
+}
+
+// renameWidth is the width of the template name column in the saved list.
+func renameWidth(savedW int) int { return min(max(8, savedW/3), 28) }
 
 // Focus implements tui.Pane: the field that was being edited gets the
 // keyboard back, in the mode it was left in.
@@ -266,6 +289,8 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		return p, p.onKey(m)
 	case tea.PasteMsg:
 		return p, p.onPaste(m)
+	case editorDoneMsg:
+		return p, p.onEditorDone(m)
 	case autosaveMsg:
 		return p, p.onAutosave(m)
 	case tui.SaveDoneMsg:
@@ -375,6 +400,11 @@ func (p *Pane) stopEditing() {
 	p.auth.stop()
 	p.settings.stop()
 	p.comp.Blur()
+	// Leaving for another section ends the prompts: a search keeps its
+	// results, a rename is cancelled.
+	p.searching = false
+	p.search.Blur()
+	p.rename = nil
 }
 
 // reloadAll refreshes every widget from the request.
