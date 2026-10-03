@@ -1,9 +1,9 @@
 postctl  demo — Run collection                                         env  none
 --------------------------------------------------------------------------------> Scope:  API (collection)
   Environment:  none
-  Iterations:  1
-  Data file:  
-  Delay (ms):  0
+  Iterations:  1                   
+  Data file:                                                              
+  Delay (ms):  0           
   Bail on failure:  [ ]
   Persist variables:  [x]
 Review  Environment  none

@@ -94,6 +94,15 @@ type ModeReporter interface {
 	VimMode() string
 }
 
+// screenVimMode returns a hosted screen's vim mode label when it implements
+// ModeReporter.
+func screenVimMode(s Screen) string {
+	if m, ok := s.(ModeReporter); ok {
+		return m.VimMode()
+	}
+	return ""
+}
+
 // SectionLister is implemented by panes that have named sections (tabs). The
 // shell uses it to decide which section jumps (g prefix) and section steps
 // ([ and ]) are valid, so the which-key popup never lists a key that does

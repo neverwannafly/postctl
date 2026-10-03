@@ -4,7 +4,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
-	"github.com/shubham/postctl/internal/tui/textin"
+	"github.com/shubham/postctl/internal/tui/listmotion"
+	"github.com/shubham/postctl/internal/tui/screenfield"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -35,6 +36,11 @@ func (m *Model) changed() tea.Cmd {
 func (m *Model) tableKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	rows := m.rows()
 	s := k.String()
+	nav := listmotion.View{Cursor: m.cur, Top: m.top}
+	if r := listmotion.Key(k, listmotion.Config{Count: len(rows), Page: m.rowsH()}, &nav); r.Handled {
+		m.cur, m.top = nav.Cursor, nav.Top
+		return m, nil
+	}
 	switch s {
 	case "esc":
 		if m.tab == tabGlobals {
@@ -45,18 +51,6 @@ func (m *Model) tableKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		if m.tab != tabGlobals {
 			m.zone = zList
 		}
-	case "up":
-		m.cur = max(0, m.cur-1)
-	case "down":
-		m.cur = min(m.cur+1, max(0, len(rows)-1))
-	case "pgup":
-		m.cur = max(0, m.cur-m.rowsH())
-	case "pgdown":
-		m.cur = min(max(0, len(rows)-1), m.cur+m.rowsH())
-	case "home":
-		m.cur = 0
-	case "end":
-		m.cur = max(0, len(rows)-1)
 	case "a", "insert":
 		if l := m.ensureList(); l != nil {
 			return m, m.addRow(l)
@@ -69,6 +63,14 @@ func (m *Model) tableKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 			return m, nil
 		}
 		m.beginEdit(1)
+	case "i":
+		if len(rows) == 0 {
+			if l := m.ensureList(); l != nil {
+				return m, m.addRow(l)
+			}
+			return m, nil
+		}
+		m.beginEdit(m.col)
 	case "space", " ":
 		if l := m.list(); l != nil && m.cur < len(*l) {
 			(*l)[m.cur].Disabled = !(*l)[m.cur].Disabled
@@ -191,14 +193,15 @@ func (m *Model) beginEdit(col int) {
 	v := (*l)[m.cur]
 	m.edit = true
 	m.col = col
-	m.in = textin.New(m.field(v, col))
-	m.in.Placeholder = [...]string{"name", "value", "description"}[col]
-	if col == 1 && v.IsSecret() {
-		m.in.Mask = !m.reveal
-		if v.Value == "" && v.SecretRef != "" && !m.reveal {
-			m.in.Placeholder = "unchanged (hidden)"
-		}
+	val := m.field(v, col)
+	masked := col == 1 && v.IsSecret() && !m.reveal
+	ph := [...]string{"name", "value", "description"}[col]
+	if col == 1 && v.IsSecret() && v.Value == "" && v.SecretRef != "" && !m.reveal {
+		val = ""
+		ph = "unchanged (hidden)"
 	}
+	f, _ := screenfield.New(m.th, val, ph, masked)
+	m.in = f
 }
 
 func (m *Model) applyText() tea.Cmd {
@@ -207,7 +210,7 @@ func (m *Model) applyText() tea.Cmd {
 		return nil
 	}
 	v := &(*l)[m.cur]
-	t := m.in.Text()
+	t := m.in.Value()
 	switch m.col {
 	case 0:
 		v.Key = t
@@ -246,9 +249,17 @@ func (m *Model) finish() tea.Cmd {
 
 func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 	s := k.String()
+	submit, changed, cmd, leave, normal := m.in.UpdateEx(k)
+	if leave || (s == "esc" && normal) {
+		return tea.Batch(cmd, m.finish())
+	}
+	if submit || (s == "enter" && normal) {
+		return tea.Batch(cmd, m.applyText(), m.finish())
+	}
+	if changed {
+		return tea.Batch(cmd, m.applyText())
+	}
 	switch s {
-	case "esc", "enter":
-		return m.finish()
 	case "tab":
 		if m.col < 2 {
 			m.beginEdit(m.col + 1)
@@ -289,19 +300,18 @@ func (m *Model) editKey(k tea.KeyPressMsg) tea.Cmd {
 	case "ctrl+r":
 		l := m.list()
 		if l == nil || m.cur >= len(*l) || !(*l)[m.cur].IsSecret() {
-			return nil
+			return cmd
 		}
 		m.reveal = !m.reveal
-		m.in.Mask = m.col == 1 && !m.reveal
+		v := (*l)[m.cur]
+		m.beginEdit(m.col)
 		if m.reveal {
-			return m.toggleRevealFromEdit()
+			return tea.Batch(cmd, m.toggleRevealFromEdit())
 		}
-		return nil
+		_ = v
+		return cmd
 	}
-	if m.in.Update(k) {
-		return m.applyText()
-	}
-	return nil
+	return cmd
 }
 
 // toggleRevealFromEdit hydrates after Ctrl-R inside a field.

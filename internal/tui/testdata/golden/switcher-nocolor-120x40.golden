@@ -1,7 +1,7 @@
  postctl  payments-api                                                                                        env  none
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  Find request  11 of 11                                                                                       Esc Close
- › search requests                                                                                                     
+ ›                                                                                                                     
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  › GET   List charges  Payments › Charges  /v1/charges                                                                 
    POST  Create charge  Payments › Charges  /v1/charges                                                                
@@ -37,4 +37,4 @@
                                                                                                                        
  ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  
- Enter Open   ↑↓ Move   Esc Close
+ INSERT   Enter Open   ↑↓ Move   Esc Close

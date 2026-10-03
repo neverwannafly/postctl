@@ -3,7 +3,6 @@ package tui
 import (
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/shubham/postctl/internal/ui"
@@ -75,7 +74,7 @@ func (o *confirmOverlay) hints(a *app) []ui.Hint {
 type promptOverlay struct {
 	title  string
 	note   string
-	input  textinput.Model
+	input  *promptInput
 	kinds  []string
 	kind   int
 	err    string
@@ -83,22 +82,15 @@ type promptOverlay struct {
 }
 
 func newPrompt(a *app, title, note, initial string, kinds []string, submit func(a *app, value string, kind int) (string, tea.Cmd)) (*promptOverlay, tea.Cmd) {
-	in := textinput.New()
-	in.Prompt = ""
-	in.CharLimit = 120
-	in.Placeholder = "Name"
-	in.SetValue(initial)
-	in.CursorEnd()
-	styleInput(&in, a.theme)
-	cmd := in.Focus()
+	in, cmd := newPromptInput(a.theme, initial, "Name")
 	return &promptOverlay{title: title, note: note, input: in, kinds: kinds, submit: submit}, cmd
 }
+
+func (o *promptOverlay) overlayVimMode() string { return o.input.vimMode() }
 
 func (o *promptOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	if k, ok := msg.(tea.KeyPressMsg); ok {
 		switch k.String() {
-		case "esc":
-			return nil, nil
 		case "tab":
 			if len(o.kinds) > 1 {
 				o.kind = (o.kind + 1) % len(o.kinds)
@@ -109,23 +101,27 @@ func (o *promptOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 				o.kind = (o.kind + len(o.kinds) - 1) % len(o.kinds)
 				return o, nil
 			}
-		case "enter":
-			v := strings.TrimSpace(o.input.Value())
-			if v == "" {
-				o.err = "Enter a name."
-				return o, nil
-			}
-			msg, cmd := o.submit(a, v, o.kind)
-			if msg != "" {
-				o.err = msg
-				return o, nil
-			}
-			return nil, cmd
 		}
+	}
+	cmd, nav := o.input.update(msg)
+	switch nav {
+	case pickNavClose:
+		return nil, nil
+	case pickNavSubmit:
+		v := strings.TrimSpace(o.input.ed.Value())
+		if v == "" {
+			o.err = "Enter a name."
+			return o, nil
+		}
+		msg, c := o.submit(a, v, o.kind)
+		if msg != "" {
+			o.err = msg
+			return o, cmd
+		}
+		return nil, c
+	case pickNavChanged:
 		o.err = ""
 	}
-	var cmd tea.Cmd
-	o.input, cmd = o.input.Update(msg)
 	return o, cmd
 }
 
@@ -133,7 +129,7 @@ func (o *promptOverlay) view(a *app, w, h int) string {
 	t := a.theme
 	width := min(w-2, 64)
 	inner := width - 4
-	o.input.SetWidth(max(8, inner-1))
+	o.input.setWidth(max(8, inner-1))
 	lines := []string{t.Bold().Render(o.title)}
 	if o.note != "" {
 		lines = append(lines, t.Render(ui.TextSecondary, t.Truncate(o.note, inner)))
@@ -153,7 +149,7 @@ func (o *promptOverlay) view(a *app, w, h int) string {
 		}
 		lines = append(lines, "", strings.Join(parts, "  "))
 	}
-	lines = append(lines, "", o.input.View())
+	lines = append(lines, "", o.input.view(t))
 	if o.err != "" {
 		lines = append(lines, t.Render(ui.StatusDanger, t.Glyphs.Fail+" "+o.err))
 	}
@@ -184,7 +180,7 @@ const maxPickResults = 60
 // pickerOverlay is a fuzzy list: the command palette and the move-to picker.
 type pickerOverlay struct {
 	title    string
-	input    textinput.Model
+	input    *pickInput
 	all      []pickItem
 	res      []ranked
 	cursor   int
@@ -199,15 +195,7 @@ type pickerOverlay struct {
 }
 
 func newPicker(a *app, title, placeholder, empty string, items []pickItem, onPick func(a *app, it pickItem) tea.Cmd) (*pickerOverlay, tea.Cmd) {
-	in := textinput.New()
-	in.Prompt = "› "
-	if a.ascii {
-		in.Prompt = "> "
-	}
-	in.Placeholder = placeholder
-	in.CharLimit = 80
-	styleInput(&in, a.theme)
-	cmd := in.Focus()
+	in, cmd := newPickInput(a.theme, a.ascii, "", placeholder)
 	p := &pickerOverlay{title: title, input: in, all: items, empty: empty, onPick: onPick}
 	p.refilter()
 	g := a.geo()
@@ -215,51 +203,51 @@ func newPicker(a *app, title, placeholder, empty string, items []pickItem, onPic
 	return p, cmd
 }
 
+func (p *pickerOverlay) overlayVimMode() string { return p.input.vimMode() }
+
 func (p *pickerOverlay) refilter() {
-	p.res = rankBy(strings.TrimSpace(p.input.Value()), len(p.all), func(i int) string { return p.all[i].label }, maxPickResults)
+	p.res = rankBy(p.input.value(), len(p.all), func(i int) string { return p.all[i].label }, maxPickResults)
 	p.cursor, p.top = 0, 0
 }
 
-func (p *pickerOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
-	if k, ok := msg.(tea.KeyPressMsg); ok {
-		page := max(1, p.lastPage-1)
-		switch k.String() {
-		case "esc":
-			return nil, nil
-		case "enter":
-			if p.exCommand != nil {
-				if cmd, ok := p.exCommand(a, p.input.Value()); ok {
-					return nil, cmd
-				}
-			}
-			if p.cursor < len(p.res) {
-				it := p.all[p.res[p.cursor].index]
-				return nil, p.onPick(a, it)
-			}
-			return p, nil
-		case "up":
-			p.cursor = max(0, p.cursor-1)
-			p.scroll()
-			return p, nil
-		case "down":
-			p.cursor = min(len(p.res)-1, p.cursor+1)
-			p.cursor = max(0, p.cursor)
-			p.scroll()
-			return p, nil
-		case "pgup":
-			p.cursor = max(0, p.cursor-page)
-			p.scroll()
-			return p, nil
-		case "pgdown":
-			p.cursor = max(0, min(len(p.res)-1, p.cursor+page))
-			p.scroll()
-			return p, nil
+func (p *pickerOverlay) pick(a *app) (overlay, tea.Cmd) {
+	if p.exCommand != nil {
+		if cmd, ok := p.exCommand(a, p.input.rawValue()); ok {
+			return nil, cmd
 		}
 	}
-	before := p.input.Value()
-	var cmd tea.Cmd
-	p.input, cmd = p.input.Update(msg)
-	if p.input.Value() != before {
+	if p.cursor < len(p.res) {
+		it := p.all[p.res[p.cursor].index]
+		return nil, p.onPick(a, it)
+	}
+	return p, nil
+}
+
+func (p *pickerOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
+	page := max(1, p.lastPage-1)
+	cmd, nav := p.input.update(msg, page)
+	switch nav {
+	case pickNavClose:
+		return nil, nil
+	case pickNavSubmit:
+		return p.pick(a)
+	case pickNavUp:
+		p.cursor = max(0, p.cursor-1)
+		p.scroll()
+	case pickNavDown:
+		if len(p.res) > 0 {
+			p.cursor = min(len(p.res)-1, p.cursor+1)
+		}
+		p.scroll()
+	case pickNavPageUp:
+		p.cursor = max(0, p.cursor-page)
+		p.scroll()
+	case pickNavPageDown:
+		if len(p.res) > 0 {
+			p.cursor = min(len(p.res)-1, p.cursor+page)
+		}
+		p.scroll()
+	case pickNavChanged:
 		p.refilter()
 	}
 	return p, cmd
@@ -276,7 +264,7 @@ func (p *pickerOverlay) scroll() {
 }
 
 func (p *pickerOverlay) setSize(w, h int) {
-	p.input.SetWidth(max(8, w-4))
+	p.input.setWidth(max(8, w-4))
 	p.lastPage = max(1, h-4)
 	p.scroll()
 }
@@ -286,11 +274,11 @@ func (p *pickerOverlay) view(a *app, w, h int) string {
 	head := t.Bold().Render(p.title)
 	esc := t.Render(ui.TextSecondary, "Esc Close")
 	gap := max(1, w-ui.Width(head)-ui.Width(esc))
-	lines := []string{head + strings.Repeat(" ", gap) + esc, p.input.View(), t.Rule(w)}
+	lines := []string{head + strings.Repeat(" ", gap) + esc, p.input.view(t), t.Rule(w)}
 	if len(p.res) == 0 {
 		msg := p.empty
-		if strings.TrimSpace(p.input.Value()) != "" {
-			msg = "No matches for \"" + strings.TrimSpace(p.input.Value()) + "\"."
+		if p.input.value() != "" {
+			msg = "No matches for \"" + p.input.value() + "\"."
 		}
 		lines = append(lines, t.Render(ui.TextSecondary, msg))
 		return strings.Join(lines, "\n")
@@ -360,9 +348,9 @@ func (p *pickerOverlay) row(t ui.Theme, ascii bool, it pickItem, pos []int, sel 
 }
 
 func (p *pickerOverlay) hints(a *app) []ui.Hint {
-	arrows := "↑↓"
+	arrows := "j/k"
 	if a.ascii {
-		arrows = "Up/Down"
+		arrows = "j/k"
 	}
 	return []ui.Hint{hint("Enter", "Choose", 0), hint(arrows, "Move", 1), hint("Esc", "Close", 0)}
 }

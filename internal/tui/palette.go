@@ -150,7 +150,7 @@ func (a *app) openPaletteMode(ex bool) tea.Cmd {
 		})
 	p.exCommand = func(a *app, input string) (tea.Cmd, bool) { return a.exCommand(input, ex) }
 	if ex {
-		p.input.Prompt = ": "
+		p.input.setPrompt(": ")
 	}
 	a.ov = p
 	return cmd

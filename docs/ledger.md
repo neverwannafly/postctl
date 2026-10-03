@@ -52,7 +52,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 | UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Started | ws/ux-v2a-request | 2026-10-03 20:15 IST |
-| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Started | ws/ux-v2b-screens | 2026-10-03 20:15 IST |
+| UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done | ws/ux-v2b-screens | 2026-10-03 20:27 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Started | ws/ux-m1-mouse | 2026-10-03 20:15 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Started | ws/ux-t-terminal | 2026-10-03 20:15 IST |
 

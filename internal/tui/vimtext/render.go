@@ -72,6 +72,11 @@ func (m *Model) View() string {
 
 func (m *Model) renderLine(row, width int) string {
 	line := m.lines[row]
+	if m.opts.SingleLine && line != "" && m.opts.Redact != nil {
+		if red := m.opts.Redact(line); red != line {
+			line = red
+		}
+	}
 	cs := clusters(line)
 	from := min(m.left, len(cs))
 	var b strings.Builder
@@ -168,6 +173,15 @@ func (m *Model) ensureVisible() {
 		m.left++
 	}
 	if m.left < 0 {
+		m.left = 0
+	}
+	// When the whole line fits, keep the start visible (SetValue/cursorEnd often
+	// run before the widget is given its final width).
+	total := 0
+	for _, c := range cs {
+		total += clusterWidth(c, m.opts.TabText)
+	}
+	if total+cursorWidth <= room {
 		m.left = 0
 	}
 }

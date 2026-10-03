@@ -20,6 +20,7 @@ import (
 	"github.com/shubham/postctl/internal/report"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui"
+	"github.com/shubham/postctl/internal/tui/envedit"
 	tuihistory "github.com/shubham/postctl/internal/tui/history"
 	"github.com/shubham/postctl/internal/tui/request"
 	"github.com/shubham/postctl/internal/tui/response"
@@ -213,6 +214,31 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	shell, _ = shell.Update(tea.WindowSizeMsg{Width: 140, Height: 40})
 	shell, _ = shell.Update(tui.OpenSwitcherMsg{})
 	frames["switcher"] = shell.View().Content
+
+	leakTheme := ui.NewTheme(true, true, false)
+	envEditScr := tui.ScreenEnv{
+		PaneEnv: tui.PaneEnv{
+			Theme: leakTheme,
+			Backend: leakEnvHydrator{
+				Backend: tui.NewStoreBackend(root, store.WithSecretStore(secrets)),
+				secrets: secrets,
+			},
+		},
+		Workspace: ws, ActiveEnv: env.ID,
+	}
+	var envEdit tui.Screen = envedit.New(envEditScr, envedit.Deps{})
+	envEdit.SetSize(140, 40)
+	envEditKey := func(code rune, text string) {
+		next, _ := envEdit.Update(tea.KeyPressMsg{Code: code, Text: text})
+		if next != nil {
+			envEdit = next
+		}
+	}
+	envEditKey(tea.KeyEnter, "") // variables table
+	envEditKey('j', "j")         // accessToken row
+	envEditKey(tea.KeyEnter, "") // value column (secret, masked)
+	envEditKey('x', "x")
+	frames["env editor secret cell"] = envEdit.View()
 	pager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(oauthOutcome))
 	folderPager := response.MaskBodyForExternalOutput(tuiengine.OutcomeToResult(folderOutcome))
 	for _, secret := range []string{sentinel, folderSentinel} {
@@ -383,4 +409,25 @@ type sweepBackend struct {
 
 func (b sweepBackend) Load(context.Context) (*model.Workspace, []*store.FileError, error) {
 	return b.ws, nil, nil
+}
+
+type leakEnvHydrator struct {
+	tui.Backend
+	secrets store.SecretStore
+}
+
+func (leakEnvHydrator) HydrateAuth(context.Context, *model.Auth) error { return nil }
+
+func (h leakEnvHydrator) HydrateVariables(ctx context.Context, vs []model.Variable) error {
+	for i := range vs {
+		if !vs[i].IsSecret() || vs[i].SecretRef == "" {
+			continue
+		}
+		v, err := h.secrets.Get(ctx, vs[i].SecretRef)
+		if err != nil {
+			return err
+		}
+		vs[i].Value = v
+	}
+	return nil
 }

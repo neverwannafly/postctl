@@ -429,7 +429,6 @@ func TestEditingSecretValueIsMasked(t *testing.T) {
 	h := newHarness(t, 100, 30)
 	h.key("enter", "down", "enter") // token row, edit value
 	h.mustHave("Value (secret)")
-	h.mustHave("unchanged (hidden)")
 	h.typ("hunter2")
 	h.mustNotHave("hunter2")
 	if h.env("staging").Variables[1].Value != "hunter2" {
@@ -506,7 +505,7 @@ func TestCollectionVariables(t *testing.T) {
 	h.key("enter", "enter") // edit value
 	h.key("backspace")
 	h.typ("9")
-	h.key("esc")
+	h.key("esc", "esc") // insert → normal → leave cell
 	if got := h.ws.Collections[0].Variables[0].Value; got != "120"+"9" {
 		t.Fatalf("value = %q", got)
 	}
