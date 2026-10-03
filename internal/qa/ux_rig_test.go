@@ -34,6 +34,7 @@ import (
 type uxSecrets struct {
 	env, folder, coll, global string // secret variables of each scope
 	password, wsToken         string // literals typed into secret auth rows
+	oauth                     string // the stored OAuth 2.0 access token the engine sends
 }
 
 func newUXSecrets(t *testing.T) uxSecrets {
@@ -42,11 +43,12 @@ func newUXSecrets(t *testing.T) uxSecrets {
 		env: uniqueSentinel(t, "env"), folder: uniqueSentinel(t, "folder"),
 		coll: uniqueSentinel(t, "coll"), global: uniqueSentinel(t, "global"),
 		password: uniqueSentinel(t, "password"), wsToken: uniqueSentinel(t, "wstoken"),
+		oauth: uniqueSentinel(t, "oauth"),
 	}
 }
 
 func (s uxSecrets) all() []string {
-	return []string{s.env, s.folder, s.coll, s.global, s.password, s.wsToken}
+	return []string{s.env, s.folder, s.coll, s.global, s.password, s.wsToken, s.oauth}
 }
 
 // uxFixture is a synthetic workspace on disk plus the real engine over it.
@@ -104,12 +106,20 @@ func newUXFixture(t *testing.T, sec uxSecrets) *uxFixture {
 	folder.Items = []model.Item{echo}
 	literal := model.NewRequest("Literal auth", http.MethodPost, "{{baseUrl}}/literal")
 	literal.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Username: "alice", Password: sec.password}}
+	// The token is the stored one the engine sends (saving moves it into the
+	// secret store); the server echoes it into an expired cookie, so the
+	// response headers and cookies carry it unless the redactor knows it.
+	oauthReq := model.NewRequest("OAuth", http.MethodGet, "{{baseUrl}}/oauth")
+	oauthReq.Auth = &model.Auth{Type: model.AuthOAuth2, OAuth2: &model.OAuth2Config{
+		GrantType: model.GrantClientCredentials,
+		Token:     &model.OAuth2Token{AccessToken: sec.oauth, TokenType: "Bearer"},
+	}}
 	socket := model.NewRequest("Socket", http.MethodGet, "wss://example.test/stream")
 	socket.Kind = model.KindWebSocket
 	socket.Auth = &model.Auth{Type: model.AuthBearer, Bearer: &model.BearerAuth{Token: sec.wsToken}}
 	coll := model.NewCollection("UX")
 	coll.Variables = []model.Variable{{Key: "collToken", Value: sec.coll, Type: model.VarSecret}}
-	coll.Items = []model.Item{folder, literal, socket}
+	coll.Items = []model.Item{folder, literal, oauthReq, socket}
 	env := &model.Environment{ID: model.NewID(), Name: "Secret environment", Variables: []model.Variable{
 		{Key: "baseUrl", Value: server.URL},
 		{Key: "accessToken", Value: sec.env, Type: model.VarSecret},

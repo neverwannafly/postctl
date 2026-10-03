@@ -43,6 +43,16 @@ func (r *uxRig) must(marker, what string) {
 	}
 }
 
+// mustClip fails when the step wrote nothing to the clipboard since n writes
+// were seen. A toast on screen could be left over from an earlier step, so the
+// write itself is the proof.
+func (r *uxRig) mustClip(n int, what string) {
+	r.t.Helper()
+	if len(r.clips) <= n {
+		r.t.Fatalf("step %q wrote nothing to the clipboard (frame: %s)", what, frameShape(r.screen()))
+	}
+}
+
 func runUXFlow(t *testing.T, r *uxRig) {
 	t.Helper()
 
@@ -143,9 +153,31 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.must("[1/7] Body", "jq views cleared")
 
 	r.begin("body yank")
+	clips = len(r.clips)
 	r.keys("g", "r", "g", "g", "V", "G", "y")
-	r.must("Copied", "body yank")
+	r.mustClip(clips, "body yank")
 	r.snap("body yank toast")
+	r.keys("esc")
+
+	r.begin("oauth")
+	r.open("oauth")
+	r.keys("ctrl+s")
+	if !r.waitFor("200", 8*time.Second) {
+		t.Fatalf("the OAuth send did not produce a 200 response (frame: %s)", frameShape(r.screen()))
+	}
+	r.keys("ctrl+s")
+	r.wait(800 * time.Millisecond)
+	r.snap("oauth sent")
+	r.keys("g", "r")
+	for i := 0; i < 6; i++ {
+		r.keys("]")
+		r.snap(fmt.Sprintf("oauth tab +%d", i+1))
+		r.keys("esc")
+	}
+	r.keys("g", "r", "space", "x")
+	r.snap("oauth diff")
+	r.keys("h")
+	r.snap("oauth diff headers")
 	r.keys("esc")
 
 	r.begin("history screen")
@@ -170,9 +202,10 @@ func runUXFlow(t *testing.T, r *uxRig) {
 	r.snap("env secret insert")
 	r.keys("esc")
 	r.snap("env secret normal")
+	clips = len(r.clips)
 	r.keys("y", "y")
 	r.keys("v", "$", "y")
-	r.must("Copied", "env secret yank")
+	r.mustClip(clips, "env secret yank")
 	r.snap("env secret yank toast")
 	r.keys("esc", "esc", "esc", "esc")
 
