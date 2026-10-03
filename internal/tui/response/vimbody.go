@@ -488,7 +488,10 @@ func (p *Pane) vimKeyPress(msg tea.KeyPressMsg) tea.Cmd {
 	case vimtext.Leave:
 		cmds = append(cmds, func() tea.Msg { return tui.FocusPaneMsg{Slot: tui.SlotRequest} })
 	case vimtext.Unhandled:
-		if f.Mode() == vimtext.Normal {
+		// Ctrl-S and Ctrl-Enter are not for the buffer or for forwarding: the
+		// shell's send key only falls back to the request's send action when
+		// the pane returns nothing for them.
+		if k := res.Event.Key.String(); f.Mode() == vimtext.Normal && k != "ctrl+s" && k != "ctrl+enter" {
 			key := res.Event.Key
 			cmds = append(cmds, func() tea.Msg { return tui.ForwardKeyMsg{Key: key} })
 		}
