@@ -1,6 +1,6 @@
 # CLI
 
-`postctl` with no subcommand opens the terminal UI. The commands below are linear: they write to stdout and stderr, never take over the screen, and are safe to pipe. Color is off when stdout is not a terminal, when `NO_COLOR` is set, or when `--accessible` is passed. Status is always a glyph plus a word (`✓` passed, `×` failed, `!` warning). `--ascii` or `POSTCTL_ASCII=1` swaps those for `+`, `x` and `!`, and swaps the secret mask `••••` for `****`.
+`postctl` with no subcommand opens the terminal UI. The commands below are linear: they write to stdout and stderr, never take over the screen, and are safe to pipe. Color is off when stdout is not a terminal, when `NO_COLOR` is set, or when `--accessible` is passed. Status is always a glyph plus a word (`✓` passed, `×` failed, `!` warning). `--ascii` or `POSTCTL_ASCII=1` swaps those for `+`, `x` and `!`, and swaps the secret mask `••••` for `****`. Mouse support in the TUI is enabled by default and can be disabled with `--no-mouse` or `POSTCTL_NO_MOUSE=1`.
 
 Paths are `<collection>/<folder>/.../<request>`. Each segment is a display name, a slug, or an ID, matched case-insensitively. A single name that is not a collection is searched through the whole tree. If more than one item matches, the command exits 3 and lists the candidates.
 

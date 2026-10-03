@@ -197,6 +197,7 @@ For Ghostty, tmux, **Ctrl-Enter**, pane handoff with **Ctrl-h/j/k/l**, and clipb
 
 - `--accessible` (or `POSTCTL_ACCESSIBLE=1`): Emits a single-column, linear layout without alternate screen buffers, animations, or cursor resets. Suitable for screen readers.
 - `--ascii` (or `POSTCTL_ASCII=1`): Replaces Unicode symbols (`●`, `✓`, `×`, `→`) with plain ASCII characters (`*`, `+`, `x`, `->`), and masks secrets with `****` instead of `••••`.
+- `--no-mouse` (or `POSTCTL_NO_MOUSE=1`): Disables mouse event capture in the TUI (mouse is on by default). When mouse tracking is active, native terminal text selection needs **Shift-drag** in Ghostty and tmux, or **Option-drag** in iTerm2.
 - `NO_COLOR`: Disables all ANSI colors while preserving layout hierarchy through text labels, brackets, and prefixes.
 - **Narrow terminals:** Responsive breakpoints automatically reorganize panes down to 80×24.
 

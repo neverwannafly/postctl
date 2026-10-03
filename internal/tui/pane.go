@@ -114,6 +114,12 @@ type SectionLister interface {
 	Sections() []string
 }
 
+// MouseHandler is implemented by panes that accept mouse events. Coordinates
+// are relative to the pane's inner body (below its header).
+type MouseHandler interface {
+	HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd
+}
+
 // ActionSource lets a pane contribute command-palette actions. The shell asks
 // on every palette open, so the list may change with pane state. Actions can
 // also be added with [Registry].

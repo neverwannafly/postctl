@@ -65,6 +65,9 @@ type Options struct {
 	// Light assumes a light terminal background until the terminal answers;
 	// the default is dark.
 	Light bool
+	// NoMouse disables mouse event capture (--no-mouse, POSTCTL_NO_MOUSE).
+	// When false (the default), mouse is enabled.
+	NoMouse bool
 }
 
 // phase is the top-level state of the shell.
@@ -148,6 +151,8 @@ type app struct {
 	watch          watcher
 	watching       bool
 	now            func() time.Time
+	noMouse        bool
+	mouse          mouseState
 }
 
 // New builds the root model. Most callers use [Run].
@@ -161,6 +166,7 @@ func newApp(opts Options) *app {
 		ascii:      opts.ASCII || opts.Accessible,
 		noColor:    opts.NoColor || opts.Accessible,
 		dark:       !opts.Light,
+		noMouse:    opts.NoMouse,
 		width:      100,
 		height:     30,
 		focus:      SlotSidebar,
@@ -267,6 +273,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.forward(msg)
 	case tea.PasteMsg:
 		return a, a.onPaste(msg)
+	case tea.MouseMsg:
+		return a, a.onMouse(msg)
 	case StartupNoopMsg:
 		return a, nil
 	case showLoadingMsg:

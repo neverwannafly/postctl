@@ -425,3 +425,11 @@ Connecting, composing, saving, and inspecting WebSocket messages.
 | `c (detail)` | Copy message | Copy the selected message |
 | `Esc` | Back | Return to the previous WebSocket section |
 
+## Mouse
+
+Mouse support is enabled by default. You can disable mouse events using the `--no-mouse` flag or by setting `POSTCTL_NO_MOUSE=1`.
+
+- **Left click**: Focuses a pane, selects tabs or section headers, selects or toggles items in Collections, and activates switcher titles.
+- **Tree open**: Clicking the selected row in Collections or double-clicking any row (within 400 ms) opens that request or problem.
+- **Wheel scroll**: Scrolls the pane or tree under the cursor without moving focus.
+- **Text selection**: Native terminal text selection requires modifier keys when mouse tracking is active: **Shift-drag** in Ghostty and tmux, and **Option-drag** in iTerm2.

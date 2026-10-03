@@ -99,6 +99,11 @@ func (a *app) View() tea.View {
 	v := tea.NewView(strings.Join(lines, "\n"))
 	v.AltScreen = !a.accessible
 	v.WindowTitle = a.windowTitle()
+	if a.mouseEnabled() {
+		v.MouseMode = tea.MouseModeCellMotion
+	} else {
+		v.MouseMode = tea.MouseModeNone
+	}
 	return v
 }
 
