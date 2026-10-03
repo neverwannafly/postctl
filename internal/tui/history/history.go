@@ -55,6 +55,11 @@ const (
 type statusFilter int
 
 const (
+	historyHeaderRows = 2
+	filterLabel       = "Filter  "
+)
+
+const (
 	filterAll statusFilter = iota
 	filterOK
 	filterClient
@@ -266,7 +271,7 @@ func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 	if !m.filtering || m.filter == nil {
 		return nil
 	}
-	m.filter.mouseUpdate(msg, x-8, y-2, m.deps.now())
+	m.filter.mouseUpdate(msg, x-ui.Width(filterLabel), y-historyHeaderRows, m.deps.now())
 	return nil
 }
 
@@ -518,7 +523,7 @@ func (m *Model) viewList() string {
 	}
 	body := m.screenHeader(title)
 	if m.filtering {
-		body += t.Render(ui.AccentPrimary, "Filter  "+m.filter.view()) + "\n"
+		body += t.Render(ui.AccentPrimary, filterLabel+m.filter.view()) + "\n"
 	}
 	if len(m.items) == 0 {
 		body += t.EmptyState("No history yet", "Send a request with Ctrl-S; entries appear here.", "Ctrl-S Send", m.w)

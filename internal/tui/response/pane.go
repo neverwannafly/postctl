@@ -781,7 +781,7 @@ func (p *Pane) tabContent(r tui.SendResult, w int) string {
 }
 
 func (p *Pane) contentHeight() int {
-	h := p.h - 3 // summary + tabs
+	h := p.h - responseChromeRows
 	if p.pathActive {
 		h--
 	}

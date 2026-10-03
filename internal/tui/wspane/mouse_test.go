@@ -3,9 +3,11 @@ package wspane
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/tui/vimtext"
 )
 
 func TestWSPaneMouseTabsAndWheel(t *testing.T) {
@@ -244,5 +246,51 @@ func TestMousePlacesCursorInURLAndComposer(t *testing.T) {
 	h.p.HandleMouse(tea.MouseClickMsg{X: 3, Y: chrome + 2, Button: tea.MouseLeft}, 3, chrome+2)
 	if row, col := h.p.comp.Cursor(); row != 1 || col != 3 || h.p.VimMode() != "NORMAL" {
 		t.Fatalf("composer click = %d,%d/%q", row, col, h.p.VimMode())
+	}
+	h.p.comp.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: 2, Y: chrome + 1, Button: tea.MouseLeft}, 2, chrome+1)
+	if h.p.comp.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused composer left insert mode")
+	}
+}
+
+func TestMouseKeepsURLInsertAndMasksWebSocketSecretFormYank(t *testing.T) {
+	const sentinel = "mouse-hidden-websocket-sentinel"
+	h := newHarness(t)
+	h.p.setZone(zBar)
+	h.p.url.Begin("i")
+	urlX := 2 + badgeW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 2, Y: 0, Button: tea.MouseLeft}, urlX+2, 0)
+	if h.p.url.Mode() != vimtext.Insert {
+		t.Fatalf("URL click changed mode to %v", h.p.url.Mode())
+	}
+
+	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Password: sentinel}}
+	h.p.reloadAll()
+	h.gotoTab(tabAuth)
+	h.p.setZone(zBody)
+	labelW := min(20, max(10, h.p.w/3))
+	valueX := 2 + labelW + 1
+	y := chrome + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX, Y: y, Button: tea.MouseLeft}, valueX, y)
+	if !h.p.auth.f.edit || h.p.auth.f.cur != 2 || h.p.auth.f.in == nil {
+		t.Fatal("clicking the WebSocket password row did not open it")
+	}
+	h.p.auth.f.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX + 1, Y: y, Button: tea.MouseLeft}, valueX+1, y)
+	if h.p.auth.f.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused WebSocket password row left insert mode")
+	}
+	h.p.HandleMouse(tea.MouseMotionMsg{X: valueX + 4, Y: y, Button: tea.MouseLeft}, valueX+4, y)
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: valueX + 4, Y: y, Button: tea.MouseLeft}, valueX+4, y)
+	res := h.p.auth.f.in.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	h.run(res.Cmd)
+	if strings.Contains(h.p.View(), sentinel) {
+		t.Fatal("hidden WebSocket password was revealed in the frame")
+	}
+	if len(h.clip) != 1 || h.clip[0] != h.theme.Glyphs.Mask || strings.Contains(h.clip[0], sentinel) {
+		t.Fatal("hidden WebSocket password yank did not produce the fixed mask")
 	}
 }

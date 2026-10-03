@@ -7,6 +7,14 @@ import (
 	"github.com/shubham/postctl/internal/ui"
 )
 
+const (
+	envScreenHeaderRows = 3
+	envTableChromeRows  = 4
+	envNameLabelWidth   = 11
+	envValueLabelWidth  = 15
+	envColumnGap        = 3
+)
+
 const listW = 28
 
 // wide reports whether there is room for the list beside the table.
@@ -75,7 +83,7 @@ func (m *Model) View() string {
 	tabs[tabEnvs].Count = len(m.envs())
 	tabs[tabCollections].Count = len(m.ws().Collections)
 	head := title + "\n" + th.Tabs(m.w, tabs, int(m.tab), m.zone == zList && m.mode == modeNone)
-	ch := max(1, m.h-3)
+	ch := max(1, m.h-envScreenHeaderRows)
 	var body string
 	switch m.mode {
 	case modeConfirm:
@@ -107,7 +115,7 @@ func (m *Model) content(w, h int) string {
 	if m.wide() {
 		lw := listW
 		left := m.listPane(lw, h)
-		right := m.rightPane(w-lw-3, h)
+		right := m.rightPane(w-lw-envColumnGap, h)
 		return joinCols(th, left, right, lw, h)
 	}
 	sel := m.selectorLine(w)
@@ -242,7 +250,7 @@ func (m *Model) selectorLine(w int) string {
 func (m *Model) nameLine(w int) string {
 	th := m.th
 	label := map[nameIntent]string{intentNew: "New name", intentRename: "Rename to", intentDuplicate: "Copy name"}[m.intent]
-	line := th.Render(ui.TextSecondary, th.Fit(label, 11)) + m.name.View()
+	line := th.Render(ui.TextSecondary, th.Fit(label, envNameLabelWidth)) + m.name.View()
 	if m.nameEr != "" {
 		line += "\n" + th.Render(ui.StatusWarning, th.Truncate(th.Glyphs.Warn+" "+m.nameEr, w))
 	}
@@ -280,7 +288,7 @@ func (m *Model) tablePane(w, h int, name, note string) string {
 		empty := t.Render(ui.TextSecondary, "No variables. Press a to add one.")
 		return header + "\n\n" + empty
 	}
-	rh := max(1, h-4)
+	rh := max(1, h-envTableChromeRows)
 	top := scroll(m.top, m.cur, rh, len(rows))
 	end := min(len(rows), top+rh)
 	kv := make([]ui.KVRow, 0, end-top)
@@ -303,7 +311,7 @@ func (m *Model) statusLine(rows []model.Variable, w int) string {
 		if m.col == 1 && m.cur < len(rows) && rows[m.cur].IsSecret() {
 			label = "Value (secret)"
 		}
-		return "\n" + t.Render(ui.TextSecondary, t.Fit(label, 15)) + m.in.View()
+		return "\n" + t.Render(ui.TextSecondary, t.Fit(label, envValueLabelWidth)) + m.in.View()
 	}
 	secrets, off := 0, 0
 	for _, v := range rows {

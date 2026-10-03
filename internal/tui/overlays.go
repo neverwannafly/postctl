@@ -81,6 +81,26 @@ type promptOverlay struct {
 	submit func(a *app, value string, kind int) (errText string, cmd tea.Cmd)
 }
 
+type promptLayout struct {
+	width, inner, inputLine, height int
+}
+
+func (o *promptOverlay) layout(w int) promptLayout {
+	line := 2
+	if o.note != "" {
+		line++
+	}
+	if len(o.kinds) > 1 {
+		line += 2
+	}
+	height := line + 3 // input line plus the modal's top and bottom edges
+	if o.err != "" {
+		height++
+	}
+	width := min(w-2, 64)
+	return promptLayout{width: width, inner: width - 4, inputLine: line, height: height}
+}
+
 func newPrompt(a *app, title, note, initial string, kinds []string, submit func(a *app, value string, kind int) (string, tea.Cmd)) (*promptOverlay, tea.Cmd) {
 	in, cmd := newPromptInput(a.theme, initial, "Name")
 	return &promptOverlay{title: title, note: note, input: in, kinds: kinds, submit: submit}, cmd
@@ -90,22 +110,11 @@ func (o *promptOverlay) overlayVimMode() string { return o.input.vimMode() }
 
 func (o *promptOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	if mouse, ok := msg.(tea.MouseMsg); ok {
-		line := 2
-		if o.note != "" {
-			line++
-		}
-		if len(o.kinds) > 1 {
-			line += 2
-		}
 		g := a.geo()
-		width := min(g.width-2, 64)
-		contentLines := line + 1
-		if o.err != "" {
-			contentLines++
-		}
-		originX := g.inset + max(0, (g.width-width)/2)
-		originY := headerRows + max(0, (g.bodyH-(contentLines+2))/3)
-		o.input.mouseUpdate(mouse, mouse.Mouse().X-originX-2, mouse.Mouse().Y-originY-line-1, a.now())
+		lay := o.layout(g.width)
+		originX := g.inset + max(0, (g.width-lay.width)/2)
+		originY := headerRows + max(0, (g.bodyH-lay.height)/3)
+		o.input.mouseUpdate(mouse, mouse.Mouse().X-originX-2, mouse.Mouse().Y-originY-lay.inputLine-1, a.now())
 		return o, nil
 	}
 	if k, ok := msg.(tea.KeyPressMsg); ok {
@@ -146,12 +155,11 @@ func (o *promptOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 
 func (o *promptOverlay) view(a *app, w, h int) string {
 	t := a.theme
-	width := min(w-2, 64)
-	inner := width - 4
-	o.input.setWidth(max(8, inner-1))
+	lay := o.layout(w)
+	o.input.setWidth(max(8, lay.inner-1))
 	lines := []string{t.Bold().Render(o.title)}
 	if o.note != "" {
-		lines = append(lines, t.Render(ui.TextSecondary, t.Truncate(o.note, inner)))
+		lines = append(lines, t.Render(ui.TextSecondary, t.Truncate(o.note, lay.inner)))
 	}
 	if len(o.kinds) > 1 {
 		var parts []string
@@ -172,7 +180,7 @@ func (o *promptOverlay) view(a *app, w, h int) string {
 	if o.err != "" {
 		lines = append(lines, t.Render(ui.StatusDanger, t.Glyphs.Fail+" "+o.err))
 	}
-	return t.Modal(strings.Join(lines, "\n"), width, false)
+	return t.Modal(strings.Join(lines, "\n"), lay.width, false)
 }
 
 func (o *promptOverlay) hints(a *app) []ui.Hint {

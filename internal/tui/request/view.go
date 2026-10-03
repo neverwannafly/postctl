@@ -14,6 +14,7 @@ import (
 const (
 	methodW = 6
 	sendW   = 9 // "  Send ⏎" / "  Sending"
+	urlX    = 2 + methodW + 2
 	// chrome is the rows above the tab content: bar, status row, tab labels
 	// and the tab rule.
 	chrome = 4
@@ -50,7 +51,7 @@ func (p *Pane) View() string {
 	out := p.th.Block(b.String(), p.w, p.h)
 	if pop := p.url.Popup(p.urlWidth()); p.urlE && len(pop) > 0 {
 		// The URL field's completion menu draws over the rows under the bar.
-		out = strings.Join(vimfield.Overlay(strings.Split(out, "\n"), 0, 2+methodW+2, pop), "\n")
+		out = strings.Join(vimfield.Overlay(strings.Split(out, "\n"), 0, urlX, pop), "\n")
 	}
 	return out
 }

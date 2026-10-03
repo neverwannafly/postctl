@@ -1243,3 +1243,21 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: hit mapping covers gutters, scroll, wide clusters, tabs, masks, placeholders and end-of-line clamping; behavior covers click modes, drag/release, click counts, edge scrolling, focused-field wheels, pane breakpoints, ASCII, disabled mouse, table cells and the read-only response body. Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; 0 goldens changed.
 - Blockers / questions: none.
 - Next: ready for orchestrator review and merge.
+
+### 2026-10-03 22:35 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: security review passed; correctness review identified insert-mode preservation, uncovered form fields, edge-drag scrolling, pointer hit boundaries, overlay release state, large-line mapping cost, duplicated layout geometry and purity coverage.
+- Files: `docs/ledger.md`.
+- Decisions: add a failing regression test for each finding before its fix; keep all editor API changes additive.
+- Tests: pending.
+- Blockers / questions: none.
+- Next: fix review findings, run the Neovim differential and full gates, then commit.
+
+### 2026-10-03 22:47 IST · UX-M2 · GPT-5.6 Sol (medium) · PROGRESS
+- Branch/worktree: `ws/ux-m2-editor-mouse` · `/Users/shubham/work/postctl-wt/ux-m2-editor-mouse`
+- Did: fixed all correctness findings from review: preserved insert mode in already-focused fields; added request and WebSocket table/form hit mapping with fixed-mask yanks for hidden credentials; made edge drag scroll exactly one line; bounded wheel ownership to the field under the pointer; cleared pane and root drag state through overlays; cached large-line hit clusters and widths; shared mouse/view layout constants; added press and mid-drag purity coverage.
+- Files: `internal/tui/{vimtext,request,wspane,envedit,history,runner,response}` plus root mouse/overlay tests and `docs/ledger.md`.
+- Decisions: credential-bearing header values use the same fixed-mask redaction contract as secret form rows; the hit cache validates each entry against current line text, so edits and undo cannot reuse stale clusters.
+- Tests: regression tests failed before their fixes; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; module files unchanged; 0 goldens changed.
+- Blockers / questions: none.
+- Next: commit for correctness re-review; do not push.

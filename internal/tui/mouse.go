@@ -204,11 +204,25 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 
 	x, y := m.X, m.Y
 	if (isMotion || isRelease) && a.ov != nil {
+		var paneCmd tea.Cmd
+		if isRelease && a.mouse.dragging {
+			switch a.mouse.dragSlot {
+			case SlotRequest:
+				if h, ok := a.request.(MouseHandler); ok {
+					paneCmd = h.HandleMouse(msg, x-a.mouse.dragX, y-a.mouse.dragY)
+				}
+			case SlotResponse:
+				if h, ok := a.response.(MouseHandler); ok {
+					paneCmd = h.HandleMouse(msg, x-a.mouse.dragX, y-a.mouse.dragY)
+				}
+			}
+			a.mouse.dragging = false
+		}
 		switch a.ov.(type) {
 		case *promptOverlay, *pickerOverlay, *screenOverlay:
-			return a.updateOverlay(msg)
+			return tea.Batch(paneCmd, a.updateOverlay(msg))
 		default:
-			return nil
+			return paneCmd
 		}
 	}
 	if (isMotion || isRelease) && a.ov == nil {
@@ -239,24 +253,6 @@ func (a *app) onMouse(msg tea.MouseMsg) tea.Cmd {
 		}
 		if isClick {
 			return a.closeOverlay()
-		}
-		return nil
-	}
-
-	if isMotion || isRelease {
-		slot := a.mouse.dragSlot
-		if isRelease {
-			defer func() { a.mouse.dragging = false }()
-		}
-		switch slot {
-		case SlotRequest:
-			if h, ok := a.request.(MouseHandler); ok {
-				return h.HandleMouse(msg, x-regions.request.x, y-regions.request.y)
-			}
-		case SlotResponse:
-			if h, ok := a.response.(MouseHandler); ok {
-				return h.HandleMouse(msg, x-regions.response.x, y-regions.response.y)
-			}
 		}
 		return nil
 	}

@@ -183,10 +183,10 @@ func (m *Model) focusInitial() {
 func (m *Model) SetSize(w, h int) {
 	m.w, m.h = w, h
 	if m.name != nil {
-		m.name.SetWidth(max(4, w-12))
+		m.name.SetWidth(max(4, w-envNameLabelWidth-1))
 	}
 	if m.in != nil {
-		m.in.SetWidth(max(4, w-15))
+		m.in.SetWidth(max(4, w-envValueLabelWidth))
 	}
 }
 
@@ -392,17 +392,17 @@ func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 		m.mode == modeNone && m.zone == zTable {
 		contentX, contentW := 0, m.w
 		if m.wide() && m.tab != tabGlobals {
-			contentX, contentW = listW+3, m.w-listW-3
+			contentX, contentW = listW+envColumnGap, m.w-listW-envColumnGap
 		}
-		firstRowY := 4
-		tableH := m.h - 3
+		firstRowY := envScreenHeaderRows + 1
+		tableH := m.h - envScreenHeaderRows
 		if !m.wide() && m.tab != tabGlobals {
 			firstRowY++
 			tableH--
 		}
 		row := y - firstRowY
 		rows := m.rows()
-		rh := max(1, tableH-4)
+		rh := max(1, tableH-envTableChromeRows)
 		top := scroll(m.top, m.cur, rh, len(rows))
 		if row >= 0 && top+row < len(rows) && x >= contentX && x < contentX+contentW {
 			localX := x - contentX
@@ -446,14 +446,14 @@ func (m *Model) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 	originX, originY := 0, m.h-1
 	switch {
 	case m.mode == modeName && m.name != nil:
-		f, originX = m.name, 11
+		f, originX = m.name, envNameLabelWidth
 		if m.nameEr != "" {
 			originY--
 		}
 	case m.edit && m.in != nil:
-		f, originX = m.in, 15
+		f, originX = m.in, envValueLabelWidth
 		if m.wide() && m.tab != tabGlobals {
-			originX += listW + 3
+			originX += listW + envColumnGap
 		}
 	default:
 		return nil
@@ -616,7 +616,7 @@ func (m *Model) beginName(in nameIntent, initial string) {
 	m.intent = in
 	f, _ := screenfield.New(m.th, initial, "Environment name", false)
 	m.name = f
-	m.name.SetWidth(max(4, m.w-12))
+	m.name.SetWidth(max(4, m.w-envNameLabelWidth-1))
 	m.nameEr = ""
 }
 

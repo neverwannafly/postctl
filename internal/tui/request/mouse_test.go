@@ -9,6 +9,8 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/store"
 	"github.com/shubham/postctl/internal/tui/vimfield"
+	"github.com/shubham/postctl/internal/tui/vimtext"
+	"github.com/shubham/postctl/internal/ui"
 )
 
 func TestRequestPaneMouseTabsAndWheel(t *testing.T) {
@@ -265,6 +267,27 @@ func TestWheelScrollsFocusedEditorInInsertOrVisualMode(t *testing.T) {
 	}
 }
 
+func TestWheelOnlyScrollsGraphQLFieldUnderPointer(t *testing.T) {
+	h := newHarness(t)
+	h.req.Body = model.Body{Mode: model.BodyGraphQL, GraphQL: &model.GraphQLBody{
+		Query: longText(80), Variables: longText(80),
+	}}
+	h.p.reloadAll()
+	h.gotoTab(tabBody)
+	b := h.p.views[tabBody].(*bodyView)
+	h.p.setZone(zBody)
+	b.cur = 1
+	b.focusZone(h.p, zkQuery, "")
+	_, bodyH := h.p.bodySize()
+	qh, _ := gqHeights(max(1, bodyH-2))
+	before := b.gq.Top()
+	y := chrome + 3 + qh
+	h.p.HandleMouse(tea.MouseWheelMsg{X: 2, Y: y, Button: tea.MouseWheelDown}, 2, y)
+	if b.gq.Top() != before {
+		t.Fatal("wheel over GraphQL variables scrolled the query field")
+	}
+}
+
 // A cell being edited and the URL field in insert mode are left alone too.
 func TestWheelIsIgnoredWhileTheURLIsInInsertMode(t *testing.T) {
 	h := newHarness(t)
@@ -407,5 +430,84 @@ func TestMouseOpensKVCellAtPointer(t *testing.T) {
 	}
 	if row, col := kv.in.Cursor(); row != 0 || col != 0 || kv.in.ModeName() != "NORMAL" {
 		t.Fatalf("KV click = cursor %d,%d mode %q", row, col, kv.in.ModeName())
+	}
+}
+
+func TestMouseClickKeepsFocusedURLInInsertMode(t *testing.T) {
+	h := newHarness(t)
+	h.p.setZone(zBar)
+	h.p.url.Begin("i")
+	urlX := 2 + methodW + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: urlX + 2, Y: 0, Button: tea.MouseLeft}, urlX+2, 0)
+	if h.p.url.Mode() != vimtext.Insert {
+		t.Fatalf("URL click changed mode to %v", h.p.url.Mode())
+	}
+}
+
+func TestMouseOpensFormRowAndMasksHiddenYanks(t *testing.T) {
+	const sentinel = "mouse-hidden-form-sentinel"
+	h := newHarness(t)
+	h.req.Auth = &model.Auth{Type: model.AuthBasic, Basic: &model.BasicAuth{Password: sentinel}}
+	h.p.reloadAll()
+	h.gotoTab(tabAuth)
+	h.p.setZone(zBody)
+	labelW := min(20, max(10, h.p.w/3))
+	valueX := 2 + labelW + 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX, Y: chrome + 1, Button: tea.MouseLeft}, valueX, chrome+1)
+	auth := h.p.views[tabAuth].(*authView)
+	if !auth.f.edit || auth.f.cur != 1 || auth.f.in == nil {
+		t.Fatal("clicking an auth text row did not open its editor")
+	}
+	auth.f.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX + 1, Y: chrome + 1, Button: tea.MouseLeft}, valueX+1, chrome+1)
+	if auth.f.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused auth row left insert mode")
+	}
+	auth.f.edit = false
+	secretY := chrome + 2
+	h.p.HandleMouse(tea.MouseClickMsg{X: valueX, Y: secretY, Button: tea.MouseLeft}, valueX, secretY)
+	h.p.HandleMouse(tea.MouseMotionMsg{X: valueX + 4, Y: secretY, Button: tea.MouseLeft}, valueX+4, secretY)
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: valueX + 4, Y: secretY, Button: tea.MouseLeft}, valueX+4, secretY)
+	res := auth.f.in.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	h.run(res.Cmd)
+	if strings.Contains(h.p.View(), sentinel) || len(h.clip) != 1 || h.clip[0] != h.theme.Glyphs.Mask {
+		t.Fatal("hidden auth yank did not produce the fixed mask")
+	}
+
+	h.req.Headers[0].Key = "Authorization"
+	h.p.reloadAll()
+	h.gotoTab(tabHeaders)
+	kv := h.p.views[tabHeaders].(*kvView)
+	items := kv.items(h.p)
+	keyW := 0
+	for _, it := range items {
+		keyW = max(keyW, ui.Width(it.Key))
+	}
+	keyW = min(max(keyW, 3), max(8, (h.p.w-6)*35/100))
+	headerValueX := 6 + keyW + ui.SpaceSM
+	headerY := chrome + 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: headerValueX, Y: headerY, Button: tea.MouseLeft}, headerValueX, headerY)
+	if kv.in == nil {
+		t.Fatal("clicking a secret header value did not open its editor")
+	}
+	kv.in.Begin("i")
+	h.advance(500 * time.Millisecond)
+	statusY := h.p.h - 1
+	h.p.HandleMouse(tea.MouseClickMsg{X: 13, Y: statusY, Button: tea.MouseLeft}, 13, statusY)
+	if kv.in.Mode() != vimtext.Insert {
+		t.Fatal("clicking the focused header field left insert mode")
+	}
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: 13, Y: statusY, Button: tea.MouseLeft}, 13, statusY)
+	h.p.HandleMouse(tea.MouseClickMsg{X: headerValueX, Y: headerY, Button: tea.MouseLeft}, headerValueX, headerY)
+	h.p.HandleMouse(tea.MouseMotionMsg{X: headerValueX + 4, Y: headerY, Button: tea.MouseLeft}, headerValueX+4, headerY)
+	h.p.HandleMouse(tea.MouseReleaseMsg{X: headerValueX + 4, Y: headerY, Button: tea.MouseLeft}, headerValueX+4, headerY)
+	res = kv.in.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	h.run(res.Cmd)
+	if strings.Contains(h.p.View(), h.req.Headers[0].Value) {
+		t.Fatal("hidden header was revealed in the frame")
+	}
+	if len(h.clip) != 2 || h.clip[1] != h.theme.Glyphs.Mask {
+		t.Fatal("hidden header yank did not produce the fixed mask")
 	}
 }

@@ -64,14 +64,14 @@ func (m *Mouse) Motion(x, y int) bool {
 	}
 	if ed.opts.SingleLine {
 		if x < 0 {
-			ed.ScrollColumns(-1)
+			ed.left = max(0, ed.left-1)
 		} else if x >= ed.width {
-			ed.ScrollColumns(1)
+			ed.left = min(max(0, len(ed.hitClusters(ed.row))-1), ed.left+1)
 		}
 	} else if y < 0 {
-		ed.ScrollLines(-1)
+		ed.top = max(0, ed.top-1)
 	} else if y >= ed.height {
-		ed.ScrollLines(1)
+		ed.top = min(max(0, len(ed.lines)-ed.height), ed.top+1)
 	}
 	x = min(max(0, x), ed.width-1)
 	y = min(max(0, y), ed.height-1)
@@ -83,7 +83,10 @@ func (m *Mouse) Motion(x, y int) bool {
 		return true
 	}
 	m.moved = true
-	ed.Select(m.anchorRow, m.anchorCol, row, col)
+	ed.anchor = position{m.anchorRow, m.anchorCol}
+	ed.row, ed.col = row, col
+	ed.preferred = displayColumn(ed.lines[row], col, ed.opts.TabText)
+	ed.mode = Visual
 	return true
 }
 

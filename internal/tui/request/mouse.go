@@ -5,7 +5,6 @@ import (
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui"
 	"github.com/shubham/postctl/internal/tui/vimfield"
-	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
 
@@ -77,6 +76,9 @@ func (p *Pane) HandleMouse(msg tea.MouseMsg, x, y int) tea.Cmd {
 			f.ScrollLines(delta)
 			return nil
 		}
+		if p.activeField() != nil {
+			return nil
+		}
 		switch msg.Button {
 		case tea.MouseWheelUp:
 			p.scrollWheel(-1)
@@ -92,7 +94,6 @@ func (p *Pane) focusedFieldUnder(x, y int) *vimfield.Field {
 	if f == nil {
 		return nil
 	}
-	const urlX = 2 + methodW + 2
 	if f == p.url && y == 0 && x >= urlX && x < urlX+p.urlWidth() {
 		return f
 	}
@@ -106,35 +107,59 @@ func (p *Pane) focusedFieldUnder(x, y int) *vimfield.Field {
 			return f
 		}
 	case *bodyView:
-		if f == v.raw && by >= 2 {
-			return f
-		}
-		if f == v.gq || f == v.gv {
-			return f
+		switch v.mode(p) {
+		case model.BodyRaw:
+			_, h := p.bodySize()
+			if f == v.raw && by >= 2 && by < 2+max(1, h-4) {
+				return f
+			}
+		case model.BodyGraphQL:
+			_, h := p.bodySize()
+			qh, vh := gqHeights(max(1, h-2))
+			if f == v.gq && by >= 2 && by < 2+qh {
+				return f
+			}
+			if f == v.gv && by >= 3+qh && by < 3+qh+vh {
+				return f
+			}
+		case model.BodyBinary:
+			if f == v.file.in && p.formFieldUnder(&v.file, v.fileRows(p), x, by-1, p.w, max(1, p.h-chrome-2)) {
+				return f
+			}
 		}
 	case *kvView:
 		if (f == v.in && by == max(0, p.h-chrome-1)) || (f == v.area && by >= 2) {
 			return f
 		}
-	default:
-		// Form fields are drawn inline; the active row is the only field.
-		if by >= 0 && by < p.h-chrome {
+	case *authView:
+		if f == v.f.in && p.formFieldUnder(&v.f, v.rows(p), x, by, p.w, max(1, p.h-chrome)) {
+			return f
+		}
+	case *settingsView:
+		if f == v.f.in && p.formFieldUnder(&v.f, v.rows(p), x, by, p.w, max(1, p.h-chrome)) {
 			return f
 		}
 	}
 	return nil
 }
 
+func (p *Pane) formFieldUnder(f *form, rows []formRow, x, y, w, h int) bool {
+	if !f.edit || f.in == nil || len(rows) == 0 {
+		return false
+	}
+	labelW := min(20, max(10, w/3))
+	valueX := 2 + labelW + 1
+	top := scrollTo(f.top, f.cur, h, len(rows))
+	return x >= valueX && x < w && y == f.cur-top
+}
+
 // mouseFieldAt returns the editor drawn under a pane-relative cell and the
 // cell relative to that editor. Opening a field uses the same pane focus path
 // as the keyboard, so the previous field is blurred and its live edit kept.
 func (p *Pane) mouseFieldAt(x, y int) (*vimfield.Field, int, int) {
-	const urlX = 2 + methodW + 2
 	if y == 0 && x >= urlX && x < urlX+p.urlWidth() {
-		wasInsert := p.urlE && p.url.Mode() == vimtext.Insert
-		p.setZone(zBar)
-		if wasInsert {
-			p.url.Focus()
+		if p.zone != zBar {
+			p.setZone(zBar)
 		}
 		p.fitURL()
 		return p.url, x - urlX, 0
@@ -174,19 +199,25 @@ func (p *Pane) mouseFieldAt(x, y int) (*vimfield.Field, int, int) {
 			qh, vh := gqHeights(room)
 			if by >= 2 && by < 2+qh {
 				v.cur = 1
-				v.focusZone(p, zkQuery, "")
+				if v.field() != v.gq {
+					v.focusZone(p, zkQuery, "")
+				}
 				return v.gq, x, by - 2
 			}
 			vy := by - (3 + qh)
 			if vy >= 0 && vy < vh {
 				v.cur = 2
-				v.focusZone(p, zkVars, "")
+				if v.field() != v.gv {
+					v.focusZone(p, zkVars, "")
+				}
 				return v.gv, x, vy
 			}
 		case model.BodyURLEncoded, model.BodyFormData:
 			if kv := v.kvs[v.mode(p)]; kv != nil {
 				return p.kvMouseField(kv, x, by-2)
 			}
+		case model.BodyBinary:
+			return p.formMouseField(&v.file, v.fileRows(p), x, by-1, p.w, max(1, p.h-chrome-2))
 		}
 	case *kvView:
 		p.setZone(zBody)
@@ -198,8 +229,34 @@ func (p *Pane) mouseFieldAt(x, y int) (*vimfield.Field, int, int) {
 			return v.in, x - 12, 0
 		}
 		return p.kvMouseField(v, x, by)
+	case *authView:
+		p.setZone(zBody)
+		return p.formMouseField(&v.f, v.rows(p), x, by, p.w, max(1, p.h-chrome))
+	case *settingsView:
+		p.setZone(zBody)
+		return p.formMouseField(&v.f, v.rows(p), x, by, p.w, max(1, p.h-chrome))
 	}
 	return nil, 0, 0
+}
+
+func (p *Pane) formMouseField(f *form, rows []formRow, x, y, w, h int) (*vimfield.Field, int, int) {
+	labelW := min(20, max(10, w/3))
+	valueX := 2 + labelW + 1
+	if x < valueX || x >= w || y < 0 || y >= h || len(rows) == 0 {
+		return nil, 0, 0
+	}
+	f.clamp(rows)
+	top := scrollTo(f.top, f.cur, h, len(rows))
+	row := top + y
+	if row >= len(rows) || rows[row].kind != rowText {
+		return nil, 0, 0
+	}
+	if !f.edit || f.cur != row || f.in == nil {
+		f.edit = false
+		f.cur = row
+		f.beginEdit(p, rows[row], "")
+	}
+	return f.in, x - valueX, 0
 }
 
 func (p *Pane) kvMouseField(v *kvView, x, y int) (*vimfield.Field, int, int) {

@@ -4,11 +4,14 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	hist "github.com/shubham/postctl/internal/history"
 	"github.com/shubham/postctl/internal/model"
 	"github.com/shubham/postctl/internal/tui/vimfield"
 	"github.com/shubham/postctl/internal/tui/vimtext"
 	"github.com/shubham/postctl/internal/ui"
 )
+
+var headerSecrets = hist.NewRedactor(nil)
 
 // kvKind picks which list of the request a key-value table edits.
 type kvKind int
@@ -207,6 +210,10 @@ func (k *kvView) cellText(it kvItem, col int) string {
 	return it.Description
 }
 
+func (k *kvView) secretCell(it kvItem, col int) bool {
+	return k.kind == kindHeaders && col == 1 && headerSecrets.Sensitive(it.Key)
+}
+
 func setField(it *kvItem, col int, s string) {
 	switch col {
 	case 0:
@@ -235,7 +242,7 @@ func (k *kvView) beginEdit(p *Pane, items []kvItem, col int, start string) {
 	}
 	k.edit = true
 	k.col = col
-	spec := fieldSpec{single: true}
+	spec := fieldSpec{single: true, secret: k.secretCell(items[k.cur], col)}
 	switch col {
 	case 0:
 		spec.placeholder = "name"
@@ -246,6 +253,7 @@ func (k *kvView) beginEdit(p *Pane, items []kvItem, col int, start string) {
 	}
 	k.in = p.newField(spec)
 	k.in.Set(k.cellText(items[k.cur], col))
+	k.in.SetMask(spec.secret)
 	k.in.Fit(cellWidth(p), 1)
 	k.in.Begin(start)
 }
@@ -689,6 +697,7 @@ func (k *kvView) view(p *Pane, w, h int) string {
 		if it.file {
 			r.Value = "@ " + it.Value
 		}
+		r.Secret = k.secretCell(it, 1)
 		rows = append(rows, r)
 	}
 	focus := -1

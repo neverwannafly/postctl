@@ -322,16 +322,20 @@ func (m *Model) PosAt(x, y int) (row, col int, ok bool) {
 	if row >= len(m.lines) {
 		return 0, 0, false
 	}
-	cs := clusters(m.lines[row])
+	cs := m.hitClusters(row)
 	if len(cs) == 0 {
 		return row, 0, true
 	}
 	cell := x - gutter
 	used := 0
+	maskWidth := 0
+	if m.opts.Mask != "" {
+		maskWidth = max(1, uniseg.StringWidth(m.opts.Mask))
+	}
 	for i := min(m.left, len(cs)); i < len(cs); i++ {
-		width := clusterWidth(cs[i], m.opts.TabText)
-		if m.opts.Mask != "" {
-			width = max(1, uniseg.StringWidth(m.opts.Mask))
+		width := m.hitCache[row].widths[i]
+		if maskWidth != 0 {
+			width = maskWidth
 		}
 		if cell < used+width {
 			return row, i, true

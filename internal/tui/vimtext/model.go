@@ -173,6 +173,13 @@ type Model struct {
 	completeSel int
 
 	highlights [][]Span
+	hitCache   []clusterCache
+}
+
+type clusterCache struct {
+	text     string
+	clusters []string
+	widths   []int
 }
 
 // New creates an empty editor.
@@ -218,6 +225,7 @@ func (m *Model) SetValue(s string) {
 		m.lines = []string{""}
 	}
 	m.row, m.col, m.top, m.left = 0, 0, 0, 0
+	m.hitCache = nil
 	m.undo, m.redo, m.lastChange = nil, nil, nil
 	m.clearPending()
 	m.rehighlight()
@@ -307,6 +315,22 @@ func clusters(s string) []string {
 		out = append(out, g.Str())
 	}
 	return out
+}
+
+func (m *Model) hitClusters(row int) []string {
+	if len(m.hitCache) != len(m.lines) {
+		m.hitCache = make([]clusterCache, len(m.lines))
+	}
+	line := m.lines[row]
+	if m.hitCache[row].text != line || m.hitCache[row].clusters == nil {
+		cs := clusters(line)
+		widths := make([]int, len(cs))
+		for i, cluster := range cs {
+			widths[i] = clusterWidth(cluster, m.opts.TabText)
+		}
+		m.hitCache[row] = clusterCache{text: line, clusters: cs, widths: widths}
+	}
+	return m.hitCache[row].clusters
 }
 
 func joinClusters(cs []string) string { return strings.Join(cs, "") }
