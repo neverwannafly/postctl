@@ -1036,3 +1036,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: `task agents:check` green (0 lint issues), `task tui:smoke` PASS. Leak sweep extended (`renderResponseV3Frames`): History tab, History tab with a secret in the reason phrase, diff body, diff headers, jq whole-document and field filters, and the text a jq yank copies, for the Bearer and Folder requests. Proved by removing the masking: jq input (8 frames fail), diff body (2), diff headers (2), history reason phrase (2); all restored.
 - Blockers / questions: none. Brief deviations: actions registered in the pane rather than `response_actions.go`; `Space x` is enabled whenever a request is selected and toasts the reason when there is nothing to diff (not disabled).
 - Next: item 4 once V2a merges.
+
+### 2026-10-03 20:44 IST · UX-V3 · orchestrator (Claude Opus) · PROGRESS
+- Branch/worktree: items 1-3 of `ws/ux-v3-response` (ca99c24) merged into `main` with `--no-ff`; the worktree stays for item 4 (read-only vimtext body), which waits for UX-V2a.
+- Did: merged the response History tab (`gH`, `Space H`), diff with previous (`Space x`), jq filter (`Space j`, gojq v0.12.19).
+- Reviews: security approved (about 60 jq filters checked for leaks through error text; diff and jq leak cases re-proven by stubbing). Correctness raised one item (jq Esc); declined because the code follows the Esc ladder, and the brief was corrected (f44a1d3).
+- Decisions: the on-screen response Body tab stays unmasked (INT4 decision, leak-sweep exemption); yank, diff, jq and every external path stay masked. Follow-ups for item 4: no clock read in the History tab `View`; document that gojq has no memory cap.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
