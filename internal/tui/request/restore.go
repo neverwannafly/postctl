@@ -74,12 +74,13 @@ func applyTemplate(req *model.Request, tmpl *hist.RequestTemplate) (kept []strin
 		req.Method = tmpl.Method
 	}
 	if hist.FieldMasked(tmpl.URLMasked, tmpl.URL) {
-		kept = append(kept, "URL")
+		kept = append(kept, "URL", "query")
 	} else {
 		req.URL.Raw = tmpl.URL
+		req.URL.Query = applyTemplateKV(cur.URL.Query, tmpl.Query, "query ", &kept)
+		req.URL.PathVars = applyTemplatePathVars(cur.URL.PathVars, tmpl.PathVars, &kept)
+		req.URL.SyncRaw()
 	}
-	req.URL.Query = applyTemplateKV(cur.URL.Query, tmpl.Query, "query ", &kept)
-	req.URL.PathVars = applyTemplatePathVars(cur.URL.PathVars, tmpl.PathVars, &kept)
 	req.Headers = applyTemplateKV(cur.Headers, tmpl.Headers, "header ", &kept)
 	applyBodyTemplate(req, cur, tmpl, &kept)
 	return kept, ""

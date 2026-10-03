@@ -2,6 +2,7 @@ package request
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -53,32 +54,100 @@ func TestApplyHistoryTemplateKeepsMaskedFields(t *testing.T) {
 }
 
 func TestApplyHistoryTemplateKeepsURLAndQueryConsistent(t *testing.T) {
-	req := model.NewRequest("R", "GET", "https://example.test/old?y=old#f")
-	clean := hist.RequestTemplate{
-		URL:   "https://example.test/p?y={{b}}#f",
-		Query: []hist.TemplateKV{{Key: "y", Value: "{{b}}"}},
-	}
-	kept, errText := applyTemplate(req, &clean)
-	if errText != "" || len(kept) != 0 {
-		t.Fatal("clean template was not fully restored")
-	}
-	if req.URL.Raw != clean.URL || len(req.URL.Query) != 1 || req.URL.Query[0].Value != "{{b}}" {
-		t.Fatal("clean URL and query row were not restored consistently")
+	cases := []struct {
+		name   string
+		tmpl   hist.RequestTemplate
+		masked bool
+	}{
+		{
+			name: "clean",
+			tmpl: hist.RequestTemplate{
+				URL:   "https://example.test/p?y={{b}}",
+				Query: []hist.TemplateKV{{Key: "y", Value: "{{b}}"}},
+			},
+		},
+		{
+			name: "query literal masked",
+			tmpl: hist.RequestTemplate{
+				URL:       "https://example.test/p?x=" + hist.Mask + "&y={{b}}",
+				URLMasked: true,
+				Query: []hist.TemplateKV{
+					{Key: "x", Value: hist.Mask, Masked: true},
+					{Key: "y", Value: "{{b}}"},
+				},
+			},
+			masked: true,
+		},
+		{
+			name: "userinfo only masked",
+			tmpl: hist.RequestTemplate{
+				URL:       "https://" + hist.Mask + "@example.test/p?y={{b}}",
+				URLMasked: true,
+				Query:     []hist.TemplateKV{{Key: "y", Value: "{{b}}"}},
+			},
+			masked: true,
+		},
+		{
+			name: "fragment",
+			tmpl: hist.RequestTemplate{
+				URL:   "https://example.test/p?y={{b}}#f",
+				Query: []hist.TemplateKV{{Key: "y", Value: "{{b}}"}},
+			},
+		},
+		{
+			name: "disabled row",
+			tmpl: hist.RequestTemplate{
+				URL: "https://example.test/p?y={{b}}#f",
+				Query: []hist.TemplateKV{
+					{Key: "x", Value: "off", Disabled: true},
+					{Key: "y", Value: "{{b}}"},
+				},
+			},
+		},
 	}
 
-	currentRaw := req.URL.Raw
-	currentValue := req.URL.Query[0].Value
-	masked := hist.RequestTemplate{
-		URL:       "https://example.test/p?y=" + hist.Mask + "#f",
-		URLMasked: true,
-		Query:     []hist.TemplateKV{{Key: "y", Value: hist.Mask, Masked: true}},
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := model.NewRequest("R", "GET", "https://example.test/orig/:id?k=1&x=CUR#old")
+			req.URL.Query[1].Disabled = true
+			req.URL.SyncRaw()
+			req.URL.PathVars[0].Value = "current-id"
+			before := req.URL
+
+			kept, errText := applyTemplate(req, &tc.tmpl)
+			if errText != "" {
+				t.Fatal("restore returned an error")
+			}
+			assertRawMatchesEnabledQuery(t, req.URL)
+			if tc.masked {
+				if req.URL.Raw != before.Raw ||
+					!slices.Equal(req.URL.Query, before.Query) ||
+					!slices.Equal(req.URL.PathVars, before.PathVars) {
+					t.Fatal("masked URL unit was partly replaced")
+				}
+				if !slices.Contains(kept, "URL") || !slices.Contains(kept, "query") {
+					t.Fatal("masked URL did not report URL and query")
+				}
+				return
+			}
+			if len(kept) != 0 {
+				t.Fatal("clean template kept current URL fields")
+			}
+		})
 	}
-	kept, errText = applyTemplate(req, &masked)
-	if errText != "" || len(kept) != 2 {
-		t.Fatal("masked template did not keep both URL representations")
+}
+
+func assertRawMatchesEnabledQuery(t *testing.T, got model.URL) {
+	t.Helper()
+	raw := model.ParseURL(got.Raw).EnabledQuery()
+	rows := got.EnabledQuery()
+	if len(raw) != len(rows) {
+		t.Fatal("raw URL and enabled query row counts differ")
 	}
-	if req.URL.Raw != currentRaw || req.URL.Query[0].Value != currentValue {
-		t.Fatal("masked URL and query row diverged")
+	for i := range raw {
+		if raw[i].Key != rows[i].Key || raw[i].Value != rows[i].Value {
+			t.Fatal("raw URL and enabled query rows differ")
+		}
 	}
 }
 

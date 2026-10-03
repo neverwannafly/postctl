@@ -890,3 +890,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: fixed-seed randomized minimality/reconstruction test passed 2,000 cases. Expanded leak sweep passed; temporarily bypassing URL-encoded/form-data body masking made it fail, then the mutation was reverted. Nine diff goldens regenerated and structurally reviewed. `task agents:check` green. Benchmarks: 20k lines at 1% changes 3,762,583 ns/op and 9,446,292 B/op; completely different 5k-line sides 20,243,442 ns/op and 573,472 B/op, bounded by the edit cap.
 - Blockers / questions: none.
 - Next: orchestrator merge; do not push.
+
+### 2026-10-03 20:13 IST · UX-H1 · GPT-5.6 Sol · PROGRESS
+- Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
+- Did: Security follow-up makes URL raw text, query rows, and path variables one restore unit. A masked URL keeps all three current values and reports `URL, query`; a clean URL replaces all three and rebuilds raw text from enabled rows through `model.URL.SyncRaw`.
+- Files: `internal/tui/request/restore.go`, `internal/tui/request/restore_test.go`, `docs/ledger.md`
+- Decisions: Disabled query rows remain structured editor state but are omitted from rebuilt raw URLs, matching the request editor.
+- Tests: Regression table covers clean, query-masked, userinfo-masked, fragment, and disabled-row restores; every case compares raw query data with enabled rows.
+- Blockers / questions: none.
+- Next: full gate and commit.
