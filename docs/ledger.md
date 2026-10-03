@@ -49,7 +49,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX0 vim/mouse/switcher/history plan | Orchestrator (Opus) | Phase 1 dispatched | main | 2026-10-03 18:20 IST |
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Started | ws/ux-v0-shell | 2026-10-03 18:20 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
-| UX-Q request switcher | Gemini 3.8 Flash (high) | Re-review fixes done, ready to merge | ws/ux-q-switcher | 2026-10-03 19:05 IST |
+| UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast) | Started | ws/ux-h1-history | 2026-10-03 18:20 IST |
 
 ## Entries
@@ -797,6 +797,8 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Blockers / questions: none.
 - Next: Ready for orchestrator merge into main.
 
-
-
-
+### 2026-10-03 19:06 IST · UX-Q · Orchestrator (Opus) · DONE
+- Branch/worktree: ws/ux-q-switcher merged into main with `--no-ff`; worktree removed; not pushed.
+- Did: two review rounds (correctness, privacy/design) by reviewer subagents; accepted fixes for scheme-less host stripping, template-aware query split, control-character stripping, unwired key in the empty state, leak-sweep coverage, palette matcher reuse, MRU pruning. Declined: masking literal path segments (URL bar shows the same path; secrets belong in secret variables). Deferred: INSERT indicator in overlays (V0/V2b).
+- Tests: `task agents:check` green on main after merge; `postctl --help` starts.
+- Next: V0 binds `Space f`/`Space Space` to `request.find` and changes the empty-state hint to `Space a` on rebase.
