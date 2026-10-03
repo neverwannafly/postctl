@@ -50,7 +50,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V0 shell keys, leader, which-key | Sonnet 5.5 (high) | Done, merged to main | ws/ux-v0-shell | 2026-10-03 19:44 IST |
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Started | ws/ux-v1-vimtext | 2026-10-03 18:20 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
-| UX-H1 history restore + diff | Composer 2.5 (fast) | Done | ws/ux-h1-history | 2026-10-03 19:56 IST |
+| UX-H1 history restore + diff | GPT-5.6 Sol | Done, final review fixes | ws/ux-h1-history | 2026-10-03 20:08 IST |
 
 ## Entries
 
@@ -881,3 +881,12 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Did: two review rounds (key-map conformance; invariants and regressions). Accepted all findings. Decision recorded in the design language: "always" keys work in panes and non-modal overlays (palette, switcher, help, which-key); modal dialogs and prompts ignore them; full-screen screens keep their own keys. Known gap until V2b: overlay inputs close on Esc instead of entering normal mode.
 - Tests: `task agents:check` green on main after merge; `task tui:smoke` PASS (3 checks); `postctl --help` starts.
 - Next: V1 (oracle round), H1 (security re-review pending), then phase 2 briefs.
+
+### 2026-10-03 20:08 IST · UX-H1 · GPT-5.6 Sol · DONE
+- Branch/worktree: ws/ux-h1-history · `/Users/shubham/work/postctl-wt/ux-h1-history`
+- Did: Completed the final correctness and security review round. Replaced the traced and small-input diff paths with linear-space middle-snake Myers, enforced the edit-cap notice, generation-guarded both async diff messages, wired hosted-screen `gg`, and covered reverse hunk navigation. Restores now preserve raw template variables in URLs, keep URL and query rows consistent when masked, never fall back to a resolved URL, cancel stale pending patches on the first different binding, and create restored requests through the shell tree-create helper. Added URL-encoded and form-data literal-secret coverage.
+- Files: `internal/history/template.go`, `internal/qa/secret_leak_test.go`, `internal/tui/{app.go,pane.go,sidebar.go,tree_test.go}`, `internal/tui/diffview/`, `internal/tui/history/`, `internal/tui/request/`, `docs/ledger.md`
+- Decisions: Restore-as-new is a typed shell message; the shell owns ID creation, insertion ordering, selection, and collection-save behavior. Diff computation retains no per-distance trace rows and stops once the 5,000-edit budget cannot be met.
+- Tests: fixed-seed randomized minimality/reconstruction test passed 2,000 cases. Expanded leak sweep passed; temporarily bypassing URL-encoded/form-data body masking made it fail, then the mutation was reverted. Nine diff goldens regenerated and structurally reviewed. `task agents:check` green. Benchmarks: 20k lines at 1% changes 3,762,583 ns/op and 9,446,292 B/op; completely different 5k-line sides 20,243,442 ns/op and 573,472 B/op, bounded by the edit cap.
+- Blockers / questions: none.
+- Next: orchestrator merge; do not push.

@@ -24,29 +24,30 @@ func (m *Model) beginDiff() (tui.Screen, tea.Cmd) {
 	m.diffBodyMode = true
 	m.phase = phDiff
 	m.diffGen++
-	return m, m.loadDiffPair(m.markID, cur.ID)
+	return m, m.loadDiffPair(m.diffGen, m.markID, cur.ID)
 }
 
 type diffPairMsg struct {
+	gen         int
 	left, right *history.Entry
 	err         error
 }
 
-func (m *Model) loadDiffPair(markID, otherID string) tea.Cmd {
+func (m *Model) loadDiffPair(gen int, markID, otherID string) tea.Cmd {
 	return func() tea.Msg {
 		log, err := m.deps.Log()
 		if err != nil {
-			return diffPairMsg{err: err}
+			return diffPairMsg{gen: gen, err: err}
 		}
 		left, err := log.Get(markID)
 		if err != nil {
-			return diffPairMsg{err: err}
+			return diffPairMsg{gen: gen, err: err}
 		}
 		right, err := log.Get(otherID)
 		if err != nil {
-			return diffPairMsg{err: err}
+			return diffPairMsg{gen: gen, err: err}
 		}
-		return diffPairMsg{left: left, right: right}
+		return diffPairMsg{gen: gen, left: left, right: right}
 	}
 }
 
@@ -57,12 +58,15 @@ type diffReadyMsg struct {
 }
 
 func (m *Model) onDiffPair(msg diffPairMsg) (tui.Screen, tea.Cmd) {
+	if msg.gen != m.diffGen || m.phase != phDiff {
+		return m, nil
+	}
 	if msg.err != nil {
 		m.notice, m.fail = msg.err.Error(), true
 		m.phase = phList
 		return m, nil
 	}
-	gen := m.diffGen
+	gen := msg.gen
 	th := m.th
 	left, right := msg.left, msg.right
 	return m, func() tea.Msg {

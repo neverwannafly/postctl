@@ -52,6 +52,36 @@ func TestApplyHistoryTemplateKeepsMaskedFields(t *testing.T) {
 	}
 }
 
+func TestApplyHistoryTemplateKeepsURLAndQueryConsistent(t *testing.T) {
+	req := model.NewRequest("R", "GET", "https://example.test/old?y=old#f")
+	clean := hist.RequestTemplate{
+		URL:   "https://example.test/p?y={{b}}#f",
+		Query: []hist.TemplateKV{{Key: "y", Value: "{{b}}"}},
+	}
+	kept, errText := applyTemplate(req, &clean)
+	if errText != "" || len(kept) != 0 {
+		t.Fatal("clean template was not fully restored")
+	}
+	if req.URL.Raw != clean.URL || len(req.URL.Query) != 1 || req.URL.Query[0].Value != "{{b}}" {
+		t.Fatal("clean URL and query row were not restored consistently")
+	}
+
+	currentRaw := req.URL.Raw
+	currentValue := req.URL.Query[0].Value
+	masked := hist.RequestTemplate{
+		URL:       "https://example.test/p?y=" + hist.Mask + "#f",
+		URLMasked: true,
+		Query:     []hist.TemplateKV{{Key: "y", Value: hist.Mask, Masked: true}},
+	}
+	kept, errText = applyTemplate(req, &masked)
+	if errText != "" || len(kept) != 2 {
+		t.Fatal("masked template did not keep both URL representations")
+	}
+	if req.URL.Raw != currentRaw || req.URL.Query[0].Value != currentValue {
+		t.Fatal("masked URL and query row diverged")
+	}
+}
+
 func TestRestoreAutosavePersistence(t *testing.T) {
 	dir := t.TempDir()
 	ws := tuitest.Demo()

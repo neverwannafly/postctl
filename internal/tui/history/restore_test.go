@@ -51,3 +51,13 @@ func TestRunRestoreUsesSequenceNotBatch(t *testing.T) {
 		t.Fatalf("expected tea.Sequence, got %T", cmd())
 	}
 }
+
+func TestTemplateURLForNewNeverUsesResolvedSnapshot(t *testing.T) {
+	e := &hist.Entry{
+		Request:  hist.RequestSnapshot{URL: "https://resolved.example.test/path"},
+		Template: &hist.RequestTemplate{},
+	}
+	if got := tmplURLForNew(e); got != "" {
+		t.Fatal("empty template URL must create an empty URL")
+	}
+}

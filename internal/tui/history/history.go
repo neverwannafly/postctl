@@ -85,6 +85,7 @@ type Model struct {
 	diffHeaders  *diffview.Model
 	diffBodyMode bool
 	diffGen      int
+	pendingG     bool
 }
 
 // New builds the history browser.
@@ -283,6 +284,14 @@ func (m *Model) matchStatus(e history.Entry) bool {
 
 func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 	m.notice = ""
+	if m.pendingG {
+		m.pendingG = false
+		if k.String() == "g" {
+			m.cur = 0
+			m.top = 0
+			return m, nil
+		}
+	}
 	switch k.String() {
 	case "esc", "q":
 		return nil, nil
@@ -290,7 +299,9 @@ func (m *Model) listKey(k tea.KeyPressMsg) (tui.Screen, tea.Cmd) {
 		m.move(-1)
 	case "down", "j":
 		m.move(1)
-	case "home", "gg":
+	case "g":
+		m.pendingG = true
+	case "home":
 		m.cur = 0
 		m.top = 0
 	case "end", "G":

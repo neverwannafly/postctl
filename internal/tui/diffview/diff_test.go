@@ -1,6 +1,10 @@
 package diffview
 
 import (
+	"errors"
+	"math/rand"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -94,11 +98,12 @@ func BenchmarkDiff20kLines(b *testing.B) {
 			a.WriteByte('\n')
 			sb.WriteByte('\n')
 		}
-		a.WriteString("line")
-		if i == n/2 {
-			sb.WriteString("LINE")
+		line := "line-" + strconv.Itoa(i)
+		a.WriteString(line)
+		if i%100 == 0 {
+			sb.WriteString("changed-" + strconv.Itoa(i))
 		} else {
-			sb.WriteString("line")
+			sb.WriteString(line)
 		}
 	}
 	left, right := a.String(), sb.String()
@@ -106,6 +111,134 @@ func BenchmarkDiff20kLines(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = Diff(left, right)
+	}
+}
+
+func BenchmarkDiffWorstCase5kLines(b *testing.B) {
+	const n = 5000
+	var left, right strings.Builder
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			left.WriteByte('\n')
+			right.WriteByte('\n')
+		}
+		left.WriteString("left-" + strconv.Itoa(i))
+		right.WriteString("right-" + strconv.Itoa(i))
+	}
+	a, z := left.String(), right.String()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, err := Compute(a, z)
+		var tooBig DiffTooBig
+		if !errors.As(err, &tooBig) {
+			b.Fatal("worst-case diff did not hit edit cap")
+		}
+	}
+}
+
+func TestShortestScriptRandomizedIsMinimalAndReconstructs(t *testing.T) {
+	rng := rand.New(rand.NewSource(73421))
+	alphabet := [...]string{"a", "b", "c"}
+	for test := 0; test < 2000; test++ {
+		a := make([]string, rng.Intn(41))
+		b := make([]string, rng.Intn(41))
+		for i := range a {
+			a[i] = alphabet[rng.Intn(len(alphabet))]
+		}
+		for i := range b {
+			b[i] = alphabet[rng.Intn(len(alphabet))]
+		}
+		script := shortestScript(a, b)
+		if script == nil {
+			t.Fatalf("case %d unexpectedly exceeded cap", test)
+		}
+		edits := 0
+		for _, op := range script {
+			if op != opKeep {
+				edits++
+			}
+		}
+		want := len(a) + len(b) - 2*lcsLength(a, b)
+		if edits != want {
+			t.Fatalf("case %d edit count = %d, want %d", test, edits, want)
+		}
+		if !scriptReconstructs(a, b, script) {
+			t.Fatalf("case %d script did not reconstruct right side", test)
+		}
+	}
+}
+
+func lcsLength(a, b []string) int {
+	dp := make([]int, len(b)+1)
+	for _, av := range a {
+		prev := 0
+		for j, bv := range b {
+			old := dp[j+1]
+			if av == bv {
+				dp[j+1] = prev + 1
+			} else {
+				dp[j+1] = max(dp[j+1], dp[j])
+			}
+			prev = old
+		}
+	}
+	return dp[len(b)]
+}
+
+func scriptReconstructs(a, b []string, script []editOp) bool {
+	ai, bi := 0, 0
+	out := make([]string, 0, len(b))
+	for _, op := range script {
+		switch op {
+		case opKeep:
+			if ai >= len(a) || bi >= len(b) || a[ai] != b[bi] {
+				return false
+			}
+			out = append(out, a[ai])
+			ai++
+			bi++
+		case opDel:
+			if ai >= len(a) {
+				return false
+			}
+			ai++
+		case opAdd:
+			if bi >= len(b) {
+				return false
+			}
+			out = append(out, b[bi])
+			bi++
+		}
+	}
+	return ai == len(a) && bi == len(b) && slices.Equal(out, b)
+}
+
+func TestEditCapNoticeIncludesSummary(t *testing.T) {
+	var left, right strings.Builder
+	for i := 0; i < maxEditDistance/2+1; i++ {
+		if i > 0 {
+			left.WriteByte('\n')
+			right.WriteByte('\n')
+		}
+		left.WriteString("left")
+		right.WriteString("right")
+	}
+	m := New(ui.NewTheme(true, true, false),
+		SideSummary{Label: "A", Status: "200"},
+		SideSummary{Label: "B", Status: "500"},
+		left.String(), right.String(),
+	)
+	m.SetSize(100, 30)
+	view := m.View()
+	if !strings.Contains(view, "Responses differ too much to diff line by line (2501 vs 2501 lines)") {
+		t.Fatal("missing edit-cap notice")
+	}
+	if !strings.Contains(view, "A  200") || !strings.Contains(view, "B  500") {
+		t.Fatal("missing header summary")
+	}
+	if strings.Contains(view, "No differences") {
+		t.Fatal("edit-cap response must not claim there are no differences")
 	}
 }
 
@@ -224,6 +357,10 @@ func TestHunkNavigation(t *testing.T) {
 	m, _ = m.Update(tea.KeyPressMsg{Text: "n"})
 	if m.HunkIndex() == before {
 		t.Fatal("expected hunk index to change on n")
+	}
+	m, _ = m.Update(tea.KeyPressMsg{Text: "N"})
+	if m.HunkIndex() != before {
+		t.Fatal("expected N to move to the previous hunk")
 	}
 }
 

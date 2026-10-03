@@ -1,7 +1,6 @@
 package history
 
 import (
-	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -136,27 +135,24 @@ func TemplateFromRequest(req *model.Request, r *Redactor) *RequestTemplate {
 
 func templateURL(u model.URL, r *Redactor) (raw string, masked bool) {
 	if len(u.Query) > 0 || u.Raw == "" {
-		raw = rebuildURLRaw(u, r)
-		orig := u.Raw
-		if orig == "" {
-			orig = rebuildURLRaw(u, nil)
-		}
-		masked = raw != orig
-		return raw, masked
+		return rebuildURLRaw(u, r)
 	}
 	raw = u.Raw
 	redacted := r.URL(raw)
 	return redacted, redacted != raw
 }
 
-func rebuildURLRaw(u model.URL, r *Redactor) string {
+func rebuildURLRaw(u model.URL, r *Redactor) (string, bool) {
 	base, frag := splitURLFragment(u.Raw)
 	base, _, _ = strings.Cut(base, "?")
+	masked := false
 	if r != nil {
-		base = r.URL(base)
+		redacted := r.URL(base)
+		masked = redacted != base
+		base = redacted
 	}
 	if len(u.EnabledQuery()) == 0 {
-		return base + frag
+		return base + frag, masked
 	}
 	var b strings.Builder
 	b.WriteString(base)
@@ -166,15 +162,18 @@ func rebuildURLRaw(u model.URL, r *Redactor) string {
 		sep = '&'
 		key := kv.Key
 		if r != nil {
-			key = r.Text(key)
+			redacted := r.Text(key)
+			masked = masked || redacted != key
+			key = redacted
 		}
-		val, _ := templateFieldValue(r, kv.Key, kv.Value)
-		b.WriteString(url.QueryEscape(key))
+		val, valueMasked := templateFieldValue(r, kv.Key, kv.Value)
+		masked = masked || valueMasked
+		b.WriteString(key)
 		b.WriteByte('=')
-		b.WriteString(url.QueryEscape(val))
+		b.WriteString(val)
 	}
 	b.WriteString(frag)
-	return b.String()
+	return b.String(), masked
 }
 
 func splitURLFragment(raw string) (base, frag string) {

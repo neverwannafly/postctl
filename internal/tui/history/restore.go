@@ -36,8 +36,8 @@ func (m *Model) beginRestore() (tui.Screen, tea.Cmd) {
 	body := "Replace method, URL, query parameters, headers and body.\nAuth, scripts and settings stay as they are."
 	if m.restoreNew {
 		body += "\nThe original request was deleted; restore will create a new request named \"" + restoreName(e.RequestName) + "\"."
-		if e.Template != nil && history.FieldMasked(e.Template.URLMasked, e.Template.URL) {
-			body += "\nThe saved URL was redacted; the new request starts with an empty URL."
+		if tmplURLForNew(e) == "" {
+			body += "\nThe saved template has no restorable URL; the new request starts with an empty URL."
 		}
 	}
 	m.conf = ui.Confirm{
@@ -105,17 +105,20 @@ func (m *Model) runRestore() (tui.Screen, tea.Cmd) {
 	targetID := e.RequestID
 	var cmds []tea.Cmd
 	if m.restoreNew {
-		coll, req, ok := m.createRestoredRequest(e)
-		if !ok {
+		coll, parent, _ := insertParent(m.env.Workspace, e)
+		if coll == nil {
 			m.notice, m.fail = "Could not create a request in the workspace.", true
 			m.phase = phDetail
 			return m, nil
 		}
-		targetID = req.ID
-		cmds = append(cmds,
-			msgCmd(tui.SaveMsg{Kind: tui.SaveCollection, Collection: coll.ID}),
-			msgCmd(tui.WorkspaceReloadedMsg{Workspace: m.env.Workspace}),
-		)
+		m.phase = phDetail
+		m.notice = "Restoring into a new request…"
+		return nil, msgCmd(tui.CreateRequestFromHistoryMsg{
+			CollectionID: coll.ID,
+			ParentID:     parent.ContainerID(),
+			Name:         restoreName(e.RequestName),
+			Template:     tmpl,
+		})
 	}
 	cmds = append(cmds,
 		msgCmd(tui.SelectRequestMsg{RequestID: targetID}),
@@ -126,40 +129,14 @@ func (m *Model) runRestore() (tui.Screen, tea.Cmd) {
 	return nil, tea.Sequence(cmds...)
 }
 
-func (m *Model) createRestoredRequest(e *history.Entry) (*model.Collection, *model.Request, bool) {
-	ws := m.env.Workspace
-	if ws == nil {
-		return nil, nil, false
-	}
-	coll, parent, _ := insertParent(ws, e)
-	if coll == nil {
-		return nil, nil, false
-	}
-	req := model.NewRequest(restoreName(e.RequestName), tmplMethod(e), tmplURLForNew(e))
-	if err := coll.Insert(parent.ContainerID(), -1, req); err != nil {
-		return nil, nil, false
-	}
-	return coll, req, true
-}
-
-func tmplMethod(e *history.Entry) string {
-	if e.Template != nil && e.Template.Method != "" {
-		return e.Template.Method
-	}
-	return e.Request.Method
-}
-
 func tmplURLForNew(e *history.Entry) string {
 	if e.Template == nil {
-		return e.Request.URL
+		return ""
 	}
 	if history.FieldMasked(e.Template.URLMasked, e.Template.URL) || !history.RestoreSafeValue(e.Template.URL) {
 		return ""
 	}
-	if e.Template.URL != "" {
-		return e.Template.URL
-	}
-	return e.Request.URL
+	return e.Template.URL
 }
 
 func insertParent(ws *model.Workspace, e *history.Entry) (*model.Collection, model.Container, int) {

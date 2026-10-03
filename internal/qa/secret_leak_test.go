@@ -93,6 +93,18 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 		Raw:  `{"password":"` + sentinel + `"}`,
 	}
 	literal.Scripts.PreRequest = &model.Script{Source: `pm.request.headers.add({key: "X-Script", value: pm.environment.get("accessToken")});`}
+	literalURLEncoded := model.NewRequest("Literal urlencoded template", http.MethodPost, server.URL+"/literal-urlencoded")
+	literalURLEncoded.Body = model.Body{
+		Mode:       model.BodyURLEncoded,
+		URLEncoded: []model.KV{{Key: "note", Value: sentinel}},
+	}
+	literalFormData := model.NewRequest("Literal form-data template", http.MethodPost, server.URL+"/literal-form-data")
+	literalFormData.Body = model.Body{
+		Mode: model.BodyFormData,
+		FormData: []model.FormPart{{
+			Key: "comment", Value: sentinel,
+		}},
+	}
 	coll := model.NewCollection("Secrets")
 	coll.Items = []model.Item{bearer, oauth, folder}
 	ws.Collections = []*model.Collection{coll}
@@ -107,7 +119,7 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	coll, env = ws.Collections[0], ws.Environments[0]
 	bearer, oauth, folderRequest = coll.Requests()[0], coll.Requests()[1], coll.Requests()[2]
 	// Literal secrets stay in memory only so on-disk fixtures never hold the sentinel.
-	coll.Items = append(coll.Items, literal)
+	coll.Items = append(coll.Items, literal, literalURLEncoded, literalFormData)
 
 	log, err := history.Open(filepath.Join(st.StateDir(), "history"), history.Options{})
 	if err != nil {
@@ -149,6 +161,18 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	}
 	if literalOutcome.HistoryID == "" {
 		t.Fatal("literal send did not record history")
+	}
+	urlencodedOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: literalURLEncoded, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	formDataOutcome, err := eng.Send(context.Background(), engine.SendInput{
+		Collection: coll, Request: literalFormData, Environment: env,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if folderOutcome.Response == nil || !bytes.Contains(folderOutcome.Response.Body, []byte(folderSentinel)) {
 		t.Fatal("folder secret variable was not resolved on the wire")
@@ -227,6 +251,18 @@ func TestSecretDoesNotLeakAcrossPersistenceReportsCurlOrTUI(t *testing.T) {
 	literalEntry, err := log.Get(literalOutcome.HistoryID)
 	if err != nil || literalEntry.Template == nil {
 		t.Fatal("literal history entry missing template")
+	}
+	urlencodedEntry, err := log.Get(urlencodedOutcome.HistoryID)
+	if err != nil || urlencodedEntry.Template == nil ||
+		len(urlencodedEntry.Template.BodyURLEncoded) != 1 ||
+		!urlencodedEntry.Template.BodyURLEncoded[0].Masked {
+		t.Fatal("literal urlencoded history template was not masked")
+	}
+	formDataEntry, err := log.Get(formDataOutcome.HistoryID)
+	if err != nil || formDataEntry.Template == nil ||
+		len(formDataEntry.Template.BodyFormData) != 1 ||
+		!formDataEntry.Template.BodyFormData[0].ValueMasked {
+		t.Fatal("literal form-data history template was not masked")
 	}
 	tmplRaw, _ := json.Marshal(literalEntry.Template)
 	assertAbsent(t, sentinel, "literal template JSON", tmplRaw)

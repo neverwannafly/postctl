@@ -370,6 +370,20 @@ type ApplyRequestPatchMsg struct {
 	Template history.RequestTemplate
 }
 
+// CreateRequestFromHistoryMsg asks the shell to create a request through the
+// same tree edit path as an interactive new request, then apply a redacted
+// history template. ParentID may be a collection or folder ID.
+type CreateRequestFromHistoryMsg struct {
+	// CollectionID is the collection that receives the request.
+	CollectionID model.ID
+	// ParentID is the collection or folder that receives the request.
+	ParentID model.ID
+	// Name is the restored request name.
+	Name string
+	// Template is applied after the new request is selected.
+	Template history.RequestTemplate
+}
+
 // Optional Backend capabilities. The shell type-asserts for them, so a Backend
 // that lacks one simply cannot do that operation.
 type (

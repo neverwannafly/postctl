@@ -18,7 +18,7 @@ func (p *Pane) onSelection(m tui.SelectionMsg) tea.Cmd {
 	}
 	var cmd tea.Cmd
 	restoreCancelled := false
-	if old != nil && ref.Request != nil && old.ID != ref.Request.ID {
+	if ref.Request != nil && (old == nil || old.ID != ref.Request.ID) {
 		restoreCancelled = p.dropPendingPatches(ref.Request.ID)
 	}
 	if old != nil {

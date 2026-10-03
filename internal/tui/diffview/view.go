@@ -18,9 +18,12 @@ func (m *Model) View() string {
 	b.WriteString("\n")
 	b.WriteString(m.summaryLine(t))
 	b.WriteString("\n")
-	if m.truncated && m.notice != "" {
+	if m.notice != "" {
 		b.WriteString(t.Render(ui.StatusWarning, m.notice))
 		b.WriteString("\n")
+	}
+	if m.notice != "" && len(m.Lines) == 0 {
+		return b.String()
 	}
 	if len(m.Lines) == 0 || allSame(m.Lines) {
 		b.WriteString(t.EmptyState("No differences", "The two responses match.", "", m.w))

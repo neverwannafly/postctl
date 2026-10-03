@@ -319,6 +319,8 @@ func (a *app) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, a.openSwitcher()
 	case SelectRequestMsg:
 		return a, a.selectRequest(msg.RequestID)
+	case CreateRequestFromHistoryMsg:
+		return a, a.createRequestFromHistory(msg)
 	case SendSavedRequestMsg:
 		return a, a.sendSavedRequest(msg.RequestID)
 	case foldPersistMsg:

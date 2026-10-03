@@ -203,6 +203,24 @@ func TestShellPendingRestoreAppliesWhenRequestOpens(t *testing.T) {
 	}
 }
 
+func TestShellPendingRestoreDropsOnFirstDifferentBinding(t *testing.T) {
+	r := newShellRig(t, "")
+	create := r.requestByName("Create charge")
+	if create == nil {
+		t.Fatal("demo request missing")
+	}
+	r.send(tui.SelectionMsg{})
+	r.send(tui.ApplyRequestPatchMsg{
+		RequestID: create.ID,
+		Template:  hist.RequestTemplate{Method: "TRACE", URL: create.URL.Raw},
+	})
+	r.open("List charges")
+	r.open("Create charge")
+	if create.Method == "TRACE" {
+		t.Fatal("stale restore applied after first binding selected another request")
+	}
+}
+
 func TestSpaceIInsertsASnippet(t *testing.T) {
 	r := newShellRig(t, "")
 	r.keys("g", "t")
