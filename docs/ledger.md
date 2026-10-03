@@ -56,7 +56,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
 | UX-V3 response vim + history + diff + jq | Sonnet 5.5 (high) | Done, merged | ws/ux-v3-response | 2026-10-03 22:05 IST |
-| UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done | ws/ux-m2-editor-mouse | 2026-10-03 22:24 IST |
+| UX-M2 mouse in editors | GPT-5.6 Sol (medium) | Done, merged | ws/ux-m2-editor-mouse | 2026-10-03 22:58 IST |
 | UX-QA final pass | Sonnet 5.5 (high) | Started | qa/ux | 2026-10-03 22:10 IST |
 
 ## Entries
@@ -1279,3 +1279,10 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Tests: regressions failed before fixes; wrapper, request script, response body and request/WebSocket table tests pass; request View remains pure mid-drag; Neovim differential, `task agents:check`, `task tui:smoke`, and CLI help are green; 0 goldens changed.
 - Blockers / questions: none.
 - Next: commit for correctness re-review; do not push.
+
+### 2026-10-03 22:58 IST · UX-M2 · orchestrator (Claude Opus) · DONE
+- Branch/worktree: `ws/ux-m2-editor-mouse` (8e4e6ee) merged into `main` with `--no-ff`; worktree removed, branch deleted.
+- Did: merged mouse inside every vimtext field: `vimtext.PosAt`, `vimtext.Mouse`, `ScrollColumns`; click places the cursor (normal mode, insert kept when clicking inside the field being edited), drag selects in visual with one-line edge scroll, double click `viw`, triple click `V`, wheel scrolls the field under the pointer; request and WebSocket form, secret and key/value cells; M1 follow-ups (shared layout constants, behaviour-level breakpoint and ASCII tests).
+- Reviews: security passed first time (drag, double and triple click plus yank on a hidden secret yield the fixed mask; stubbing the mask fails the tests). Correctness: three rounds. Fixed: a click in an insert-mode field dropped to normal, form and secret fields not mouse-wired, edge drag scrolling 3 lines per event (the pane wrapper had its own drag path; now delegates to vimtext), wheel outside the field, drag state left after a release over an overlay, per-event re-splitting of long lines.
+- Tests: `task agents:check` green on main; `postctl --help` ok; `task tui:smoke` PASS.
+- Next: UX-QA adds the mouse-selection leak case.
