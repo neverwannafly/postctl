@@ -596,9 +596,8 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 
 	if a.ov != nil {
 		a.pend = nil
-		if key.Matches(msg, a.keys.Palette) {
-			a.ov = nil // Ctrl-P again closes the palette
-			return nil
+		if cmd, ok := a.overlayAlways(msg); ok {
+			return cmd
 		}
 		return a.updateOverlay(msg)
 	}
@@ -612,19 +611,8 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 
 	// Shortcuts that work even while typing.
-	switch {
-	case key.Matches(msg, a.keys.Palette):
-		return a.openPalette()
-	case key.Matches(msg, a.keys.Sidebar):
-		return a.toggleSidebar()
-	case s == "alt+1":
-		return a.setFocus(SlotSidebar)
-	case s == "alt+2":
-		return a.setFocus(SlotRequest)
-	case s == "alt+3":
-		return a.setFocus(SlotResponse)
-	case s == "ctrl+s" || s == "ctrl+enter":
-		return a.sendKey(msg)
+	if cmd, ok := a.alwaysKey(msg); ok {
+		return cmd
 	}
 	if a.editing() {
 		if a.focus == SlotSidebar {
@@ -633,6 +621,24 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.updateFocused(msg)
 	}
 
+	// Esc is the bottom of the ladder: stop a running send or sign-in no matter
+	// which pane has focus (the request pane cancels its own).
+	if s == "esc" && a.focus != SlotRequest {
+		return tea.Batch(a.cancelOAuth(), a.routeKey(msg))
+	}
+	return a.routeKey(msg)
+}
+
+// cancelOAuth tells the request pane to stop a running OAuth sign-in.
+func (a *app) cancelOAuth() tea.Cmd {
+	var cmd tea.Cmd
+	a.request, cmd = a.request.Update(CancelOAuthMsg{})
+	return cmd
+}
+
+// routeKey sends a key that no overlay, prefix or text field claimed to the
+// shell's own keys and then to the sidebar or the focused pane.
+func (a *app) routeKey(msg tea.KeyPressMsg) tea.Cmd {
 	if cmd, ok := a.commonKey(msg); ok {
 		return cmd
 	}
@@ -646,6 +652,69 @@ func (a *app) onKey(msg tea.KeyPressMsg) tea.Cmd {
 		return a.sidebarKey(msg)
 	}
 	return a.paneKey(msg)
+}
+
+// alwaysKey handles the shortcuts that work in every pane, even while a text
+// field has the keyboard: Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter.
+func (a *app) alwaysKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	s := msg.String()
+	switch {
+	case key.Matches(msg, a.keys.Palette):
+		return a.openPalette(), true
+	case key.Matches(msg, a.keys.Sidebar):
+		return a.toggleSidebar(), true
+	case s == "alt+1":
+		return a.setFocus(SlotSidebar), true
+	case s == "alt+2":
+		return a.setFocus(SlotRequest), true
+	case s == "alt+3":
+		return a.setFocus(SlotResponse), true
+	case s == "ctrl+s" || s == "ctrl+enter":
+		return a.sendKey(msg), true
+	}
+	return nil, false
+}
+
+// keyOwner is implemented by overlays that use one of the always-keys for
+// their own purpose (the request switcher moves its cursor with Ctrl-P).
+type keyOwner interface {
+	ownsKey(s string) bool
+}
+
+// overlayAlways routes Ctrl-P, Ctrl-S, Ctrl-Enter and Alt-1/2/3 while an
+// overlay is open. Non-modal overlays (palette, switcher, help, environment
+// switcher) close and the key then acts as it would on the main screen.
+// Confirmation dialogs and text prompts must be answered first and ignore
+// these keys; hosted screens keep their own key handling (only Ctrl-P closes
+// them). Esc and Ctrl-C are not routed here.
+func (a *app) overlayAlways(msg tea.KeyPressMsg) (tea.Cmd, bool) {
+	s := msg.String()
+	switch s {
+	case "ctrl+p", "ctrl+s", "ctrl+enter", "alt+1", "alt+2", "alt+3":
+	default:
+		return nil, false
+	}
+	switch o := a.ov.(type) {
+	case *confirmOverlay, *promptOverlay:
+		return nil, true
+	case *screenOverlay:
+		if s == "ctrl+p" {
+			a.ov = nil
+			return nil, true
+		}
+		return nil, false
+	case *pickerOverlay:
+		if s == "ctrl+p" {
+			a.ov = nil // Ctrl-P again closes the palette
+			return nil, true
+		}
+	case keyOwner:
+		if o.ownsKey(s) {
+			return nil, false
+		}
+	}
+	a.ov = nil
+	return a.alwaysKey(msg)
 }
 
 // sendKey is Ctrl-S or Ctrl-Enter: the focused pane sends; from the tree (or
@@ -700,9 +769,10 @@ func (a *app) globalKey(msg tea.KeyPressMsg) (tea.Cmd, bool) {
 		return a.cycleFocus(1), true
 	case key.Matches(msg, a.keys.Prev):
 		return a.cycleFocus(-1), true
-	case key.Matches(msg, a.keys.Filter):
-		cmds := []tea.Cmd{a.setFocus(SlotSidebar), a.tree.startFilter()}
-		return tea.Batch(cmds...), true
+	case key.Matches(msg, a.keys.Filter) && a.focus == SlotSidebar:
+		// "/" belongs to the focused pane elsewhere: search in the response,
+		// the log in a WebSocket request, nothing in the request editor.
+		return a.tree.startFilter(), true
 	case s == "1":
 		return a.setFocus(SlotSidebar), true
 	case s == "2":
@@ -780,9 +850,6 @@ func vimMotion(s string) (rune, bool) {
 func (a *app) focusOrder() []Slot {
 	if a.responseHidden() {
 		return []Slot{SlotSidebar, SlotRequest}
-	}
-	if a.layoutKind() == ui.LayoutSingle && a.focus != SlotSidebar {
-		return []Slot{SlotRequest, SlotResponse}
 	}
 	return []Slot{SlotSidebar, SlotRequest, SlotResponse}
 }

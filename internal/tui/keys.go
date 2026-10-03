@@ -96,8 +96,10 @@ func rows(bs ...key.Binding) []helpRow {
 
 // helpGroups builds the help screen from the key map, grouped by context.
 // focusHints are the focused pane's own hints, appended as their own group.
-// leader lists the leader rows that are currently available.
-func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, leader []helpRow, responseHidden ...bool) []helpGroup {
+// leader lists the leader rows that are currently available. Rows for keys a
+// legacy terminal cannot send (Ctrl-Enter, Ctrl-i) appear only when enhanced
+// keyboard reporting is known to be on.
+func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, leader []helpRow, responseHidden, enhanced bool) []helpGroup {
 	groups := []helpGroup{
 		{"Everywhere", rows(k.Palette, k.Ex, k.Leader, k.Filter, k.Next, k.Prev, k.Pane1, k.PaneLeft, k.JumpBack, k.Sidebar, k.Goto, k.SectionPrev, k.Help, k.Quit, k.ForceQuit)},
 		{"Collections", rows(k.Up, k.Down, k.Unfold, k.Fold, k.Open, k.PageUp, k.Home, k.End, k.ReorderUp)},
@@ -120,20 +122,27 @@ func (k keyMap) helpGroups(paneTitle string, focusHints []ui.Hint, leader []help
 	groups[idx("Collections")].Rows = replaceRow(groups[idx("Collections")].Rows, k.ReorderUp.Help().Key, helpRow{k.ReorderUp.Help().Key + " " + k.ReorderDown.Help().Key, "Move up or down in its folder"})
 	// The overview rows for the pane numbers and moves read better as one line.
 	ev := idx("Everywhere")
-	if len(responseHidden) > 0 && responseHidden[0] {
+	if responseHidden {
 		groups[ev].Rows = replaceRow(groups[ev].Rows, k.Pane1.Help().Key, helpRow{"1 2", "Jump to Collections or WebSocket"})
 		groups[idx("Lists and dialogs")].Title = "WebSocket"
 	} else {
 		groups[ev].Rows = replaceRow(groups[ev].Rows, k.Pane1.Help().Key, helpRow{"1 2 3", "Jump to Collections, Request, Response"})
 	}
 	groups[ev].Rows = replaceRow(groups[ev].Rows, k.PaneLeft.Help().Key, helpRow{"Ctrl-h j k l", "Move to the neighbouring pane"})
-	groups[ev].Rows = replaceRow(groups[ev].Rows, k.JumpBack.Help().Key, helpRow{"Ctrl-o Ctrl-i", "Back and forward through opened requests"})
+	if enhanced {
+		groups[ev].Rows = replaceRow(groups[ev].Rows, k.JumpBack.Help().Key, helpRow{"Ctrl-o Ctrl-i", "Back and forward through opened requests"})
+	} else {
+		groups[ev].Rows = replaceRow(groups[ev].Rows, k.JumpBack.Help().Key, helpRow{"Ctrl-o", "Back through opened requests (Space ] forward)"})
+	}
 	groups[ev].Rows = replaceRow(groups[ev].Rows, k.SectionPrev.Help().Key, helpRow{"[ ]", "Previous and next section tab"})
 	co := idx("Collections")
 	groups[co].Rows = replaceRow(groups[co].Rows, k.PageUp.Help().Key, helpRow{"Ctrl-u Ctrl-d", "Half page up or down"})
 	groups[co].Rows = replaceRow(groups[co].Rows, k.Home.Help().Key, helpRow{"gg G", "First and last row"})
 	groups[co].Rows = dropRow(groups[co].Rows, k.End.Help().Key)
 	rr := idx("Request and response")
+	if !enhanced {
+		groups[rr].Rows = replaceRow(groups[rr].Rows, k.Send.Help().Key, helpRow{"Ctrl-S", "Send request"})
+	}
 	groups[rr].Rows = replaceRow(groups[rr].Rows, k.Undo.Help().Key, helpRow{"u Ctrl-r", "Undo and redo request edits"})
 	groups[rr].Rows = dropRow(groups[rr].Rows, k.Redo.Help().Key)
 	if len(focusHints) > 0 {

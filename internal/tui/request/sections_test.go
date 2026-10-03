@@ -92,3 +92,17 @@ func TestHiddenLetterShortcutsAreGone(t *testing.T) {
 		}
 	}
 }
+
+// Every advertised Action.Keys alternative is a binding the shell dispatches
+// to that action (leader, g, or an always-key).
+func TestActionKeysAreRealBindings(t *testing.T) {
+	h := newHarness(t)
+	for _, enhanced := range []bool{false, true} {
+		h.p.enhanced = enhanced
+		for _, act := range h.p.Actions() {
+			if bad := tui.UnboundActionKeys(act.ID, act.Keys); len(bad) > 0 {
+				t.Errorf("%s advertises %v, which nothing dispatches to it", act.ID, bad)
+			}
+		}
+	}
+}

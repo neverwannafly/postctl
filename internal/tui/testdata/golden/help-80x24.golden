@@ -11,14 +11,14 @@
    Shift-Tab      Previous pane                                                
    1 2 3          Jump to Collections, Request, Response                       
    Ctrl-h j k l   Move to the neighbouring pane                                
-   Ctrl-o Ctrl-i  Back and forward through opened requests                     
+   Ctrl-o         Back through opened requests (Space ] forward)               
    Ctrl-B         Show or hide collections                                     
    g              Go to a section (gu gp ga gh gb gs gt gS gm gr)              
    [ ]            Previous and next section tab                                
    ?              Help                                                         
    q              Quit                                                         
    Ctrl-C         Quit (twice), or Esc while typing                            
-   1-16 of 60 lines, scroll for more                                           
+   1-16 of 61 lines, scroll for more                                           
  ──────────────────────────────────────────────────────────────────────────────
  
  Esc Close help   ↑↓ Scroll

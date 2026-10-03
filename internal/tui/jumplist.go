@@ -35,12 +35,15 @@ func (j *jumpList) push(id model.ID) {
 	j.pos = len(j.ids) - 1
 }
 
-// step moves delta (-1 back, +1 forward) to the nearest entry for which exists
-// reports true. Entries that no longer exist are dropped on the way. It
-// returns false, leaving the position unchanged, when there is none.
-func (j *jumpList) step(delta int, exists func(model.ID) bool) (model.ID, bool) {
+// step finds the nearest entry in direction delta (-1 back, +1 forward) for
+// which exists reports true and returns its ID and index. Entries that no
+// longer exist are dropped on the way. The position does not move: the caller
+// calls commit with the index once the request has really been opened, so a
+// failed jump leaves the list where it was. It returns false when there is no
+// such entry.
+func (j *jumpList) step(delta int, exists func(model.ID) bool) (model.ID, int, bool) {
 	if len(j.ids) == 0 || delta == 0 {
-		return "", false
+		return "", 0, false
 	}
 	dir := 1
 	if delta < 0 {
@@ -51,8 +54,8 @@ func (j *jumpList) step(delta int, exists func(model.ID) bool) (model.ID, bool) 
 	i := pos + dir
 	for i >= 0 && i < len(ids) {
 		if exists(ids[i]) {
-			j.ids, j.pos = ids, i
-			return ids[i], true
+			j.ids, j.pos = ids, pos
+			return ids[i], i, true
 		}
 		ids = append(ids[:i], ids[i+1:]...)
 		if dir < 0 {
@@ -62,7 +65,14 @@ func (j *jumpList) step(delta int, exists func(model.ID) bool) (model.ID, bool) 
 	}
 	// Nothing to go to; keep the entries that survived the clean-up.
 	j.ids, j.pos = ids, min(max(pos, 0), max(len(ids)-1, 0))
-	return "", false
+	return "", 0, false
+}
+
+// commit makes entry i (an index returned by step) the current one.
+func (j *jumpList) commit(i int) {
+	if i >= 0 && i < len(j.ids) {
+		j.pos = i
+	}
 }
 
 // recordJump pushes an opened request on the jump list.
@@ -78,7 +88,7 @@ func (a *app) jump(delta int) tea.Cmd {
 	if a.ws == nil {
 		return nil
 	}
-	id, ok := a.jumps.step(delta, func(id model.ID) bool {
+	id, idx, ok := a.jumps.step(delta, func(id model.ID) bool {
 		_, r := findRequest(a.ws, id)
 		return r != nil
 	})
@@ -93,6 +103,7 @@ func (a *app) jump(delta int) tea.Cmd {
 	if !a.tree.reveal(id) {
 		return a.toastWarn("That request is not in the workspace.")
 	}
+	a.jumps.commit(idx)
 	a.layoutPanes()
 	return a.syncSelection(true)
 }

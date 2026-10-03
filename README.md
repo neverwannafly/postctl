@@ -100,7 +100,7 @@ my-service/
 | Key | Action |
 | --- | --- |
 | `Ctrl-S` / `Ctrl-Enter` | **Send request** immediately (Ctrl-S always works, even while typing) |
-| `Space` | **Leader**: `Space e` environment, `Space E` edit environments, `Space a` new, `Space r` rename, `Space d` delete, `Space D` duplicate, `Space R` run collection, `Space h` history, `Space y` copy as curl, `Space o` open in `$EDITOR`, `Space l` reload, `Space q` quit |
+| `Space` | **Leader**: `Space f` (or `Space Space`) find a request, `Space e` environment, `Space E` edit environments, `Space a` new, `Space r` rename, `Space d` delete, `Space D` duplicate, `Space R` run collection, `Space h` history, `Space y` copy as curl, `Space o` open in `$EDITOR`, `Space l` reload, `Space q` quit |
 | `Ctrl-P` / `:` | Open the **Command Palette** / the command line (`:q`, `:q!`, `:w`, `:wq`) |
 | `j` `k` `h` `l`, arrows | Move in the tree and fold folders; `Ctrl-d` / `Ctrl-u` half page, `gg` / `G` top and bottom |
 | `Tab` / `Shift-Tab`, `1` `2` `3` | Move focus between panes: **Collections → Request → Response** (the pane titles show `[1] [2] [3]`) |

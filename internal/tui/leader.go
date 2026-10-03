@@ -157,7 +157,12 @@ func (a *app) leaderEntries() []whichEntry {
 		if _, ok := a.resolve(lb.ids); !ok {
 			continue
 		}
-		out = append(out, whichEntry{Key: strings.Join(displayKeys(lb.keys), "/"), Label: lb.label})
+		keys := displayKeys(lb.keys)
+		label := lb.label
+		if len(keys) > 1 { // a second key for the same action: first key shown, rest named
+			label += " (or " + strings.Join(keys[1:], ", ") + ")"
+		}
+		out = append(out, whichEntry{Key: keys[0], Label: label})
 	}
 	return out
 }
@@ -288,8 +293,13 @@ func (a *app) followUp(p *pendingKeys, msg tea.KeyPressMsg) (tea.Cmd, bool) {
 			cmd := a.stepSection(delta)
 			return tea.Batch(cmd, a.startPending(s)), true
 		}
-		return nil, false
+		return a.noBinding(p.prefix + displayKey(s)), true
 	}
+}
+
+// noBinding cancels a sequence and says so. Only key names are shown.
+func (a *app) noBinding(keys string) tea.Cmd {
+	return a.toastInfo("No binding for " + keys)
 }
 
 // leaderKey runs the action bound to s after Space.
@@ -303,7 +313,7 @@ func (a *app) leaderKey(s string) tea.Cmd {
 		}
 		return a.toastInfo("Space " + displayKey(s) + " (" + lb.label + ") is not available here.")
 	}
-	return a.toastInfo("Space " + displayKey(s) + " is not bound. Press Space and wait to see the keys.")
+	return a.noBinding("Space " + displayKey(s))
 }
 
 func containsKey(keys []string, s string) bool {
@@ -332,7 +342,7 @@ func (a *app) gotoKey(s string) tea.Cmd {
 		}
 		return a.focusSection(gs.slot, gs.section)
 	}
-	return a.toastInfo("g" + s + " is not bound. Press g and wait to see the keys.")
+	return a.noBinding("g" + s)
 }
 
 // focusSection focuses slot and asks its pane to show section.

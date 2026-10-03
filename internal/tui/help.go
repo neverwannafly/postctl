@@ -49,7 +49,7 @@ func (a *app) helpGroups() []helpGroup {
 	for _, e := range a.leaderEntries() {
 		leader = append(leader, helpRow{Key: "Space " + e.Key, Desc: e.Label})
 	}
-	return a.keys.helpGroups(a.focusTitle(), a.focusHints(), leader, a.responseHidden())
+	return a.keys.helpGroups(a.focusTitle(), a.focusHints(), leader, a.responseHidden(), a.enhanced)
 }
 
 func (o *helpOverlay) measure(a *app) {

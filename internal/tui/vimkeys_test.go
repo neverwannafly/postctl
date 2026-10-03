@@ -107,12 +107,13 @@ func TestLeaderKeysWithoutAnActionAreHiddenAndInert(t *testing.T) {
 	h.selectByName("Create charge")
 	h.keys("space")
 	h.pop()
-	for _, hidden := range []string{"Find request", "History of request", "Diff with previous", "jq filter"} {
+	for _, hidden := range []string{"History of request", "Diff with previous", "jq filter"} {
 		h.mustNotHave(hidden)
 	}
 	h.mustHave("Switch environment") // a bound key is listed
+	h.mustHave("Find request")       // the request switcher (UX-Q) is bound
 	h.keys("esc")
-	for _, k := range [][]string{{"f"}, {"space"}, {"H"}, {"x"}, {"j"}} {
+	for _, k := range [][]string{{"H"}, {"x"}, {"j"}} {
 		h.keys("space")
 		h.keys(k...)
 		if h.a.ov != nil || h.quit || h.a.pend != nil {
@@ -161,7 +162,7 @@ func TestLeaderDisabledActionIsHiddenAndInert(t *testing.T) {
 func TestLeaderUnknownKeyExplainsAndCancels(t *testing.T) {
 	h := newHarness(t, demo(), 160, 30)
 	h.keys("space", "z")
-	h.mustHave("not bound")
+	h.mustHave("No binding for Space z")
 	if h.a.pend != nil || h.a.ov != nil {
 		t.Fatal("an unknown follow-up key must end the sequence")
 	}
@@ -391,10 +392,9 @@ func TestEscLadder(t *testing.T) {
 	if flight == nil {
 		t.Fatal("send did not start")
 	}
-	go func() {
-		time.Sleep(30 * time.Millisecond)
-		sh.a.Update(keyPress("esc"))
-	}()
+	// Esc goes through the shell (and its OAuth cancel) before the events are
+	// delivered, so nothing touches the app from a second goroutine.
+	sh.a.Update(keyPress("esc"))
 	settle(t, sh, cmd)
 	if len(rec.res) != 1 || !errors.Is(rec.res[0].Err, context.Canceled) {
 		t.Fatalf("Esc did not cancel the send: %+v", rec.res)
@@ -684,7 +684,7 @@ func TestJumpingDoesNotRecordJumps(t *testing.T) {
 func TestJumpListUnit(t *testing.T) {
 	all := func(model.ID) bool { return true }
 	var j jumpList
-	if _, ok := j.step(-1, all); ok {
+	if _, _, ok := j.step(-1, all); ok {
 		t.Fatal("an empty list has nowhere to go")
 	}
 	j.push("a")
@@ -694,24 +694,32 @@ func TestJumpListUnit(t *testing.T) {
 	if len(j.ids) != 3 {
 		t.Fatalf("ids = %v", j.ids)
 	}
-	if id, ok := j.step(-1, all); !ok || id != "b" {
+	id, i, ok := j.step(-1, all)
+	if !ok || id != "b" {
 		t.Fatalf("back -> %q %v", id, ok)
 	}
+	if j.pos != 2 {
+		t.Fatal("step must not move the position before commit")
+	}
+	j.commit(i)
 	// "a" was deleted: stepping back drops it and reports nothing earlier.
-	if _, ok := j.step(-1, func(id model.ID) bool { return id != "a" }); ok {
+	if _, _, ok := j.step(-1, func(id model.ID) bool { return id != "a" }); ok {
 		t.Fatal("deleted entries must be skipped")
 	}
 	if len(j.ids) != 2 || j.ids[j.pos] != "b" {
 		t.Fatalf("after the clean-up ids=%v pos=%d", j.ids, j.pos)
 	}
-	if id, ok := j.step(1, all); !ok || id != "c" {
+	id, i, ok = j.step(1, all)
+	if !ok || id != "c" {
 		t.Fatalf("forward -> %q %v", id, ok)
 	}
-	if _, ok := j.step(1, all); ok {
+	j.commit(i)
+	if _, _, ok := j.step(1, all); ok {
 		t.Fatal("nothing after the newest entry")
 	}
 	// Pushing from the middle discards the forward entries.
-	j.step(-1, all)
+	_, i, _ = j.step(-1, all)
+	j.commit(i)
 	j.push("d")
 	if fmt.Sprint(j.ids) != "[b d]" {
 		t.Fatalf("ids = %v", j.ids)

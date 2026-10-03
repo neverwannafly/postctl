@@ -432,3 +432,24 @@ func TestPasteCurlIntoBodyEditorIsPlainText(t *testing.T) {
 		t.Fatal("paste lost")
 	}
 }
+
+// Enter on the Get new token row starts the flow (the real key path; the
+// action id is for the palette), and the error says how to try again without
+// naming a key that is gone.
+func TestOAuthGetTokenWithEnterOnTheRow(t *testing.T) {
+	fetch := func(context.Context, *model.OAuth2Config, oauth2.FetchOptions) (*model.OAuth2Token, error) {
+		return nil, oauth2.ErrTimeout
+	}
+	h, _, _ := oauthHarness(t, fetch)
+	h.key("down", "down", "down", "enter") // Type, Grant type, Get new token (the status row is skipped)
+	h.mustHave("Timed out waiting for the browser")
+	for _, err := range []error{oauth2.ErrTimeout, errors.New("x")} {
+		msg := oauthMessage(err)
+		if !strings.Contains(msg, "select Get new token and press Enter") && !strings.Contains(msg, "Select Get new token and press Enter") {
+			t.Errorf("OAuth error does not say how to retry: %q", msg)
+		}
+		if strings.Contains(msg, "press g") || strings.Contains(msg, "Press g") {
+			t.Errorf("OAuth error names a key that no longer exists: %q", msg)
+		}
+	}
+}

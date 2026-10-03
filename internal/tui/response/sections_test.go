@@ -31,3 +31,15 @@ func TestSectionsAndStepsInTheResponsePane(t *testing.T) {
 		t.Fatalf("mode = %q while not typing", p.VimMode())
 	}
 }
+
+func TestActionKeysAreRealBindings(t *testing.T) {
+	own := map[string]bool{"y": true} // handled in the pane's onKey
+	p := New(tui.PaneEnv{Theme: ui.NewTheme(true, true, false), Actions: &tui.Registry{}}).(*Pane)
+	for _, act := range p.Actions() {
+		for _, bad := range tui.UnboundActionKeys(act.ID, act.Keys) {
+			if !own[bad] {
+				t.Errorf("%s advertises %q, which nothing dispatches to it", act.ID, bad)
+			}
+		}
+	}
+}

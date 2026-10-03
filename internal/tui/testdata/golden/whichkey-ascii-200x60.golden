@@ -49,11 +49,11 @@
                                              |                                                                                   |                                                                     
                                              |    +--------------------------------------------------------------------------------------------------+                                                 
                                              |    | Space                                                                                 Esc Cancel |                                                 
+                                             |    | f  Find request (or Space)       d  Delete                        q  Quit                        |                                                 
                                              |    | p  Command palette               D  Duplicate                     [  Back (jump list)            |                                                 
                                              |    | e  Switch environment            m  Move to folder                ]  Forward (jump list)         |                                                 
                                              |    | a  New request or folder         b  Toggle sidebar                ?  All keys                    |                                                 
                                              |    | r  Rename                        l  Reload workspace                                             |                                                 
-                                             |    | d  Delete                        q  Quit                                                         |                                                 
                                              |    +--------------------------------------------------------------------------------------------------+                                                 
  ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
  

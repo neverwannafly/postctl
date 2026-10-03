@@ -286,6 +286,11 @@ type SectionStepMsg struct {
 	Delta int
 }
 
+// CancelOAuthMsg asks the request pane to cancel a running OAuth 2.0 sign-in.
+// The shell sends it for Esc when another pane has focus, so the flow can be
+// stopped from anywhere like a running send.
+type CancelOAuthMsg struct{}
+
 // ToastMsg asks the shell to show a transient status line.
 type ToastMsg struct {
 	// Kind picks the symbol and color.

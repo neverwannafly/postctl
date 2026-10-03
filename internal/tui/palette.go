@@ -13,7 +13,7 @@ func (a *app) builtinActions() []Action {
 	in := func(s Slot) func() tea.Cmd { return func() tea.Cmd { return a.setFocus(s) } }
 	workspace := func() bool { return a.ws != nil }
 	return []Action{
-		{ID: "request.find", Title: "Find request", Group: "Navigation", Keys: "Space f",
+		{ID: "request.find", Title: "Find request", Group: "Navigation", Keys: "Space f / Space Space",
 			Run: func() tea.Cmd { return a.openSwitcher() }},
 		{ID: "palette.open", Title: "Command palette", Group: "Navigation", Keys: "Ctrl-P / Space p",
 			Run: func() tea.Cmd { return a.openPalette() }},

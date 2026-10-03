@@ -323,7 +323,7 @@ Every line pairs a symbol with words. Counts add up to the total. Warnings name 
 
 This is the binding spec; `docs/keys.md` is generated from code and must match it. Terminal notes: `Ctrl-i` equals `Tab` and `Ctrl-h` equals Backspace in legacy key encoding, so every such key has a fallback (plan U4).
 
-**Always (every mode, every pane):** `Ctrl-S` send · `Ctrl-Enter` send (enhanced keyboard only) · `Alt-1/2/3` jump to sidebar, request, response · `Ctrl-P` palette · `Esc` (see below).
+**Always (every mode, every pane, and non-modal overlays):** `Ctrl-S` send · `Ctrl-Enter` send (enhanced keyboard only) · `Alt-1/2/3` jump to sidebar, request, response · `Ctrl-P` palette · `Esc` (see below). They work in panes **and** in the non-modal overlays (palette, request switcher, help, environment switcher, which-key): the overlay closes, then the key acts. The one exception is the request switcher, where `Ctrl-P` moves the cursor up like `Ctrl-N` moves it down. Modal confirm dialogs (destructive or restore) and text prompts must be answered first and ignore these keys. Full-screen screens (environment editor, history, runner, cookies) keep their own handling, except that `Ctrl-P` closes them. `/` is contextual: it filters the tree only when Collections has focus, searches the body in the Response pane and the log in the WebSocket pane, and does nothing elsewhere.
 
 **Escape ladder:** insert or visual → normal; normal in a text field → leave the field (back to pane navigation); in a pane with an overlay → close it; otherwise cancel a running send or OAuth flow. `Ctrl-C` in insert or visual acts as `Esc`; elsewhere `Ctrl-C` twice within a second quits (the first press says so in the status line).
 

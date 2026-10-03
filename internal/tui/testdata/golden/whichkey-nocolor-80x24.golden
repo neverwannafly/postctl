@@ -11,13 +11,13 @@
          POST  Create customer                                                 
   ╭──────────────────────────────────────────────────────────────────────────╮ 
   │ Space                                                         Esc Cancel │ 
-  │ p  Command palette                   b  Toggle sidebar                   │ 
-  │ e  Switch environment                l  Reload workspace                 │3
+  │ f  Find request (or Space)           m  Move to folder                   │ 
+  │ p  Command palette                   b  Toggle sidebar                   │3
+  │ e  Switch environment                l  Reload workspace                 │ 
   │ a  New request or folder             q  Quit                             │ 
   │ r  Rename                            [  Back (jump list)                 │ 
   │ d  Delete                            ]  Forward (jump list)              │ 
   │ D  Duplicate                         ?  All keys                         │ 
-  │ m  Move to folder                                                        │ 
   ╰──────────────────────────────────────────────────────────────────────────╯ 
  ──────────────────────────────────────────────────────────────────────────────
  

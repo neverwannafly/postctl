@@ -230,7 +230,7 @@ func (k *kvView) key(p *Pane, m tea.KeyPressMsg) (handled, changed bool) {
 	case "a", "insert":
 		k.addRow(p, items)
 		return true, true
-	case "enter":
+	case "enter", "i": // i edits the cell in insert, like Enter
 		if len(items) == 0 {
 			k.addRow(p, items)
 			return true, true

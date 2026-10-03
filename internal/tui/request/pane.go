@@ -292,6 +292,8 @@ func (p *Pane) Update(msg tea.Msg) (tui.Pane, tea.Cmd) {
 		return p, p.onFocusSection(m)
 	case tui.SectionStepMsg:
 		return p, p.onSectionStep(m)
+	case tui.CancelOAuthMsg:
+		return p, p.cancelOAuth()
 	case tea.KeyPressMsg:
 		return p, p.onKey(m)
 	case tea.PasteMsg:

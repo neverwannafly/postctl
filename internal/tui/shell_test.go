@@ -147,9 +147,27 @@ func TestSinglePaneSidebarOverlay(t *testing.T) {
 		t.Fatalf("tab in single pane -> %v", h.a.focus)
 	}
 	h.keys("tab")
-	if h.a.focus != SlotRequest {
-		t.Fatalf("tab toggles request/response, got %v", h.a.focus)
+	if h.a.focus != SlotSidebar {
+		t.Fatalf("tab in single pane reaches Collections too: focus=%v", h.a.focus)
 	}
+	h.mustHave("Refund charge")
+	h.keys("tab")
+	if h.a.focus != SlotRequest {
+		t.Fatalf("tab from Collections -> %v", h.a.focus)
+	}
+	h.keys("shift+tab")
+	if h.a.focus != SlotSidebar {
+		t.Fatalf("shift+tab from Request in single pane -> %v", h.a.focus)
+	}
+	h.keys("esc")
+	if h.a.focus != SlotRequest {
+		t.Fatalf("esc closes the overlay -> %v", h.a.focus)
+	}
+	h.keys("/")
+	if h.a.tree.filtering {
+		t.Fatal("/ in the request pane must not open the collections filter")
+	}
+	h.keys("ctrl+b")
 	h.keys("/")
 	if h.a.focus != SlotSidebar || !h.a.tree.filtering {
 		t.Fatalf("/ opens the sidebar filter: focus=%v filtering=%v", h.a.focus, h.a.tree.filtering)
@@ -496,14 +514,27 @@ func TestHelpIsGeneratedFromKeyMap(t *testing.T) {
 	h := newHarness(t, demo(), 160, 40)
 	h.keys("?")
 	scr := h.screen()
-	for _, want := range []string{"Everywhere", "Collections", "After Space", "Request and response", "Ctrl-Enter", "Switch environment", "Command palette", "Ctrl-P", "Duplicate", "Ctrl-h j k l"} {
+	for _, want := range []string{"Everywhere", "Collections", "After Space", "Request and response", "Switch environment", "Command palette", "Ctrl-P", "Duplicate", "Ctrl-h j k l"} {
 		if !strings.Contains(scr, want) {
 			t.Errorf("help is missing %q:\n%s", want, scr)
 		}
 	}
+	// Ctrl-Enter and Ctrl-i rows need enhanced keyboard reporting: a legacy
+	// terminal sees Ctrl-S only and never an unreachable key.
+	if strings.Contains(scr, "Ctrl-Enter") || strings.Contains(scr, "Ctrl-i") {
+		t.Errorf("help lists a key this terminal cannot send:\n%s", scr)
+	}
+	h.keys("esc")
+	h.msg(tea.KeyboardEnhancementsMsg{Flags: 1})
+	h.keys("?")
+	for _, want := range []string{"Ctrl-Enter", "Ctrl-o Ctrl-i"} {
+		if !strings.Contains(h.screen(), want) {
+			t.Errorf("enhanced help is missing %q", want)
+		}
+	}
 	// Every documented binding is reachable from the key map itself.
 	km := newKeyMap(false)
-	for _, g := range km.helpGroups("Collections", nil, nil) {
+	for _, g := range km.helpGroups("Collections", nil, nil, false, false) {
 		if len(g.Rows) == 0 || g.Title == "" {
 			t.Errorf("empty help group %+v", g)
 		}

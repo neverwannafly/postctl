@@ -334,6 +334,10 @@ func (s *switcherOverlay) refilter() {
 	s.cursor, s.top = 0, 0
 }
 
+// ownsKey reports that Ctrl-P moves the cursor up in the switcher (Ctrl-N moves
+// it down), as in most fuzzy finders.
+func (s *switcherOverlay) ownsKey(k string) bool { return k == "ctrl+p" }
+
 func (s *switcherOverlay) update(a *app, msg tea.Msg) (overlay, tea.Cmd) {
 	if k, ok := msg.(tea.KeyPressMsg); ok {
 		page := max(1, s.lastPage-1)
@@ -414,7 +418,7 @@ func (s *switcherOverlay) view(a *app, w, h int) string {
 
 	lines := []string{topLine, s.input.View(), t.Rule(w)}
 	if len(s.res) == 0 {
-		msg := "No requests yet. Press Esc, then n to create one."
+		msg := "No requests yet. Press Esc, then Space a to create one."
 		if strings.TrimSpace(s.input.Value()) != "" {
 			msg = "No matches for \"" + strings.TrimSpace(s.input.Value()) + "\"."
 		}

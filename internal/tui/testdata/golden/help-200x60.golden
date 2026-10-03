@@ -11,18 +11,19 @@
    Shift-Tab      Previous pane                                                                         Ctrl-u Ctrl-d  Half page up or down                                                            
    1 2 3          Jump to Collections, Request, Response                                                gg G           First and last row                                                              
    Ctrl-h j k l   Move to the neighbouring pane                                                         Alt-↑ Alt-↓    Move up or down in its folder                                                   
-   Ctrl-o Ctrl-i  Back and forward through opened requests                                                                                                                                             
+   Ctrl-o         Back through opened requests (Space ] forward)                                                                                                                                       
    Ctrl-B         Show or hide collections                                                              Request and response                                                                           
-   g              Go to a section (gu gp ga gh gb gs gt gS gm gr)                                       Ctrl-Enter     Send request (also Ctrl-S)                                                      
+   g              Go to a section (gu gp ga gh gb gs gt gS gm gr)                                       Ctrl-S         Send request                                                                    
    [ ]            Previous and next section tab                                                         u Ctrl-r       Undo and redo request edits                                                     
    ?              Help                                                                                                                                                                                 
    q              Quit                                                                                  Collections (focused)                                                                          
    Ctrl-C         Quit (twice), or Esc while typing                                                     Enter          Fold                                                                            
                                                                                                         Space a        New                                                                             
    After Space                                                                                          Space r        Rename                                                                          
-   Space p        Command palette                                                                       Space d        Delete                                                                          
-   Space e        Switch environment                                                                    Space m        Move                                                                            
-   Space a        New request or folder                                                                 Space D        Duplicate                                                                       
+   Space f        Find request (or Space)                                                               Space d        Delete                                                                          
+   Space p        Command palette                                                                       Space m        Move                                                                            
+   Space e        Switch environment                                                                    Space D        Duplicate                                                                       
+   Space a        New request or folder                                                                                                                                                                
    Space r        Rename                                                                                                                                                                               
    Space d        Delete                                                                                                                                                                               
    Space D        Duplicate                                                                                                                                                                            
@@ -38,7 +39,6 @@
    Enter          Choose                                                                                                                                                                               
    Esc            Close or cancel                                                                                                                                                                      
    k ↑ j ↓        Move                                                                                                                                                                                 
-                                                                                                                                                                                                       
                                                                                                                                                                                                        
                                                                                                                                                                                                        
                                                                                                                                                                                                        

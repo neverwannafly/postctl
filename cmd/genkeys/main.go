@@ -34,10 +34,10 @@ type Section struct {
 var KeyCatalog = []Section{
 	{
 		Title:       "Global Shortcuts",
-		Description: "Available everywhere unless a text field is being edited. Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter work even while typing.",
+		Description: "Available everywhere unless a text field is being edited. Ctrl-P, Ctrl-B, Alt-1/2/3, Ctrl-S and Ctrl-Enter work even while typing, and in the palette, request switcher, help, environment switcher and which-key popup (the popup closes, then the key acts). Confirmation dialogs and prompts must be answered first and ignore them; full-screen screens (environments, history, runner, cookies) keep their own keys, except Ctrl-P, which closes them. Ctrl-Enter and Ctrl-i need a terminal with enhanced keyboard reporting.",
 		Entries: []KeyEntry{
 			{"?", "Help", "Open the keyboard shortcut and context help overlay"},
-			{"Ctrl-P", "Command palette", "Open the fuzzy command palette (press again to close)"},
+			{"Ctrl-P", "Command palette", "Open the fuzzy command palette (press again to close; inside the request switcher it moves the cursor up)"},
 			{":", "Command line", "Open the palette as a command line: q or wq quits, q! quits without waiting for saves, w saves now"},
 			{"Space", "Leader", "Start a key sequence; after 300 ms the which-key popup lists the keys that are available (see Leader keys)"},
 			{"g", "Go to", "Start a g sequence: gg top, gu URL, gp Params, ... (see Go-to and section keys)"},
@@ -47,7 +47,7 @@ var KeyCatalog = []Section{
 			{"Tab", "Next pane", "Cycle focus forward: Collections → Request → Response"},
 			{"Shift-Tab", "Previous pane", "Cycle focus backward: Response → Request → Collections"},
 			{"Ctrl-B", "Toggle sidebar", "Show or hide the Collections sidebar"},
-			{"/", "Filter requests", "Focus the sidebar and start filtering requests by name/path"},
+			{"/", "Filter / search", "Contextual: with Collections focused it filters requests by name/path; in the Response pane it searches the body; in the WebSocket pane it searches the log; elsewhere it does nothing"},
 			{"1, Alt-1", "Collections pane", "Jump directly to the Collections sidebar"},
 			{"2, Alt-2", "Request pane", "Jump directly to the Request editor pane"},
 			{"3, Alt-3", "Response pane", "Jump directly to the Response viewer pane"},
@@ -56,14 +56,15 @@ var KeyCatalog = []Section{
 			{"Ctrl-k", "Pane above", "Move focus to the pane above"},
 			{"Ctrl-l", "Pane to the right", "Move focus to the neighbouring pane on the right"},
 			{"Ctrl-o", "Jump back", "Go back to the previously opened request (jump list, 100 entries)"},
-			{"Ctrl-i", "Jump forward", "Go forward in the jump list (needs a terminal with enhanced keyboard reporting; Space ] works everywhere)"},
-			{"Esc", "Back / cancel", "Leave a text field, then close overlays and dialogs, then cancel a running send or OAuth login"},
+			{"Ctrl-i", "Jump forward (needs enhanced keyboard)", "Go forward in the jump list; on terminals without enhanced keyboard reporting Ctrl-i is Tab, use Space ] instead"},
+			{"Esc", "Back / cancel", "Leave a text field, then close overlays and dialogs, then cancel a running send or OAuth login (from any pane)"},
 		},
 	},
 	{
 		Title:       "Leader keys (Space)",
 		Description: "Press Space, then one of these keys. A key is listed and works only when its action exists and is enabled for the focused pane; otherwise it is hidden and does nothing. Every row is also a command-palette action. Keys whose feature has not shipped yet are not listed.",
 		Entries: []KeyEntry{
+			{"Space f, Space Space", "Find request", "Open the request switcher: fuzzy-find any request in the workspace, most recent first"},
 			{"Space p", "Command palette", "Open the command palette"},
 			{"Space e", "Switch environment", "Open the active environment switcher"},
 			{"Space E", "Edit environments", "Open the environment and variable editor"},
@@ -133,7 +134,7 @@ var KeyCatalog = []Section{
 		Title:       "Request Pane — General & URL Bar",
 		Description: "Editing request target, method, and global pane shortcuts.",
 		Entries: []KeyEntry{
-			{"Ctrl-S, Ctrl-Enter", "Send request", "Send the active request immediately (Ctrl-S always works)"},
+			{"Ctrl-S, Ctrl-Enter", "Send request", "Send the active request immediately (Ctrl-S always works; Ctrl-Enter needs enhanced keyboard reporting)"},
 			{"u", "Undo", "Undo the previous edit (when not typing)"},
 			{"Ctrl-r", "Redo", "Redo the previously undone edit (when not typing)"},
 			{"Ctrl-Z", "Undo (typing)", "Undo the previous edit while typing in a field"},
@@ -232,10 +233,9 @@ var KeyCatalog = []Section{
 		Title:       "Response Pane",
 		Description: "Inspecting response payload, headers, timings, test results, and searching.",
 		Entries: []KeyEntry{
-			{"]", "Next tab", "Cycle forward: Body → Headers → Tests → Timeline → Raw"},
+			{"]", "Next tab", "Cycle forward: Body → Headers → Cookies → Tests → Console → Timeline"},
 			{"[", "Previous tab", "Cycle backward through response tabs"},
 			{"gr", "Body tab", "Focus the response pane on its Body tab"},
-			{"1, 2, 3, 4, 5, 6", "Jump to tab", "Directly activate tab 1–6"},
 			{"↑, k", "Scroll up", "Scroll response viewer up one line"},
 			{"↓, j", "Scroll down", "Scroll response viewer down one line"},
 			{"PgUp, Ctrl-u", "Page up", "Scroll response up by half screen"},
@@ -308,7 +308,7 @@ var KeyCatalog = []Section{
 		Entries: []KeyEntry{
 			{"Tab, Shift-Tab", "Navigate fields", "Cycle through Iterations, Data file, Delay, Bail, Persist"},
 			{"Space", "Toggle option", "Toggle Bail (stop on failure) and Persist variables options"},
-			{"Ctrl-Enter", "Start run", "Begin executing the collection run"},
+			{"Ctrl-Enter", "Start run", "Begin executing the collection run (needs enhanced keyboard reporting)"},
 			{"Enter (last field)", "Start run", "Begin collection run from bottom of setup form"},
 			{"Esc (live run)", "Cancel run", "Prompt confirmation to cancel running collection"},
 			{"f (live run)", "Failures only", "Filter live progress list to failed requests only"},
@@ -343,6 +343,18 @@ var KeyCatalog = []Section{
 			{"Enter (confirm)", "Confirm clear", "Confirm deleting all request history"},
 			{"Esc (confirm)", "Cancel clear", "Cancel clear prompt and keep history"},
 			{"Esc, q", "Close history", "Exit history viewer and return to workspace"},
+		},
+	},
+	{
+		Title:       "Request switcher (Space f)",
+		Description: "Fuzzy-find a request by name, path or URL host. Opens on the most recently used requests.",
+		Entries: []KeyEntry{
+			{"Type text", "Filter", "Narrow the list; Space and letters are text here"},
+			{"↑, ↓, Ctrl-p, Ctrl-n", "Move", "Move the cursor (Ctrl-p is a cursor key here, not the palette)"},
+			{"PgUp, PgDn", "Page", "Move a page at a time"},
+			{"Enter", "Open", "Reveal the request in the tree and open it"},
+			{"Esc", "Close", "Close the switcher without opening anything"},
+			{"Ctrl-S, Alt-1/2/3", "Always-keys", "Close the switcher, then send or jump as usual"},
 		},
 	},
 	{
