@@ -1,10 +1,14 @@
 package request
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/shubham/postctl/internal/model"
+	"github.com/shubham/postctl/internal/store"
+	"github.com/shubham/postctl/internal/tui/vimfield"
 )
 
 func TestRequestPaneMouseTabsAndWheel(t *testing.T) {
@@ -74,7 +78,7 @@ func TestRequestWheelDoesNothingWhileEditing(t *testing.T) {
 		t.Fatalf("need at least 2 items, got %d", len(items))
 	}
 	kv.cur = 1
-	kv.beginEdit(h.p, items, 0)
+	kv.beginEdit(h.p, items, 0, "")
 	if !h.p.Editing() {
 		t.Fatalf("expected p.Editing() to be true during kv edit")
 	}
@@ -84,5 +88,273 @@ func TestRequestWheelDoesNothingWhileEditing(t *testing.T) {
 	h.p.HandleMouse(wheelUp, 10, 10)
 	if kv.cur != 1 {
 		t.Errorf("wheel up while editing moved kv.cur from 1 to %d", kv.cur)
+	}
+}
+
+// ---- the wheel and the vim fields ---------------------------------------------------
+
+func longText(n int) string {
+	lines := make([]string, n)
+	for i := range lines {
+		lines[i] = "line " + strings.Repeat("x", i%5)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func (h *harness) wheel(down bool) {
+	h.t.Helper()
+	b := tea.MouseWheelUp
+	if down {
+		b = tea.MouseWheelDown
+	}
+	h.p.HandleMouse(tea.MouseWheelMsg{X: 10, Y: 10, Button: b}, 10, 10)
+}
+
+// wheelCase puts a long text in one kind of editor.
+type wheelCase struct {
+	name string
+	open func(h *harness) // the cursor on the tab bar, the editor not focused
+	into func(h *harness) // the cursor in the editor, normal mode
+	ed   func(h *harness) *vimfield.Field
+	text func(h *harness) string
+}
+
+func wheelCases() []wheelCase {
+	return []wheelCase{
+		{
+			name: "pre-request script",
+			open: func(h *harness) {
+				h.req.Scripts.PreRequest = &model.Script{Source: longText(80)}
+				h.p.reloadAll()
+				h.gotoTab(tabPre)
+			},
+			into: func(h *harness) { h.key("down") },
+			ed:   func(h *harness) *vimfield.Field { return h.p.views[tabPre].(*scriptView).ed },
+			text: func(h *harness) string { return h.req.Scripts.PreRequest.Source },
+		},
+		{
+			name: "test script",
+			open: func(h *harness) {
+				h.req.Scripts.Test = &model.Script{Source: longText(80)}
+				h.p.reloadAll()
+				h.gotoTab(tabTests)
+			},
+			into: func(h *harness) { h.key("down") },
+			ed:   func(h *harness) *vimfield.Field { return h.p.views[tabTests].(*scriptView).ed },
+			text: func(h *harness) string { return h.req.Scripts.Test.Source },
+		},
+		{
+			name: "raw body",
+			open: func(h *harness) {
+				h.req.Body = model.Body{Mode: model.BodyRaw, Language: "text", Raw: longText(80)}
+				h.p.reloadAll()
+				h.gotoTab(tabBody)
+			},
+			into: func(h *harness) { h.key("down", "down", "down") },
+			ed:   func(h *harness) *vimfield.Field { return h.p.views[tabBody].(*bodyView).raw },
+			text: func(h *harness) string { return h.req.Body.Raw },
+		},
+		{
+			name: "graphql query",
+			open: func(h *harness) {
+				h.req.Body = model.Body{Mode: model.BodyGraphQL, GraphQL: &model.GraphQLBody{Query: longText(80)}}
+				h.p.reloadAll()
+				h.gotoTab(tabBody)
+			},
+			into: func(h *harness) { h.key("down", "down") },
+			ed:   func(h *harness) *vimfield.Field { return h.p.views[tabBody].(*bodyView).gq },
+			text: func(h *harness) string { return h.req.Body.GraphQL.Query },
+		},
+	}
+}
+
+// The wheel over a script or body editor that does not have the cursor scrolls
+// its view: no edit, no save, no mode change.
+func TestWheelScrollsAnUnfocusedEditorWithoutEditing(t *testing.T) {
+	for _, tc := range wheelCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			tc.open(h)
+			if h.p.Editing() {
+				t.Fatal("the cursor should be on the tab bar")
+			}
+			ed, before := tc.ed(h), tc.text(h)
+			nSaves, nDirty := len(h.saves()), 0
+			if n, _ := h.dirty(); n > 0 {
+				nDirty = n
+			}
+			h.wheel(true)
+			h.wheel(true)
+			if ed.Top() == 0 {
+				t.Fatal("the wheel did not scroll the editor")
+			}
+			down := ed.Top()
+			h.wheel(false)
+			if ed.Top() >= down {
+				t.Fatalf("wheel up did not scroll back (top %d -> %d)", down, ed.Top())
+			}
+			if tc.text(h) != before || ed.Text() != before {
+				t.Fatal("the wheel edited the text")
+			}
+			if n, _ := h.dirty(); n != nDirty || len(h.saves()) != nSaves {
+				t.Fatal("the wheel marked the request changed")
+			}
+			if h.p.Editing() || h.p.zone == zBody {
+				t.Fatal("the wheel moved the cursor into the editor")
+			}
+		})
+	}
+}
+
+// In normal mode the editor has the cursor but is not being typed into: the
+// wheel scrolls the view, keeps the cursor inside it, and keeps the mode.
+func TestWheelScrollsAFocusedEditorInNormalMode(t *testing.T) {
+	for _, tc := range wheelCases() {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			tc.open(h)
+			tc.into(h)
+			ed := tc.ed(h)
+			if !h.p.Editing() || ed.ModeName() != "NORMAL" {
+				t.Fatalf("setup: editing=%v mode=%q", h.p.Editing(), ed.ModeName())
+			}
+			before := tc.text(h)
+			h.wheel(true)
+			h.wheel(true)
+			if ed.Top() == 0 {
+				t.Fatal("the wheel did not scroll the editor")
+			}
+			if row, _ := ed.Cursor(); row < ed.Top() {
+				t.Fatalf("cursor row %d is above the view at %d", row, ed.Top())
+			}
+			if ed.ModeName() != "NORMAL" || tc.text(h) != before || !h.p.Editing() {
+				t.Fatal("the wheel changed the mode or the text")
+			}
+		})
+	}
+}
+
+// While a field is in insert or visual mode the wheel does nothing at all.
+func TestWheelIsIgnoredWhileAnEditorIsInInsertOrVisualMode(t *testing.T) {
+	for _, tc := range wheelCases() {
+		for _, mode := range []struct{ name, key, want string }{{"insert", "i", "INSERT"}, {"visual", "v", "VISUAL"}} {
+			t.Run(tc.name+"/"+mode.name, func(t *testing.T) {
+				h := newHarness(t)
+				tc.open(h)
+				tc.into(h)
+				h.key(mode.key)
+				ed := tc.ed(h)
+				if ed.ModeName() != mode.want {
+					t.Fatalf("mode = %q, want %q", ed.ModeName(), mode.want)
+				}
+				top := ed.Top()
+				row, col := ed.Cursor()
+				before := tc.text(h)
+				nSaves := len(h.saves())
+				h.wheel(true)
+				h.wheel(false)
+				h.wheel(true)
+				r2, c2 := ed.Cursor()
+				if ed.Top() != top || r2 != row || c2 != col {
+					t.Fatal("the wheel moved the view or the cursor of a field being typed into")
+				}
+				if ed.ModeName() != mode.want || tc.text(h) != before || len(h.saves()) != nSaves {
+					t.Fatal("the wheel changed the mode, the text or the saves")
+				}
+			})
+		}
+	}
+}
+
+// A cell being edited and the URL field in insert mode are left alone too.
+func TestWheelIsIgnoredWhileTheURLIsInInsertMode(t *testing.T) {
+	h := newHarness(t)
+	h.key("up", "A") // the URL field, insert mode
+	if !h.p.url.Typing() {
+		t.Fatal("setup: the URL field should be in insert mode")
+	}
+	before := h.p.url.Text()
+	h.wheel(true)
+	h.wheel(false)
+	if !h.p.url.Typing() || h.p.url.Text() != before || h.p.zone != zBar {
+		t.Fatal("the wheel disturbed the URL field")
+	}
+}
+
+// Editing is true exactly when a vim field has the cursor, in any mode.
+func TestEditingMeansAVimFieldHasTheCursor(t *testing.T) {
+	h := newHarness(t)
+	h.req.Scripts.PreRequest = &model.Script{Source: "a\nb"}
+	h.p.reloadAll()
+	h.gotoTab(tabPre)
+	if h.p.Editing() {
+		t.Fatal("Editing on the tab bar")
+	}
+	h.key("down")
+	if !h.p.Editing() {
+		t.Fatal("not Editing with the cursor in the editor (normal mode)")
+	}
+	h.key("i")
+	if !h.p.Editing() {
+		t.Fatal("not Editing in insert mode")
+	}
+	h.key("esc", "esc")
+	if h.p.Editing() {
+		t.Fatal("still Editing after leaving the editor")
+	}
+	h.key("up", "up", "A") // the tab bar, then the URL field
+	if !h.p.Editing() {
+		t.Fatal("not Editing in the URL field")
+	}
+}
+
+// ---- a click on another pane while typing ----------------------------------------
+
+// Clicking another pane while a field is in insert mode commits the edit: the
+// pane blurs, the pending change is written, and nothing typed is lost.
+func TestClickAwayFromAFieldInInsertModeSavesTheEdit(t *testing.T) {
+	// Row 2 of the screen is the pane title row: the sidebar title is at the
+	// left, the response title in the right column.
+	for _, target := range []struct {
+		name string
+		x    int
+	}{{"sidebar", 3}, {"response", 110}} {
+		t.Run(target.name, func(t *testing.T) {
+			r := newShellRig(t, "")
+			r.keys("g", "u", "A")
+			r.mustHave("INSERT")
+			for _, k := range []string{"z", "q"} {
+				r.keys(k)
+			}
+			r.send(tea.MouseClickMsg{X: target.x, Y: 2, Button: tea.MouseLeft})
+			r.pump(200 * time.Millisecond)
+			if strings.Contains(r.screen(), "INSERT") {
+				t.Fatal("the field is still in insert mode after the click")
+			}
+
+			st, err := store.Open(r.dir, store.WithSecretStore(store.NewMemorySecrets()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			ws, err := st.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var saved *model.Request
+			for _, req := range ws.Collections[0].Requests() {
+				if req.Name == "Create charge" {
+					saved = req
+				}
+			}
+			if saved == nil || !strings.HasSuffix(saved.URL.Raw, "zq") {
+				t.Fatal("the edit was not written when focus left the pane")
+			}
+
+			// Back in the pane the edit is still there, exactly once.
+			r.keys("2")
+			if got := strings.Count(r.screen(), "zq"); got != 1 {
+				t.Fatalf("the typed text shows %d times after coming back", got)
+			}
+		})
 	}
 }

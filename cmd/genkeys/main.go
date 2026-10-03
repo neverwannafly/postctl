@@ -482,7 +482,7 @@ func GenerateMarkdown() string {
 	b.WriteString("Mouse support is enabled by default. You can disable mouse events using the `--no-mouse` flag or by setting `POSTCTL_NO_MOUSE=1`.\n\n")
 	b.WriteString("- **Left click**: Focuses a pane, selects tabs or section headers, selects or toggles items in Collections, and activates switcher titles.\n")
 	b.WriteString("- **Tree open**: Clicking the selected row in Collections or double-clicking any row (within 400 ms) opens that request or problem.\n")
-	b.WriteString("- **Wheel scroll**: Scrolls the pane or tree under the cursor without moving focus.\n")
+	b.WriteString("- **Wheel scroll**: Scrolls the pane or tree under the cursor without moving focus. Over a script, body or message editor it scrolls the view (no edit, no mode change); while a field is in insert or visual mode, or a prompt or cell is open, it does nothing.\n")
 	b.WriteString("- **Text selection**: Native terminal text selection requires modifier keys when mouse tracking is active: **Shift-drag** in Ghostty and tmux, and **Option-drag** in iTerm2.\n")
 
 	return b.String()

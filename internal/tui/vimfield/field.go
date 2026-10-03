@@ -90,6 +90,13 @@ func maskGlyph(th ui.Theme) string {
 	return cluster
 }
 
+// ScrollLines scrolls the view by n lines (positive is down) without editing
+// or changing the mode: the wheel uses it. The cursor stays inside the view.
+func (f *Field) ScrollLines(n int) { f.m.ScrollLines(n) }
+
+// Top is the zero-based index of the first visible line.
+func (f *Field) Top() int { return f.m.Top() }
+
 // Cursor is the zero-based row and column of the cursor.
 func (f *Field) Cursor() (row, col int) { return f.m.Cursor() }
 

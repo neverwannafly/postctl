@@ -51,7 +51,7 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 | UX-V1 vimtext widget | GPT-5.6 Sol (medium) | Done, merged to main | ws/ux-v1-vimtext | 2026-10-03 20:08 IST |
 | UX-Q request switcher | Gemini 3.8 Flash (high) | Done, merged to main | ws/ux-q-switcher | 2026-10-03 19:06 IST |
 | UX-H1 history restore + diff | Composer 2.5 (fast), GPT-5.6 Sol | Done, merged | ws/ux-h1-history | 2026-10-03 20:16 IST |
-| UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | Review fixes done, ready to merge (gate green, not pushed) | ws/ux-v2a-request | 2026-10-03 21:12 IST |
+| UX-V2a request/WebSocket vim editing | Sonnet 5.5 (high) | M1 merged in, wheel fixed for vim fields; ready to merge (gate green, not pushed) | ws/ux-v2a-request | 2026-10-03 21:26 IST |
 | UX-V2b overlays/screens/lists vim | Composer 2.5 (fast) | Done, merged | ws/ux-v2b-screens | 2026-10-03 20:56 IST |
 | UX-M1 mouse | Gemini 3.8 Flash (high) | Done, merged | ws/ux-m1-mouse | 2026-10-03 21:08 IST |
 | UX-T tmux/terminal | Composer 2.5 (fast) | Done, merged | ws/ux-t-terminal | 2026-10-03 20:19 IST |
@@ -1167,3 +1167,13 @@ Append-only. Every agent (and the orchestrator) adds an entry when it **starts**
 - Follow-ups for M2: no wheel guard in the WebSocket pane while a field is editing; the tab rows' Y offsets are still constants; breakpoint and ASCII mouse tests are mostly geometric.
 - Process note: a reviewer ran its trial merge inside the M1 worktree (on a `trial` branch); the orchestrator discarded it before merging. Reviewer prompts must keep experiments in `/tmp` copies.
 - Tests: `task agents:check` green on main; `postctl --help` lists `--no-mouse`; `task tui:smoke` PASS.
+
+### 2026-10-03 21:26 IST · UX-V2a · Sonnet 5.5 · PROGRESS
+- Branch/worktree: `ws/ux-v2a-request` · `~/work/postctl-wt/ux-v2a-request`
+- Did: merged M1 (mouse) into the branch; only `docs/ledger.md` conflicted (all entries kept). M1's `request/mouse.go` called `update` on the old editors; the wheel now uses an additive `vimtext.Model.ScrollLines(n)` / `Top()` and `vimfield.Field.ScrollLines/Top` (Ctrl-e/Ctrl-y behaviour: moves the top line, pushes the cursor into the view, never edits, never changes the mode). Request pane: wheel scrolls a script, raw body or GraphQL query editor whether or not it has the cursor; it does nothing while the active field is in insert or visual mode or a method/confirm selector is open; lists move as before unless a cell is open. WebSocket pane (M1 follow-up): same guard, so the wheel no longer reaches `bodyKey`/`detailKey`/`logKey` while a field, the log search, the template name prompt or a cell is open; the composer scrolls with `ScrollLines` when the pointer is over it. `p.Editing()` is unchanged: true while any vim field has the cursor, in any mode (test added); the click-away path (`setFocus` to `Blur` and `BlurCmd`) saves the edit (test added).
+- Files: `internal/tui/vimtext/{render.go,scroll_lines_test.go}`, `internal/tui/vimfield/field.go`, `internal/tui/request/{mouse.go,mouse_test.go}`, `internal/tui/wspane/{mouse.go,mouse_test.go}`, `cmd/genkeys/main.go`, `docs/keys.md`.
+- Decisions: wheel step is 3 lines for editors, 1 row for lists. Normal mode counts as "not typing": the wheel scrolls the view and leaves the mode alone. Stub proofs (guard removed, then restored): request, 9 test cases fail; WebSocket, 9 cases fail; cell guard removed, `TestWheelIsIgnoredWhileACellIsOpen` fails.
+- Tests: new `TestScrollLines*` (vimtext), request `TestWheel*`, `TestEditingMeansAVimFieldHasTheCursor`, `TestClickAwayFromAFieldInInsertModeSavesTheEdit`, WebSocket `TestWheel*`; M1's `kv.beginEdit` call updated to the new signature.
+- Process note: while I worked, another session committed a trial merge on this branch and then reset it (`restore after accidental review-copy merge`); I redid the merge from a3ba9ae.
+- Blockers / questions: none.
+- Next: orchestrator review and merge.
